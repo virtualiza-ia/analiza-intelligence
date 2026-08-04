@@ -6,6 +6,10 @@ const dashboard = readFileSync(
   "components/manual-monthly-entry-dashboard.tsx",
   "utf8",
 );
+const readinessRoute = readFileSync(
+  "app/api/manual-submissions/readiness/route.ts",
+  "utf8",
+);
 const validation = readFileSync("lib/manual-submissions/validation.ts", "utf8");
 const migration = readFileSync(
   "supabase/migrations/20260804000200_manual_monthly_submissions.sql",
@@ -45,5 +49,16 @@ assert.match(migration, /unique \(organization_id, branch_id, business_line, per
 assert.match(migration, /status.*PUBLISHED/);
 assert.match(migration, /answers jsonb not null/);
 assert.match(migration, /created_by uuid not null/);
+
+for (const expected of [
+  "queryDatabase",
+  "to_regclass('public.manual_monthly_submissions')",
+  "Cache-Control",
+  "status: ready ? 200 : 503",
+]) {
+  assert.ok(readinessRoute.includes(expected));
+}
+
+assert.ok(!readinessRoute.includes("error.message"));
 
 console.log("Manual submission API checks passed.");

@@ -22,6 +22,10 @@ When the form context selects a branch, business line and month, it requests tha
 exact server history and restores an existing draft. A server error never falls
 back to browser storage for a productive write.
 
+`GET /api/manual-submissions/readiness` verifies database reachability and the
+three required tables without returning connection details. Deployment tooling
+must treat HTTP 503 as a failed rollout.
+
 ## Data lineage
 
 The canonical key is organization, branch, business line and month. Each version stores its validated answer payload, source type, quality score, actor and publication time. Later transformation jobs must reference the submission and version instead of reading browser state.
