@@ -4,7 +4,9 @@
 
 Users sign in with an assigned account. The UI shows `Crear cuenta`, but it is a controlled account-creation page that explains administrative provisioning. Public self-registration is not part of the product flow. Password recovery is available through Supabase Auth.
 
-For local exploration, use the DEMO admin account from the login page. DEMO access still requires an email and password configured by environment variables; it is not intended for production access and can be disabled with `ANALIZA_DISABLE_DEMO_ADMIN=true`.
+Access requires a PostgreSQL-backed account, an active profile, and an assigned
+role. The application does not provide public self-registration or a
+browser-controlled DEMO administrator session.
 
 ## Roles
 

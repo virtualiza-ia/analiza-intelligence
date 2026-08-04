@@ -2,9 +2,16 @@
 
 ## Authentication
 
-Supabase Auth is the authentication provider. The app supports login, password recovery, logout, secure sessions, and protected routes. Public self-registration must be disabled from the product flow.
+Authentication is local and server-side on PostgreSQL. Password hashes live in
+`app_auth.accounts`; opaque session-token hashes live in `app_auth.sessions`.
+Raw session tokens exist only in `HttpOnly`, `SameSite=Strict`, `Secure`
+cookies in production. Sessions expire after eight hours and logout revokes
+the corresponding database record.
 
-Local DEMO administrator access is available for exploration before real users are provisioned. It uses an HTTP-only cookie, is labeled DEMO, is disabled in Vercel production, and can be disabled locally with `ANALIZA_DISABLE_DEMO_ADMIN=true`.
+Five failed password attempts lock the account for fifteen minutes. Public
+self-registration is disabled. Automated password recovery remains disabled
+until a server-side email provider and single-use reset-token flow are
+configured; the UI fails closed and directs users to the superadministrator.
 
 ## Roles
 
@@ -43,6 +50,12 @@ RLS must enforce access by:
 - direct assignments
 
 Users only see assigned countries, companies, branches, and allowed consolidated views.
+
+The protected shell resolves the active role from `public.user_roles`. The
+sidebar does not accept role selection from `localStorage`, and every module
+route performs a server-side RBAC check. `super_admin` and the legacy
+`webmaster_admin` alias can access every module; other roles only access the
+modules explicitly assigned in `lib/navigation.ts`.
 
 Phase 1 adds RLS helper functions:
 

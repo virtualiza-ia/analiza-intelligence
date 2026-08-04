@@ -2,7 +2,8 @@
 
 ## System Shape
 
-Analiza Intelligence uses Next.js App Router as the web application layer and Supabase as the authentication, database, storage, and policy platform.
+Analiza Intelligence uses Next.js App Router as the web application layer and
+local PostgreSQL for authentication, application data, and policy enforcement.
 
 The expected hierarchy is:
 
@@ -44,8 +45,8 @@ Global filters are compressed into a context bar. Business line and country rema
 ## Application Layers
 
 - Web UI: Next.js App Router, server components by default, client components for forms and interaction.
-- Authentication: Supabase Auth with protected routes.
-- Authorization: PostgreSQL RLS using organization, country, company, branch, the four Analiza roles, and direct assignments.
+- Authentication: local PostgreSQL accounts with adaptive password hashes and opaque, individually revocable server-side sessions.
+- Authorization: server-side module RBAC plus PostgreSQL RLS using organization, country, company, branch, roles, and direct assignments.
 - Data ingestion: imports, templates, connectors, sync jobs, and raw records.
 - Analytics: dimensions, facts, KPI functions, and dashboard views.
 - Audit: immutable records for sensitive actions and data movement.
@@ -67,3 +68,13 @@ Connectors run only on the server. Browser code may initiate allowed actions, bu
 ## UI Boundary
 
 The UI should feel executive, professional, clean, responsive, accessible, and presentation-ready. It must avoid excessive gradients, unnecessary animation, misleading rankings, and metrics without data sufficiency.
+
+## Local Authentication Boundary
+
+- `app_auth.accounts` and `app_auth.sessions` are server-only.
+- The browser receives an opaque cookie; only its SHA-256 hash is persisted.
+- Password verification, failed-attempt locking, session creation, revocation,
+  and role resolution happen on the server.
+- The active role comes from `public.user_roles`; browser state cannot select
+  or elevate it.
+- Every protected module validates its required role before rendering.

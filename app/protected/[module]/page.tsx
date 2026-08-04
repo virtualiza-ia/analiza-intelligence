@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { BranchNetworkDashboard } from "@/components/branch-network-dashboard";
 import { BusinessModuleDashboard } from "@/components/business-module-dashboard";
@@ -21,6 +22,8 @@ import { ServicePortfolioDashboard } from "@/components/service-portfolio-dashbo
 import { Badge } from "@/components/ui/badge";
 import { moduleConfigs } from "@/lib/analytics/demo-business-modules";
 import { navigationItems } from "@/lib/navigation";
+import { canRoleAccessModule } from "@/lib/auth/rbac";
+import { requireAuthenticatedUser } from "@/lib/auth/session";
 
 type ModulePageProps = {
   params: Promise<{
@@ -42,12 +45,17 @@ export function generateStaticParams() {
 
 export default async function ModulePage({ params }: ModulePageProps) {
   const { module } = await params;
+  const user = await requireAuthenticatedUser();
   const item = navigationItems.find(
     (navigationItem) => navigationItem.href === `/protected/${module}`,
   );
 
   if (!item) {
     notFound();
+  }
+
+  if (!canRoleAccessModule(user.roleKey, module)) {
+    redirect("/protected?error=module-not-authorized");
   }
 
   const Icon = item.icon;

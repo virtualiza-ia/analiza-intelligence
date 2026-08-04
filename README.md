@@ -39,7 +39,7 @@ Phase 3 baseline plus the executive DEMO expansion is now in place:
 - RLS helper functions and policies
 - protected executive view selection by region/country, business unit, branch, and date range
 - `Crear cuenta` visible as controlled provisioning, without public self-registration
-- local `Admin DEMO` access for executive exploration without real credentials
+- local PostgreSQL authentication with server-side role enforcement
 - executive shell with collapsible sidebar
 - persistent context selector in the protected header
 - executive DEMO dashboard with KPI cards, charts, sources, insights, and financial/operational health by business
@@ -62,11 +62,8 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 
 Do not add service role keys to browser-exposed variables.
 
-Local DEMO admin access is enabled outside Vercel production so the app can be explored before real users are provisioned. To disable it locally:
-
-```env
-ANALIZA_DISABLE_DEMO_ADMIN=true
-```
+Authentication requires a provisioned PostgreSQL account, active profile, and
+role assignment. Public self-registration is disabled.
 
 Install dependencies if needed:
 
