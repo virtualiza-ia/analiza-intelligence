@@ -1,8 +1,6 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
-import { hasEnvVars } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,34 +31,24 @@ export function LoginForm({
     setError(null);
 
     try {
-      const demoResponse = await fetch("/auth/demo-admin", {
+      const loginResponse = await fetch("/auth/local", {
         body: JSON.stringify({ email, password }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
 
-      if (demoResponse.ok) {
+      if (loginResponse.ok) {
         router.push("/protected/context");
         router.refresh();
         return;
       }
 
-      if (!hasEnvVars) {
-        const demoPayload = (await demoResponse.json().catch(() => null)) as
-          | { error?: string }
-          | null;
-        throw new Error(
-          demoPayload?.error ?? "Usuario o contrasena incorrectos.",
-        );
-      }
-
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
-      router.push("/protected/context");
+      const loginPayload = (await loginResponse.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      throw new Error(
+        loginPayload?.error ?? "Usuario o contrasena incorrectos.",
+      );
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -124,8 +112,7 @@ export function LoginForm({
               </Link>
             </div>
             <div className="mt-4 rounded-md border bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">
-              Admin DEMO tambien requiere usuario y contrasena asignados. No se
-              puede entrar al panel solo con el link.
+              El acceso y los permisos se validan de forma segura en el servidor.
             </div>
           </form>
         </CardContent>

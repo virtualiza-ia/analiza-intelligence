@@ -20,17 +20,12 @@ export default function Page() {
           </div>
           <CardTitle>Crear cuenta</CardTitle>
           <CardDescription>
-            Para usuarios reales, el webmaster/administrador crea el acceso y
-            asigna uno de cuatro roles: Webmaster / Administrador, CEO, Gerente
-            de operaciones o Gerente de sucursal. Para probar ahora, usa Admin
-            DEMO.
+            El superadministrador crea el acceso, asigna el rol y define el
+            alcance autorizado. No existe registro publico.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3">
-            <Button asChild className="w-full">
-              <Link href="/auth/demo-admin">Entrar como Admin DEMO</Link>
-            </Button>
             <Button asChild className="w-full" variant="outline">
               <Link href="/auth/login">Volver al login</Link>
             </Button>

@@ -1,8 +1,19 @@
-import { updateSession } from "@/lib/supabase/proxy";
+import { localSessionCookieName } from "@/lib/auth/constants";
+import { NextResponse } from "next/server";
 import { type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
-  return await updateSession(request);
+  if (
+    request.nextUrl.pathname.startsWith("/protected") &&
+    !request.cookies.has(localSessionCookieName)
+  ) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/auth/login";
+    loginUrl.search = "";
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {

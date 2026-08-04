@@ -107,3 +107,22 @@ Executive DEMO expansion now also includes:
 - Complete E2E coverage.
 - Harden security.
 - Finalize Supabase and deployment guides.
+
+## Local Authentication And RBAC Hardening
+
+Implemented after the PostgreSQL migration:
+
+- server-only `app_auth.accounts` and `app_auth.sessions`
+- migration of existing compatible password hashes
+- unique opaque sessions with hashed tokens and database revocation
+- failed-login lockout
+- PostgreSQL role resolution
+- server-side protected-shell and per-module authorization
+- removal of browser-controlled DEMO role elevation
+- production cookie hardening
+
+Still required in a later security phase:
+
+- single-use password-reset tokens and approved email delivery
+- MFA for privileged accounts
+- scope-aware PostgreSQL repositories for every business query
