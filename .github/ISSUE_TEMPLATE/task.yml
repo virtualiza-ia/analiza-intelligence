@@ -1,0 +1,50 @@
+name: Implementation task
+description: Claim a scoped change before starting implementation
+title: "[Task]: "
+labels:
+  - task
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: State the observable result without including secrets or patient data.
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Owner
+      description: GitHub username or agreed agent identifier.
+    validations:
+      required: true
+  - type: input
+    id: branch
+    attributes:
+      label: Branch
+      placeholder: codex/owner/task
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Claimed paths and contracts
+      description: List likely files, modules, database objects, APIs, KPIs, or environment contracts.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and collision risks
+      description: Link related tasks and identify shared areas that require coordination.
+  - type: checkboxes
+    id: readiness
+    attributes:
+      label: Readiness
+      options:
+        - label: I checked the active workboard and found no uncoordinated overlap.
+          required: true
+        - label: I will use a dedicated branch and separate worktree.
+          required: true
+        - label: I will not include secrets, PII, or real patient data.
+          required: true

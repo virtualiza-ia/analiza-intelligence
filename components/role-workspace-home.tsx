@@ -1,0 +1,497 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  ClipboardList,
+  Clock3,
+} from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  getNavigationForRole,
+  navigationItems,
+} from "@/lib/navigation";
+import {
+  demoRoleProfiles,
+  roleKeys,
+  type RoleKey,
+} from "@/lib/tenant/demo-context";
+import { cn } from "@/lib/utils";
+
+const roleStorageKey = "analiza:demo-role";
+const roleChangeEvent = "analiza:role-change";
+
+type WorkspaceItem = {
+  title: string;
+  detail: string;
+  href: string;
+  tone: "critical" | "action" | "ok";
+};
+
+type WorkspaceConfig = {
+  badge: string;
+  title: string;
+  description: string;
+  primaryHref: string;
+  primaryLabel: string;
+  metrics: Array<{
+    label: string;
+    value: string;
+    note: string;
+  }>;
+  inbox: WorkspaceItem[];
+  shortcutHrefs: string[];
+};
+
+const adminWorkspace: WorkspaceConfig = {
+  badge: "Gobierno del sistema",
+  title: "Bandeja de trabajo del superadministrador",
+  description:
+    "Prioriza usuarios, conectores, calidad de datos y auditoria antes de entrar a dashboards densos.",
+  primaryHref: "/protected/usuarios-permisos",
+  primaryLabel: "Gestionar usuarios",
+  metrics: [
+    { label: "Usuarios", value: "Delegados", note: "por invitacion" },
+    { label: "Conectores", value: "Checklist", note: "por linea" },
+    { label: "Calidad", value: "Tickets", note: "con responsable" },
+  ],
+  inbox: [
+    {
+      title: "Validar permisos por alcance",
+      detail: "Revisar roles, pais, linea, area y sucursal antes de activar cuentas.",
+      href: "/protected/usuarios-permisos",
+      tone: "action",
+    },
+    {
+      title: "Conectores sin credenciales reales",
+      detail: "Mantener fallback manual hasta que CRM/LIS/RIS tengan endpoints aprobados.",
+      href: "/protected/conectores",
+      tone: "critical",
+    },
+    {
+      title: "Auditoria lista para revision",
+      detail: "Cambios de asignacion y carga mensual deben conservar historial.",
+      href: "/protected/auditoria",
+      tone: "ok",
+    },
+  ],
+  shortcutHrefs: [
+    "/protected/usuarios-permisos",
+    "/protected/conectores",
+    "/protected/calidad-datos",
+    "/protected/auditoria",
+  ],
+};
+
+const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
+  super_admin: adminWorkspace,
+  webmaster_admin: adminWorkspace,
+  ceo: {
+    badge: "Lectura ejecutiva",
+    title: "Bandeja de decisiones del CEO",
+    description:
+      "Empieza por salud del negocio, alertas criticas, metas pendientes y decisiones que requieren aprobacion.",
+    primaryHref: "/protected/overview",
+    primaryLabel: "Ver resumen ejecutivo",
+    metrics: [
+      { label: "Decisiones", value: "3", note: "requieren aprobacion" },
+      { label: "Riesgo", value: "1 critico", note: "margen laboratorio" },
+      { label: "Metas", value: "2", note: "pendientes CEO" },
+    ],
+    inbox: [
+      {
+        title: "Laboratorio crece, pero margen bajo presion",
+        detail: "Validar costo de reactivos y pruebas de bajo rendimiento antes de aprobar meta.",
+        href: "/protected/finanzas",
+        tone: "critical",
+      },
+      {
+        title: "Metas sugeridas pendientes",
+        detail: "AnaliA propone escenarios conservadores; el CEO define la meta final.",
+        href: "/protected/metas",
+        tone: "action",
+      },
+      {
+        title: "Sucursales con excepciones",
+        detail: "Ver top de sucursales que requieren accion, no el ranking completo.",
+        href: "/protected/sucursales",
+        tone: "ok",
+      },
+    ],
+    shortcutHrefs: [
+      "/protected/overview",
+      "/protected/finanzas",
+      "/protected/insights",
+      "/protected/metas",
+    ],
+  },
+  gerente_operaciones: {
+    badge: "Operacion por linea",
+    title: "Bandeja del gerente de operaciones",
+    description:
+      "Entra por cierres pendientes, sucursales con riesgo, capacidad, SLA y datos faltantes.",
+    primaryHref: "/protected/operacion",
+    primaryLabel: "Ver operacion ejecutiva",
+    metrics: [
+      { label: "Cierres pendientes", value: "5", note: "pendientes de validar" },
+      { label: "Sucursales", value: "4", note: "con riesgo operativo" },
+      { label: "Datos", value: "2", note: "bloqueos de calidad" },
+    ],
+    inbox: [
+      {
+        title: "Cierres mensuales incompletos",
+        detail: "Priorizar sucursales con campos obligatorios pendientes antes del dia 5.",
+        href: "/protected/plantillas",
+        tone: "critical",
+      },
+      {
+        title: "Capacidad perdida",
+        detail: "Detectar donde hay horas disponibles no convertidas en produccion.",
+        href: "/protected/capacidad",
+        tone: "action",
+      },
+      {
+        title: "Calidad de datos por revisar",
+        detail: "Resolver tickets de datos antes de usar insights predictivos.",
+        href: "/protected/calidad-datos",
+        tone: "ok",
+      },
+    ],
+    shortcutHrefs: [
+      "/protected/operacion",
+      "/protected/sucursales",
+      "/protected/plantillas",
+      "/protected/calidad-datos",
+    ],
+  },
+  gerente_area: {
+    badge: "Area operativa",
+    title: "Bandeja del gerente de area",
+    description:
+      "Supervisa sucursales asignadas, explicaciones pendientes, acciones por validar y metas de su area.",
+    primaryHref: "/protected/sucursales",
+    primaryLabel: "Ver mis sucursales",
+    metrics: [
+      { label: "Sucursales", value: "8", note: "en seguimiento" },
+      { label: "Acciones", value: "4", note: "requieren evidencia" },
+      { label: "Bonos", value: "2", note: "con bloqueo" },
+    ],
+    inbox: [
+      {
+        title: "Explicaciones pendientes por sucursal",
+        detail: "Pedir causa y accion a gerentes antes de cerrar el periodo.",
+        href: "/protected/sucursales",
+        tone: "critical",
+      },
+      {
+        title: "Bonos con revision",
+        detail: "Separar performance, bloqueo y coaching para evitar decisiones injustas.",
+        href: "/protected/gerentes",
+        tone: "action",
+      },
+      {
+        title: "Metas del area",
+        detail: "Comparar avance contra meta y periodo anterior.",
+        href: "/protected/metas",
+        tone: "ok",
+      },
+    ],
+    shortcutHrefs: [
+      "/protected/sucursales",
+      "/protected/gerentes",
+      "/protected/plantillas",
+      "/protected/metas",
+    ],
+  },
+  gerente_sucursal: {
+    badge: "Mi sucursal",
+    title: "Bandeja del gerente de sucursal",
+    description:
+      "Muestra solo lo que necesita completar o explicar: cierre mensual, metas, alertas y evidencias.",
+    primaryHref: "/protected/plantillas",
+    primaryLabel: "Completar cierre mensual",
+    metrics: [
+      { label: "Cierre", value: "33%", note: "DEMO completado" },
+      { label: "Pendientes", value: "6", note: "campos obligatorios" },
+      { label: "Alertas", value: "2", note: "requieren comentario" },
+    ],
+    inbox: [
+      {
+        title: "Completar cierre de julio",
+        detail: "Ingresar resultados, costos, capacidad y observaciones antes de publicar.",
+        href: "/protected/plantillas",
+        tone: "critical",
+      },
+      {
+        title: "Explicar variacion de ventas",
+        detail: "Agregar causa, evidencia y accion para que operaciones valide.",
+        href: "/protected/sucursales",
+        tone: "action",
+      },
+      {
+        title: "Revisar metas propias",
+        detail: "Ver avance de la sucursal y brecha contra meta del mes.",
+        href: "/protected/metas",
+        tone: "ok",
+      },
+    ],
+    shortcutHrefs: [
+      "/protected/plantillas",
+      "/protected/sucursales",
+      "/protected/metas",
+      "/protected/insights",
+    ],
+  },
+  usuario_operativo: {
+    badge: "Captura operativa",
+    title: "Bandeja del usuario operativo",
+    description:
+      "Enfoca la experiencia en completar datos asignados y resolver validaciones simples.",
+    primaryHref: "/protected/plantillas",
+    primaryLabel: "Abrir formulario",
+    metrics: [
+      { label: "Formulario", value: "Asignado", note: "por sucursal" },
+      { label: "Calidad", value: "En revision", note: "por gerente" },
+      { label: "Permisos", value: "Limitados", note: "sin gerencia" },
+    ],
+    inbox: [
+      {
+        title: "Capturar datos pendientes",
+        detail: "Completar solo campos autorizados de la sucursal asignada.",
+        href: "/protected/plantillas",
+        tone: "action",
+      },
+      {
+        title: "Corregir validaciones",
+        detail: "No publicar datos con campos obligatorios incompletos.",
+        href: "/protected/plantillas",
+        tone: "ok",
+      },
+    ],
+    shortcutHrefs: ["/protected/plantillas", "/protected/configuracion"],
+  },
+  viewer: {
+    badge: "Solo lectura",
+    title: "Bandeja de consulta",
+    description:
+      "Acceso reducido para leer informacion autorizada sin editar datos, usuarios ni permisos.",
+    primaryHref: "/protected/overview",
+    primaryLabel: "Ver resumen",
+    metrics: [
+      { label: "Acceso", value: "Lectura", note: "sin edicion" },
+      { label: "Alertas", value: "Visibles", note: "segun alcance" },
+      { label: "Cuenta", value: "Personal", note: "perfil propio" },
+    ],
+    inbox: [
+      {
+        title: "Consultar resumen autorizado",
+        detail: "Usar la lectura ejecutiva sin cambiar datos ni configuracion.",
+        href: "/protected/overview",
+        tone: "ok",
+      },
+    ],
+    shortcutHrefs: ["/protected/overview", "/protected/insights", "/protected/configuracion"],
+  },
+};
+
+function readActiveRole() {
+  if (typeof window === "undefined") {
+    return "super_admin";
+  }
+
+  const storedRole = window.localStorage.getItem(roleStorageKey);
+  return roleKeys.includes(storedRole as RoleKey)
+    ? (storedRole as RoleKey)
+    : "super_admin";
+}
+
+function toneClass(tone: WorkspaceItem["tone"]) {
+  if (tone === "critical") {
+    return "border-red-200 bg-red-50 text-red-900";
+  }
+
+  if (tone === "action") {
+    return "border-amber-200 bg-amber-50 text-amber-900";
+  }
+
+  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+}
+
+function toneIcon(tone: WorkspaceItem["tone"]) {
+  if (tone === "critical") {
+    return AlertTriangle;
+  }
+
+  if (tone === "action") {
+    return Clock3;
+  }
+
+  return CheckCircle2;
+}
+
+export function RoleWorkspaceHome() {
+  const [activeRole, setActiveRole] = useState<RoleKey>("super_admin");
+
+  useEffect(() => {
+    function refreshRole() {
+      setActiveRole(readActiveRole());
+    }
+
+    refreshRole();
+    window.addEventListener("storage", refreshRole);
+    window.addEventListener(roleChangeEvent, refreshRole);
+
+    return () => {
+      window.removeEventListener("storage", refreshRole);
+      window.removeEventListener(roleChangeEvent, refreshRole);
+    };
+  }, []);
+
+  const visibleNavigation = useMemo(
+    () => getNavigationForRole(activeRole),
+    [activeRole],
+  );
+  const workspace = workspaceByRole[activeRole];
+  const shortcutItems = workspace.shortcutHrefs
+    .map((href) => navigationItems.find((item) => item.href === href))
+    .filter((item): item is (typeof navigationItems)[number] => {
+      if (!item) {
+        return false;
+      }
+
+      return visibleNavigation.some((visible) => visible.href === item.href);
+    });
+
+  return (
+    <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
+      <div className="grid gap-4 xl:grid-cols-[1fr_340px] xl:items-end">
+        <div className="grid gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
+              Entorno DEMO
+            </Badge>
+            <Badge variant="outline">{workspace.badge}</Badge>
+          </div>
+          <div className="grid gap-2">
+            <h1 className="text-3xl font-semibold tracking-normal">
+              {workspace.title}
+            </h1>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+              {workspace.description}
+            </p>
+          </div>
+        </div>
+
+        <aside className="rounded-md border bg-card p-4 text-sm">
+          <div className="mb-2 font-medium">
+            {demoRoleProfiles[activeRole].label}
+          </div>
+          <p className="leading-6 text-muted-foreground">
+            {demoRoleProfiles[activeRole].accessSummary}
+          </p>
+          <div className="mt-3 text-xs text-muted-foreground">
+            {visibleNavigation.length} de {navigationItems.length} modulos visibles
+          </div>
+        </aside>
+      </div>
+
+      <section className="grid gap-3">
+        <div className="text-sm font-medium">Lectura en 10 segundos</div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {workspace.metrics.map((metric) => (
+            <article className="rounded-md border bg-card p-4" key={metric.label}>
+              <div className="text-sm text-muted-foreground">{metric.label}</div>
+              <div className="mt-2 text-2xl font-semibold tracking-normal">
+                {metric.value}
+              </div>
+              <Badge className="mt-3 bg-emerald-50 text-emerald-800 hover:bg-emerald-50">
+                {metric.note}
+              </Badge>
+            </article>
+          ))}
+          <article className="rounded-md border border-primary/30 bg-primary/5 p-4">
+            <div className="text-sm text-muted-foreground">Accion inicial</div>
+            <div className="mt-2 text-lg font-semibold tracking-normal">
+              {workspace.primaryLabel}
+            </div>
+            <p className="mt-3 text-xs leading-5 text-muted-foreground">
+              Entrar por la pantalla recomendada antes de abrir dashboards de
+              detalle.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <section className="rounded-md border bg-card p-4">
+          <div className="mb-4 flex items-center gap-2 text-sm font-medium">
+            <ClipboardList className="size-4 text-primary" />
+            Que necesita decidir o completar este rol ahora
+          </div>
+          <div className="grid gap-3">
+            {workspace.inbox.map((item) => {
+              const Icon = toneIcon(item.tone);
+
+              return (
+                <Link
+                  className={cn(
+                    "grid gap-2 rounded-md border p-4 transition-colors hover:bg-accent/40",
+                    toneClass(item.tone),
+                  )}
+                  href={item.href}
+                  key={item.title}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 font-medium">
+                      <Icon className="size-4" />
+                      {item.title}
+                    </div>
+                    <ArrowRight className="size-4" />
+                  </div>
+                  <p className="text-sm leading-6 opacity-80">{item.detail}</p>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+
+        <aside className="grid gap-4">
+          <div className="rounded-md border bg-card p-4">
+            <div className="mb-3 text-sm font-medium">Acceso recomendado</div>
+            <Button asChild className="w-full justify-between">
+              <Link href={workspace.primaryHref}>
+                {workspace.primaryLabel}
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
+
+          <div className="rounded-md border bg-card p-4">
+            <div className="mb-3 text-sm font-medium">Atajos por rol</div>
+            <div className="grid gap-2">
+              {shortcutItems.map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <Link
+                    className="flex h-10 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    href={item.href}
+                    key={item.href}
+                  >
+                    <Icon className="size-4" />
+                    {item.title}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
