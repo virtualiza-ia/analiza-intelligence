@@ -1,5 +1,5 @@
-import { readFileSync, statSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 const migrationPath = "supabase/migrations/20260720000100_phase1_core.sql";
 const seedPath = "supabase/seed.sql";
@@ -141,26 +141,27 @@ if (removedSignUpFormExists) {
   throw new Error("Public self-registration form must not exist.");
 }
 
-let signUpCalls = "";
-try {
-  signUpCalls = execFileSync(
-    "rg",
-    ["auth.signUp", "app", "components", "lib"],
-    { encoding: "utf8" },
-  );
-} catch (error) {
-  if (
-    typeof error !== "object" ||
-    error === null ||
-    !("status" in error) ||
-    error.status !== 1
-  ) {
-    throw error;
-  }
+function collectSourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return collectSourceFiles(path);
+    }
+    return /\.(ts|tsx|js|jsx|mjs)$/.test(entry.name) ? [path] : [];
+  });
 }
 
-if (signUpCalls.trim().length > 0) {
-  throw new Error(`Unexpected public self-registration behavior:\n${signUpCalls}`);
+const signUpCalls = ["app", "components", "lib"]
+  .flatMap(collectSourceFiles)
+  .flatMap((path) => {
+    const source = readFileSync(path, "utf8");
+    return source.includes("auth.signUp") ? [path] : [];
+  });
+
+if (signUpCalls.length > 0) {
+  throw new Error(
+    `Unexpected public self-registration behavior:\n${signUpCalls.join("\n")}`,
+  );
 }
 
 if (
