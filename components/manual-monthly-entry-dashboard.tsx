@@ -1460,11 +1460,6 @@ export function ManualMonthlyEntryDashboard() {
     });
   }
 
-  function persistHistory(entries: LocalManualMonthlySubmission[]) {
-    setLocalHistory(entries);
-    window.localStorage.setItem(manualHistoryStorageKey, JSON.stringify(entries));
-  }
-
   function buildSubmission(
     status: ManualMonthlySubmissionStatus,
   ): LocalManualMonthlySubmission | null {
@@ -1514,7 +1509,7 @@ export function ManualMonthlyEntryDashboard() {
     };
   }
 
-  function saveSubmission(status: ManualMonthlySubmissionStatus) {
+  async function saveSubmission(status: ManualMonthlySubmissionStatus) {
     if (!canUseManualForm) {
       setNotice("Selecciona una linea de negocio arriba para llenar el cierre mensual.");
       return;
@@ -1547,18 +1542,51 @@ export function ManualMonthlyEntryDashboard() {
       return;
     }
 
-    const nextHistory = [
-      submission,
-      ...localHistory.filter(
-        (entry) =>
-          `${entry.businessLine}|${entry.branch}|${entry.period}` !==
-          submissionKey,
-      ),
-    ];
-    persistHistory(nextHistory);
-    setNotice(
-      `${submission.status} guardado para ${submission.businessLine}, ${submission.branch}, ${submission.period}. Puntualidad: ${submission.deadlineStatus}.`,
-    );
+    if (!formValues.branch_reported?.trim()) {
+      setNotice("Selecciona una sucursal valida antes de guardar el cierre.");
+      return;
+    }
+
+    try {
+      const apiResponse = await fetch("/api/manual-submissions", {
+        body: JSON.stringify({
+          action: status === "Publicado DEMO" ? "publish" : "save",
+          answers: formValues,
+          branchId: formValues.branch_reported,
+          businessLine: activeLine,
+          period: submission.period,
+          qualityScore: submission.dataQualityScore,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const apiResult = (await apiResponse.json().catch(() => null)) as
+        | { error?: string; errors?: string[]; status?: string; version?: number }
+        | null;
+
+      if (!apiResponse.ok) {
+        const detail = apiResult?.errors?.join(" ") || apiResult?.error;
+        setNotice(detail || "No se pudo guardar el cierre en el servidor.");
+        return;
+      }
+
+      const nextHistory = [
+        submission,
+        ...localHistory.filter(
+          (entry) =>
+            `${entry.businessLine}|${entry.branch}|${entry.period}` !==
+            submissionKey,
+        ),
+      ];
+      setLocalHistory(nextHistory);
+      setNotice(
+        `${submission.status} persistido en servidor para ${submission.businessLine}, ${submission.branch}, ${submission.period}. Version ${apiResult?.version ?? 1}.`,
+      );
+    } catch {
+      setNotice(
+        "No se pudo contactar el servidor. El cierre no fue guardado y no se uso localStorage como fuente alternativa.",
+      );
+    }
   }
 
   function showPreviousStep() {
@@ -1766,7 +1794,7 @@ export function ManualMonthlyEntryDashboard() {
                       <ArrowRight className="size-4" />
                     </Button>
                     <Button
-                      onClick={() => saveSubmission("Borrador DEMO")}
+                      onClick={() => void saveSubmission("Borrador DEMO")}
                       type="button"
                       variant="secondary"
                     >
@@ -1774,7 +1802,7 @@ export function ManualMonthlyEntryDashboard() {
                       Guardar avance DEMO
                     </Button>
                     <Button
-                      onClick={() => saveSubmission("Publicado DEMO")}
+                      onClick={() => void saveSubmission("Publicado DEMO")}
                       type="button"
                     >
                       <CheckCircle2 className="size-4" />

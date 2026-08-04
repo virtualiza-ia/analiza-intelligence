@@ -54,7 +54,7 @@ Cuando el usuario tiene rol `gerente_sucursal`, la sucursal reportada, gerente d
 
 ## Historial
 
-En el prototipo, los cierres guardados por el formulario viven en `localStorage` bajo `analiza:manual-monthly-history` para demostrar la experiencia de uso. En produccion, este historial debe persistir en base de datos con:
+El historial DEMO heredado puede seguir leyendose desde `localStorage` bajo `analiza:manual-monthly-history`, pero los guardados y publicaciones productivos usan `/api/manual-submissions` con sesion autenticada y nunca vuelven a almacenamiento del navegador como fallback. El historial productivo persiste en base de datos con:
 
 - Organizacion, pais, empresa, linea de negocio, sucursal y periodo.
 - Usuario responsable, gerente de sucursal, gerente de area, rol, fecha de captura, fecha de publicacion y estado.
