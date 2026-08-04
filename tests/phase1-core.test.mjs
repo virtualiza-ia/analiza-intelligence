@@ -1,5 +1,5 @@
-import { readFileSync, statSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 const migrationPath = "supabase/migrations/20260720000100_phase1_core.sql";
 const seedPath = "supabase/seed.sql";
@@ -88,8 +88,8 @@ for (const country of countries) {
 
 const signUpPage = readFileSync("app/auth/sign-up/page.tsx", "utf8");
 const loginForm = readFileSync("components/login-form.tsx", "utf8");
-const demoAdminRoute = readFileSync("app/auth/demo-admin/route.ts", "utf8");
-const demoAdminHelper = readFileSync("lib/auth/demo-admin.ts", "utf8");
+const localAuthRoute = readFileSync("app/auth/local/route.ts", "utf8");
+const localSession = readFileSync("lib/auth/session.ts", "utf8");
 const removedSignUpFormExists = (() => {
   try {
     statSync("components/sign-up-form.tsx");
@@ -99,8 +99,8 @@ const removedSignUpFormExists = (() => {
   }
 })();
 
-if (!signUpPage.includes("Crear cuenta")) {
-  throw new Error("Controlled account creation page should say Crear cuenta.");
+if (!signUpPage.includes("Activa tu cuenta") || !signUpPage.includes("getInvitationPreview")) {
+  throw new Error("Invitation-only account activation page is missing.");
 }
 
 for (const requiredRoleText of [
@@ -121,46 +121,47 @@ if (!loginForm.includes("Crear cuenta")) {
   throw new Error("Login form should link to controlled account creation.");
 }
 
-if (!loginForm.includes("Admin DEMO tambien requiere usuario y contrasena")) {
-  throw new Error("Login form should expose controlled DEMO admin access.");
+if (!loginForm.includes('fetch("/auth/local"')) {
+  throw new Error("Login form should use local server-side authentication.");
 }
 
-if (!demoAdminRoute.includes("getDemoAdminPassword")) {
-  throw new Error("DEMO admin route should require configured credentials.");
+if (!localAuthRoute.includes("authenticatePassword")) {
+  throw new Error("Local auth route should verify password hashes.");
 }
 
-if (!demoAdminRoute.includes("demoAdminCookieName")) {
-  throw new Error("DEMO admin route should set a local demo session cookie.");
+if (!localAuthRoute.includes("localSessionCookieName")) {
+  throw new Error("Local auth route should set an individual session cookie.");
 }
 
-if (!demoAdminHelper.includes("VERCEL_ENV !== \"production\"")) {
-  throw new Error("DEMO admin helper must disable demo access in production.");
+if (!localSession.includes("hashSessionToken")) {
+  throw new Error("Local sessions should persist only a token hash.");
 }
 
 if (removedSignUpFormExists) {
   throw new Error("Public self-registration form must not exist.");
 }
 
-let signUpCalls = "";
-try {
-  signUpCalls = execFileSync(
-    "rg",
-    ["auth.signUp", "app", "components", "lib"],
-    { encoding: "utf8" },
-  );
-} catch (error) {
-  if (
-    typeof error !== "object" ||
-    error === null ||
-    !("status" in error) ||
-    error.status !== 1
-  ) {
-    throw error;
-  }
+function collectSourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return collectSourceFiles(path);
+    }
+    return /\.(ts|tsx|js|jsx|mjs)$/.test(entry.name) ? [path] : [];
+  });
 }
 
-if (signUpCalls.trim().length > 0) {
-  throw new Error(`Unexpected public self-registration behavior:\n${signUpCalls}`);
+const signUpCalls = ["app", "components", "lib"]
+  .flatMap(collectSourceFiles)
+  .flatMap((path) => {
+    const source = readFileSync(path, "utf8");
+    return source.includes("auth.signUp") ? [path] : [];
+  });
+
+if (signUpCalls.length > 0) {
+  throw new Error(
+    `Unexpected public self-registration behavior:\n${signUpCalls.join("\n")}`,
+  );
 }
 
 if (

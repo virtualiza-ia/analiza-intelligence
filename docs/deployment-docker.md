@@ -68,7 +68,7 @@ docker compose --env-file .env.docker up -d
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: llave publica/anon de Supabase.
 - `OPENAI_API_KEY`: llave server-only para AnaliA.
 - `ANALIA_OPENAI_MODEL`: modelo usado por AnaliA.
-- `ANALIZA_DISABLE_DEMO_ADMIN`: en produccion debe estar en `true`.
+- `DATABASE_URL`: conexion server-only a PostgreSQL; nunca debe exponerse al navegador.
 - `APP_PORT`: puerto publico del servidor.
 - `DOCKER_IMAGE`: nombre de imagen para Docker Hub.
 

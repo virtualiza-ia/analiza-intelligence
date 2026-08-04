@@ -1,53 +1,21 @@
 import { AuthButton } from "@/components/auth-button";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TenantContextHeader } from "@/components/tenant-context-header";
-import {
-  demoAdminCookieName,
-  hasDemoAdminCookie,
-} from "@/lib/auth/demo-admin";
-import { createClient } from "@/lib/supabase/server";
-import { hasEnvVars } from "@/lib/utils";
-import { cookies } from "next/headers";
+import { requireAuthenticatedUser } from "@/lib/auth/session";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
-
-async function requireProtectedAccess() {
-  const cookieStore = await cookies();
-  const hasDemoAdminSession = hasDemoAdminCookie(
-    cookieStore.get(demoAdminCookieName)?.value,
-  );
-
-  if (hasDemoAdminSession) {
-    return;
-  }
-
-  if (!hasEnvVars) {
-    redirect("/auth/login");
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims().catch(() => ({
-    data: null,
-    error: new Error("Supabase claims unavailable"),
-  }));
-
-  if (error || !data?.claims) {
-    redirect("/auth/login");
-  }
-}
 
 async function ProtectedShell({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireProtectedAccess();
+  const user = await requireAuthenticatedUser();
 
   return (
     <main className="min-h-screen bg-muted/30">
       <div className="flex min-h-screen w-full">
-        <AppSidebar roleKey="super_admin" />
+        <AppSidebar roleKey={user.roleKey} />
         <div className="flex min-w-0 flex-1 flex-col">
           <nav className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
             <div className="flex min-h-16 w-full flex-col gap-3 px-4 py-3 text-sm lg:flex-row lg:items-start lg:justify-between lg:px-5">
@@ -59,7 +27,7 @@ async function ProtectedShell({
               </Link>
               <TenantContextHeader />
               <Suspense>
-                <AuthButton />
+                <AuthButton user={user} />
               </Suspense>
             </div>
           </nav>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -18,13 +18,9 @@ import {
 } from "@/lib/navigation";
 import {
   demoRoleProfiles,
-  roleKeys,
   type RoleKey,
 } from "@/lib/tenant/demo-context";
 import { cn } from "@/lib/utils";
-
-const roleStorageKey = "analiza:demo-role";
-const roleChangeEvent = "analiza:role-change";
 
 type WorkspaceItem = {
   title: string;
@@ -299,17 +295,6 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
   },
 };
 
-function readActiveRole() {
-  if (typeof window === "undefined") {
-    return "super_admin";
-  }
-
-  const storedRole = window.localStorage.getItem(roleStorageKey);
-  return roleKeys.includes(storedRole as RoleKey)
-    ? (storedRole as RoleKey)
-    : "super_admin";
-}
-
 function toneClass(tone: WorkspaceItem["tone"]) {
   if (tone === "critical") {
     return "border-red-200 bg-red-50 text-red-900";
@@ -334,29 +319,12 @@ function toneIcon(tone: WorkspaceItem["tone"]) {
   return CheckCircle2;
 }
 
-export function RoleWorkspaceHome() {
-  const [activeRole, setActiveRole] = useState<RoleKey>("super_admin");
-
-  useEffect(() => {
-    function refreshRole() {
-      setActiveRole(readActiveRole());
-    }
-
-    refreshRole();
-    window.addEventListener("storage", refreshRole);
-    window.addEventListener(roleChangeEvent, refreshRole);
-
-    return () => {
-      window.removeEventListener("storage", refreshRole);
-      window.removeEventListener(roleChangeEvent, refreshRole);
-    };
-  }, []);
-
+export function RoleWorkspaceHome({ roleKey }: { roleKey: RoleKey }) {
   const visibleNavigation = useMemo(
-    () => getNavigationForRole(activeRole),
-    [activeRole],
+    () => getNavigationForRole(roleKey),
+    [roleKey],
   );
-  const workspace = workspaceByRole[activeRole];
+  const workspace = workspaceByRole[roleKey];
   const shortcutItems = workspace.shortcutHrefs
     .map((href) => navigationItems.find((item) => item.href === href))
     .filter((item): item is (typeof navigationItems)[number] => {
@@ -389,10 +357,10 @@ export function RoleWorkspaceHome() {
 
         <aside className="rounded-md border bg-card p-4 text-sm">
           <div className="mb-2 font-medium">
-            {demoRoleProfiles[activeRole].label}
+            {demoRoleProfiles[roleKey].label}
           </div>
           <p className="leading-6 text-muted-foreground">
-            {demoRoleProfiles[activeRole].accessSummary}
+            {demoRoleProfiles[roleKey].accessSummary}
           </p>
           <div className="mt-3 text-xs text-muted-foreground">
             {visibleNavigation.length} de {navigationItems.length} modulos visibles

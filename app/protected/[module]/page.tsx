@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { BranchNetworkDashboard } from "@/components/branch-network-dashboard";
 import { BusinessModuleDashboard } from "@/components/business-module-dashboard";
@@ -18,9 +19,13 @@ import { PatientFlowDemandDashboard } from "@/components/patient-flow-demand-das
 import { PhysiotherapyPresentationDashboard } from "@/components/physiotherapy-presentation-dashboard";
 import { ProfessionalPerformanceDashboard } from "@/components/professional-performance-dashboard";
 import { ServicePortfolioDashboard } from "@/components/service-portfolio-dashboard";
+import { UserManagementDashboard } from "@/components/user-management-dashboard";
 import { Badge } from "@/components/ui/badge";
 import { moduleConfigs } from "@/lib/analytics/demo-business-modules";
 import { navigationItems } from "@/lib/navigation";
+import { canRoleAccessModule } from "@/lib/auth/rbac";
+import { requireAuthenticatedUser } from "@/lib/auth/session";
+import { getUserManagementData } from "@/lib/auth/user-management";
 
 type ModulePageProps = {
   params: Promise<{
@@ -42,12 +47,17 @@ export function generateStaticParams() {
 
 export default async function ModulePage({ params }: ModulePageProps) {
   const { module } = await params;
+  const user = await requireAuthenticatedUser();
   const item = navigationItems.find(
     (navigationItem) => navigationItem.href === `/protected/${module}`,
   );
 
   if (!item) {
     notFound();
+  }
+
+  if (!canRoleAccessModule(user.roleKey, module)) {
+    redirect("/protected?error=module-not-authorized");
   }
 
   const Icon = item.icon;
@@ -126,6 +136,10 @@ export default async function ModulePage({ params }: ModulePageProps) {
 
   if (module === "finanzas") {
     return <FinancialHealthDashboard />;
+  }
+
+  if (module === "usuarios-permisos") {
+    return <UserManagementDashboard data={await getUserManagementData(user)} />;
   }
 
   if (moduleConfigs[module]) {

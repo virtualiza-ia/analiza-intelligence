@@ -2,9 +2,18 @@
 
 ## Authentication
 
-Supabase Auth is the authentication provider. The app supports login, password recovery, logout, secure sessions, and protected routes. Public self-registration must be disabled from the product flow.
+Authentication is local and server-side on PostgreSQL. Password hashes live in
+`app_auth.accounts`; opaque session-token hashes live in `app_auth.sessions`.
+Raw session tokens exist only in `HttpOnly`, `SameSite=Strict`, `Secure`
+cookies in production. Sessions expire after eight hours and logout revokes
+the corresponding database record.
 
-Local DEMO administrator access is available for exploration before real users are provisioned. It uses an HTTP-only cookie, is labeled DEMO, is disabled in Vercel production, and can be disabled locally with `ANALIZA_DISABLE_DEMO_ADMIN=true`.
+Five failed password attempts lock the account for fifteen minutes. Public
+self-registration is disabled. Accounts are created from seven-day,
+single-use invitation tokens. Passwords require at least twelve characters,
+upper- and lowercase letters, a number, and a symbol. Password recovery uses
+server-only SMTP and a thirty-minute, single-use token; completing recovery
+revokes every active session for the account.
 
 ## Roles
 
@@ -44,6 +53,12 @@ RLS must enforce access by:
 
 Users only see assigned countries, companies, branches, and allowed consolidated views.
 
+The protected shell resolves the active role from `public.user_roles`. The
+sidebar does not accept role selection from `localStorage`, and every module
+route performs a server-side RBAC check. `super_admin` and the legacy
+`webmaster_admin` alias can access every module; other roles only access the
+modules explicitly assigned in `lib/navigation.ts`.
+
 Phase 1 adds RLS helper functions:
 
 - `current_user_is_super_admin`
@@ -72,6 +87,13 @@ The delegation migration adds these controls:
 - `current_user_can_manage_delegated_scope`
 
 User creation is invitation-only. The platform must not ask administrators to set a manual password for another user. An invited account stays pending until accepted.
+
+The invitation API derives the actor role, organization, and delegated scope
+from the authenticated server session. Client payloads may describe only the
+target role and scope. Acceptance creates the identity, profile, password
+account, and role assignment in one database transaction. Invitation and
+password-reset tables store only SHA-256 token hashes; raw tokens exist only in
+the email link.
 
 Users and managers are deactivated with soft delete fields and history, not physical deletion. If a manager owns branches or subordinates, the system must request reassignment before finalizing the deactivation.
 

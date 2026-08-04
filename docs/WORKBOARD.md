@@ -15,6 +15,7 @@ This board prevents overlapping work while GitHub issues and pull requests remai
 | Issue | Task | Owner | Branch | Claimed paths or contracts | Status |
 | --- | --- | --- | --- | --- | --- |
 | — | Repository collaboration controls | Primary Codex | `codex/primary/collaboration-controls` | `AGENTS.md`, `.github/`, `docs/WORKBOARD.md`, `docs/collaboration-workflow.md` | In review |
+| [#1](https://github.com/virtualiza-ia/analiza-intelligence/issues/1) | PostgreSQL authentication, RBAC, and secure user lifecycle | Codex Alberto | `codex/alberto/auth-rbac` | `app/auth/`, `app/api/users/`, `app/protected/`, authentication, user-management and navigation components, `lib/auth/`, `lib/db/`, server-only mail and user-lifecycle services, `lib/navigation.ts`, `proxy.ts`, `supabase/migrations/`, dependency and environment contracts, auth documentation and tests | In progress |
 
 Allowed statuses: `Planned`, `In progress`, `Blocked`, `In review`.
 
