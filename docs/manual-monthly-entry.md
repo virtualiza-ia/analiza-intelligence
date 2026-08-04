@@ -56,6 +56,8 @@ Cuando el usuario tiene rol `gerente_sucursal`, la sucursal reportada, gerente d
 
 El historial DEMO heredado puede seguir leyendose desde `localStorage` bajo `analiza:manual-monthly-history`, pero los guardados y publicaciones productivos usan `/api/manual-submissions` con sesion autenticada y nunca vuelven a almacenamiento del navegador como fallback. El historial productivo persiste en base de datos con:
 
+Al seleccionar sucursal, linea y periodo, el formulario consulta el historial autorizado del servidor y recupera automaticamente el borrador activo si existe. La consulta acepta filtros exactos y devuelve un maximo de 50 versiones activas dentro del alcance del usuario.
+
 - Organizacion, pais, empresa, linea de negocio, sucursal y periodo.
 - Usuario responsable, gerente de sucursal, gerente de area, rol, fecha de captura, fecha de publicacion y estado.
 - Version activa, version anterior, motivo de reemplazo y auditoria.

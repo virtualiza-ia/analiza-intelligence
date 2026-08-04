@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const route = readFileSync("app/api/manual-submissions/route.ts", "utf8");
+const dashboard = readFileSync(
+  "components/manual-monthly-entry-dashboard.tsx",
+  "utf8",
+);
 const validation = readFileSync("lib/manual-submissions/validation.ts", "utf8");
 const migration = readFileSync(
   "supabase/migrations/20260804000200_manual_monthly_submissions.sql",
@@ -14,8 +18,18 @@ for (const expected of [
   "Sucursal fuera de tu alcance",
   "manual_monthly_submission_versions",
   "manual_monthly_submission_events",
+  "export async function GET",
+  "limit 50",
 ]) {
   assert.match(route, new RegExp(expected));
+}
+
+for (const expected of [
+  "ProductiveManualSubmission",
+  "Borrador productivo recuperado",
+  "/api/manual-submissions?${query.toString()}",
+]) {
+  assert.ok(dashboard.includes(expected));
 }
 
 for (const expected of [

@@ -26,6 +26,111 @@ type SubmissionRow = {
   status: string;
 };
 
+type ManualSubmissionListRow = {
+  answers: Record<string, string>;
+  branch_id: string;
+  branch_name: string;
+  business_line: string;
+  created_at: string;
+  id: string;
+  period: string;
+  quality_score: number;
+  status: string;
+  updated_at: string;
+  version_number: number;
+};
+
+export async function GET(request: Request) {
+  const user = await getAuthenticatedUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Sesion requerida." }, { status: 401 });
+  }
+
+  const url = new URL(request.url);
+  const branchId = url.searchParams.get("branchId");
+  const businessLine = url.searchParams.get("businessLine");
+  const period = url.searchParams.get("period");
+
+  if (
+    (branchId &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        branchId,
+      )) ||
+    (businessLine && !["Laboratorio", "Fisioterapia", "Imagenes"].includes(businessLine)) ||
+    (period && !/^\d{4}-(0[1-9]|1[0-2])$/.test(period))
+  ) {
+    return NextResponse.json({ error: "Filtros invalidos." }, { status: 400 });
+  }
+
+  const result = await withDatabaseTransaction(async (client) =>
+    client.query<ManualSubmissionListRow>(
+      `select
+         s.id, s.branch_id, b.name as branch_name, s.business_line,
+         to_char(s.period, 'YYYY-MM') as period, s.status,
+         to_char(s.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as updated_at,
+         v.version_number, v.answers, v.quality_score,
+         to_char(v.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at
+       from public.manual_monthly_submissions s
+       join public.branches b on b.id = s.branch_id
+       join public.profiles p on p.id = $1 and p.organization_id = s.organization_id
+       join public.manual_monthly_submission_versions v
+         on v.submission_id = s.id and v.version_number = s.active_version
+       where ($3::uuid is null or s.branch_id = $3)
+         and ($4::text is null or s.business_line = $4)
+         and ($5::date is null or s.period = $5)
+         and exists (
+           select 1
+           from public.user_roles ur
+           join public.roles r on r.id = ur.role_id
+           where ur.user_id = $1
+             and r.key = $2
+             and ur.organization_id = s.organization_id
+             and coalesce(ur.status, 'active') = 'active'
+             and (
+               r.key in ('super_admin', 'webmaster_admin', 'ceo')
+               or (r.key = 'gerente_operaciones' and (ur.company_id is null or ur.company_id = s.company_id))
+               or (r.key = 'gerente_area' and ur.operational_area_id = b.operational_area_id)
+               or ur.branch_id = s.branch_id
+               or exists (
+                 select 1 from public.user_branch_access uba
+                 where uba.user_id = $1 and uba.branch_id = s.branch_id
+               )
+               or exists (
+                 select 1 from public.user_company_access uca
+                 where uca.user_id = $1 and uca.company_id = s.company_id
+               )
+             )
+         )
+       order by s.period desc, s.updated_at desc
+       limit 50`,
+      [
+        user.userId,
+        user.roleKey,
+        branchId,
+        businessLine,
+        period ? `${period}-01` : null,
+      ],
+    ),
+  );
+
+  return NextResponse.json({
+    submissions: result.rows.map((row) => ({
+      answers: row.answers,
+      branchId: row.branch_id,
+      branchName: row.branch_name,
+      businessLine: row.business_line,
+      createdAt: row.created_at,
+      id: row.id,
+      period: row.period,
+      qualityScore: row.quality_score,
+      status: row.status,
+      updatedAt: row.updated_at,
+      version: row.version_number,
+    })),
+  });
+}
+
 export async function POST(request: Request) {
   const user = await getAuthenticatedUser();
 

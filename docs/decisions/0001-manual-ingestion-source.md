@@ -8,14 +8,19 @@ Accepted for the interim production phase.
 
 Monthly forms enter the same versioned ingestion boundary that future official connectors will use. PostgreSQL is the source of truth. Browser `localStorage` may render legacy DEMO history but must never acknowledge a productive save or publication.
 
-The first server boundary is `POST /api/manual-submissions`:
+The server boundary is `/api/manual-submissions`:
 
 - `save` persists a draft;
 - `publish` revalidates all required fields and requires quality score 70 or higher;
+- `GET` returns at most 50 active versions filtered by branch, business line and period;
 - branch access is derived from the authenticated account and database assignments;
 - published versions are immutable;
 - corrections create a higher version;
 - every successful write creates an audit event.
+
+When the form context selects a branch, business line and month, it requests that
+exact server history and restores an existing draft. A server error never falls
+back to browser storage for a productive write.
 
 ## Data lineage
 
@@ -27,7 +32,6 @@ The API rejects unauthenticated users, read-only roles, out-of-scope branches, e
 
 ## Follow-up
 
-- Add authenticated GET endpoints for server-backed history and draft recovery.
 - Add database integration tests against disposable PostgreSQL.
 - Add attachment upload, validation and malware scanning.
 - Publish normalized facts from approved versions.

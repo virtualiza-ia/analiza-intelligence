@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -73,6 +73,19 @@ type StoredContext = {
 
 type LocalManualMonthlySubmission = ManualMonthlyHistoryEntry & {
   answers: Record<string, string>;
+};
+
+type ProductiveManualSubmission = {
+  answers: Record<string, string>;
+  branchId: string;
+  branchName: string;
+  businessLine: ImportBusinessLine;
+  id: string;
+  period: string;
+  qualityScore: number;
+  status: "DRAFT" | "PUBLISHED";
+  updatedAt: string;
+  version: number;
 };
 
 type ManualMetricCardProps = {
@@ -1275,6 +1288,7 @@ export function ManualMonthlyEntryDashboard() {
   const [notice, setNotice] = useState(
     "El formulario mensual sera la via manual principal mientras no haya conectores.",
   );
+  const recoveredDraftKey = useRef("");
 
   useEffect(() => {
     function refreshContext() {
@@ -1348,6 +1362,72 @@ export function ManualMonthlyEntryDashboard() {
     );
     setActiveStepIndex(0);
   }, [activeLine, activeRole, branchOptions, context]);
+
+  useEffect(() => {
+    const branchId = formValues.branch_reported;
+    const period = formValues.period;
+
+    if (activeLine === "Consolidado" || !branchId || !period) {
+      return;
+    }
+
+    const recoveryKey = `${activeLine}|${branchId}|${period}`;
+
+    if (recoveredDraftKey.current === recoveryKey) {
+      return;
+    }
+
+    recoveredDraftKey.current = recoveryKey;
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      branchId,
+      businessLine: activeLine,
+      period,
+    });
+
+    void fetch(`/api/manual-submissions?${query.toString()}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string; submissions?: ProductiveManualSubmission[] }
+          | null;
+
+        if (!response.ok) {
+          if (response.status !== 401) {
+            setNotice(payload?.error || "No se pudo consultar el historial productivo.");
+          }
+          return;
+        }
+
+        const draft = payload?.submissions?.find(
+          (submission) => submission.status === "DRAFT",
+        );
+
+        if (!draft) {
+          return;
+        }
+
+        setFormValues((currentValue) => ({
+          ...currentValue,
+          ...draft.answers,
+          branch_reported: draft.branchId,
+          period: draft.period,
+        }));
+        setNotice(
+          `Borrador productivo recuperado: ${draft.branchName}, ${draft.period}, version ${draft.version}.`,
+        );
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setNotice("No se pudo contactar el servidor para recuperar borradores.");
+      });
+
+    return () => controller.abort();
+  }, [activeLine, formValues.branch_reported, formValues.period]);
 
   const allFields = useMemo(
     () => formSteps.flatMap((step) => step.fields),
@@ -1579,8 +1659,11 @@ export function ManualMonthlyEntryDashboard() {
         ),
       ];
       setLocalHistory(nextHistory);
+      const persistedStatus = apiResult?.status === "PUBLISHED"
+        ? "Cierre publicado"
+        : "Borrador guardado";
       setNotice(
-        `${submission.status} persistido en servidor para ${submission.businessLine}, ${submission.branch}, ${submission.period}. Version ${apiResult?.version ?? 1}.`,
+        `${persistedStatus} en servidor para ${submission.businessLine}, ${submission.branch}, ${submission.period}. Version ${apiResult?.version ?? 1}.`,
       );
     } catch {
       setNotice(
@@ -1799,14 +1882,14 @@ export function ManualMonthlyEntryDashboard() {
                       variant="secondary"
                     >
                       <Save className="size-4" />
-                      Guardar avance DEMO
+                      Guardar borrador
                     </Button>
                     <Button
                       onClick={() => void saveSubmission("Publicado DEMO")}
                       type="button"
                     >
                       <CheckCircle2 className="size-4" />
-                      Publicar cierre DEMO
+                      Publicar cierre
                     </Button>
                   </div>
                 </div>
