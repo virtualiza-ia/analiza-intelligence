@@ -15,7 +15,8 @@ The server boundary is `/api/manual-submissions`:
 - `GET` returns at most 50 active versions filtered by branch, business line and period;
 - branch access is derived from the authenticated account and database assignments;
 - published versions are immutable;
-- corrections create a higher version;
+- only an authenticated `super_admin` or `webmaster_admin` can replace a
+  published closure, and the correction creates a higher version;
 - every successful write creates an audit event.
 
 When the form context selects a branch, business line and month, it requests that
@@ -25,6 +26,10 @@ back to browser storage for a productive write.
 `GET /api/manual-submissions/readiness` verifies database reachability and the
 three required tables without returning connection details. Deployment tooling
 must treat HTTP 503 as a failed rollout.
+
+Productive history and legacy DEMO history are rendered separately. Only
+server-backed records can affect productive counts, draft recovery and checks
+for an already-published closure.
 
 ## Data lineage
 

@@ -58,6 +58,8 @@ El historial DEMO heredado puede seguir leyendose desde `localStorage` bajo `ana
 
 Al seleccionar sucursal, linea y periodo, el formulario consulta el historial autorizado del servidor y recupera automaticamente el borrador activo si existe. La consulta acepta filtros exactos y devuelve un maximo de 50 versiones activas dentro del alcance del usuario.
 
+La interfaz presenta el historial productivo en una tabla independiente con estado, version, calidad y fecha de actualizacion. Los ejemplos heredados permanecen en una seccion marcada como `DEMO`; no participan en conteos productivos, deteccion de publicaciones previas ni confirmaciones de guardado.
+
 - Organizacion, pais, empresa, linea de negocio, sucursal y periodo.
 - Usuario responsable, gerente de sucursal, gerente de area, rol, fecha de captura, fecha de publicacion y estado.
 - Version activa, version anterior, motivo de reemplazo y auditoria.
@@ -70,7 +72,7 @@ Al seleccionar sucursal, linea y periodo, el formulario consulta el historial au
 
 - No se deben capturar nombres, telefonos, documentos ni datos clinicos identificables de pacientes.
 - No se publica un cierre si faltan campos obligatorios.
-- Un cierre publicado solo puede reemplazarse con autorizacion de administrador.
+- Un cierre publicado solo puede reemplazarlo en el servidor un usuario con rol `super_admin` o `webmaster_admin`; los codigos ingresados en el navegador no conceden permisos.
 - La carga tardia queda marcada como penalizacion DEMO para score, disciplina y bono sugerido.
 - La evaluacion 360 debe guardarse como senal anonima y cualitativa; no debe exponer colaboradores ni usarse para represalias.
 - Si el score de calidad automatico baja de 70%, el cierre debe quedar bloqueado o marcado con advertencia.
