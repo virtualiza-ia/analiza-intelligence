@@ -255,7 +255,7 @@ for (const requiredContextText of [
 }
 
 for (const requiredUserUiText of [
-  "Invitar usuario DEMO",
+  "Invitar usuario",
   "Selecciona la gerencia de area",
   "Selecciona la sucursal",
   "Pendiente invitacion",

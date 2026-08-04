@@ -119,7 +119,16 @@ The DEMO module pages now include structured panels for:
 
 `Mi cuenta` is for profile, password recovery, preferences, and user-level settings. System-wide configuration remains an admin-only responsibility.
 
-Users are created by invitation. The system should not email manual passwords; each invited user creates their own password through the Auth provider. Only Webmaster / Administrador can create global users or change global roles. Gerente de operaciones can invite lower roles inside its scope and validate branch submissions for the business line. Gerente de sucursal can only work inside the assigned branch.
+Users are created by invitation. The system should not email manual passwords; each invited user accepts a secure link and later creates their own password through the active auth flow. Only Webmaster / Administrador can create global users or change global roles. Gerente de operaciones can invite lower roles inside its scope and validate branch submissions for the business line. Gerente de sucursal can only work inside the assigned branch.
+
+Real invitation email requires private server variables:
+
+- `DATABASE_URL`: PostgreSQL connection string used to store the invitation and audit record.
+- `APP_URL`: public site URL used in the invitation link.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`: SMTP server settings.
+- `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`: Google Workspace sender account, app password, and visible sender.
+
+For Google Workspace with app passwords, use `smtp.gmail.com`, port `587`, `SMTP_SECURE=false`, and the Workspace mailbox as `SMTP_USER`. The app password must stay only in the server environment file.
 
 ## Imports
 
