@@ -42,8 +42,8 @@ assert(
   "Manual monthly dashboard must persist DEMO history locally.",
 );
 assert(
-  component.includes("Guardar avance DEMO") &&
-    component.includes("Publicar cierre DEMO"),
+  component.includes("Guardar borrador") &&
+    component.includes("Publicar cierre"),
   "Manual monthly dashboard must support draft and publish actions.",
 );
 assert(
