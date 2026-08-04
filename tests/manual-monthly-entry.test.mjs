@@ -70,7 +70,7 @@ assert(
     component.includes("2026-08-04") &&
     component.includes("monthValue, 4") &&
     component.includes("edit_authorization_code") &&
-    component.includes("Ese cierre ya fue publicado"),
+    component.includes("Editar un cierre publicado requiere autorizacion"),
   "Manual monthly dashboard must enforce deadline and edit authorization rules.",
 );
 assert(

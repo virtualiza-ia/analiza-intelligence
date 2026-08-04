@@ -13,6 +13,8 @@ const writableRoles = new Set([
   "usuario_operativo",
 ]);
 
+class CorrectionDeniedError extends Error {}
+
 type BranchAccessRow = {
   branch_id: string;
   company_id: string;
@@ -211,6 +213,13 @@ export async function POST(request: Request) {
 
     if (!submission) throw new Error("Manual submission upsert returned no row.");
 
+    if (
+      submission.status === "PUBLISHED" &&
+      !["super_admin", "webmaster_admin"].includes(user.roleKey)
+    ) {
+      throw new CorrectionDeniedError();
+    }
+
     const nextVersion = submission.status === "PUBLISHED"
       ? submission.active_version + 1
       : submission.active_version;
@@ -280,6 +289,12 @@ export async function POST(request: Request) {
       status,
       version: nextVersion,
     };
+  }).catch((error: unknown) => {
+    if (error instanceof CorrectionDeniedError) {
+      return { correctionDenied: true as const };
+    }
+
+    throw error;
   });
 
   if ("denied" in result) {
@@ -290,6 +305,13 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "La version publicada es inmutable; crea una correccion nueva." },
       { status: 409 },
+    );
+  }
+
+  if ("correctionDenied" in result) {
+    return NextResponse.json(
+      { error: "Solo un administrador puede reemplazar un cierre publicado." },
+      { status: 403 },
     );
   }
 

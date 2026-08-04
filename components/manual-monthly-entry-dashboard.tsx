@@ -1292,6 +1292,57 @@ function HistoryTable({ entries }: { entries: ManualMonthlyHistoryEntry[] }) {
   );
 }
 
+function ProductiveHistoryTable({
+  entries,
+}: {
+  entries: ProductiveManualSubmission[];
+}) {
+  if (entries.length === 0) {
+    return (
+      <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+        No hay cierres productivos visibles para este alcance.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[760px] text-left text-sm">
+        <thead className="text-xs text-muted-foreground">
+          <tr className="border-b">
+            <th className="py-2 pr-4 font-medium">Periodo</th>
+            <th className="py-2 pr-4 font-medium">Linea</th>
+            <th className="py-2 pr-4 font-medium">Sucursal</th>
+            <th className="py-2 pr-4 font-medium">Version</th>
+            <th className="py-2 pr-4 font-medium">Calidad</th>
+            <th className="py-2 pr-4 font-medium">Actualizado</th>
+            <th className="py-2 pr-4 font-medium">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((entry) => (
+            <tr className="border-b last:border-b-0" key={entry.id}>
+              <td className="py-3 pr-4 font-medium">{entry.period}</td>
+              <td className="py-3 pr-4">{entry.businessLine}</td>
+              <td className="py-3 pr-4">{entry.branchName}</td>
+              <td className="py-3 pr-4">{entry.version}</td>
+              <td className="py-3 pr-4">{formatPercent(entry.qualityScore)}</td>
+              <td className="py-3 pr-4">
+                {new Date(entry.updatedAt).toLocaleString("es-SV")}
+              </td>
+              <td className="py-3 pr-4">
+                <Badge variant={entry.status === "PUBLISHED" ? "default" : "outline"}>
+                  {entry.status === "PUBLISHED" ? "Publicado" : "Borrador"}
+                </Badge>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function ManualMonthlyEntryDashboard() {
   const activeBusinessLine = useActiveBusinessLine();
   const activeLine = toImportBusinessLine(activeBusinessLine.line);
@@ -1303,6 +1354,10 @@ export function ManualMonthlyEntryDashboard() {
   const [localHistory, setLocalHistory] = useState<LocalManualMonthlySubmission[]>(
     [],
   );
+  const [productiveHistory, setProductiveHistory] = useState<
+    ProductiveManualSubmission[]
+  >([]);
+  const [historyRefresh, setHistoryRefresh] = useState(0);
   const [todayIsoDate, setTodayIsoDate] = useState("2026-07-29");
   const [notice, setNotice] = useState(
     "El formulario mensual sera la via manual principal mientras no haya conectores.",
@@ -1381,6 +1436,37 @@ export function ManualMonthlyEntryDashboard() {
     );
     setActiveStepIndex(0);
   }, [activeLine, activeRole, branchOptions, context]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const query = new URLSearchParams();
+
+    if (activeLine !== "Consolidado") {
+      query.set("businessLine", activeLine);
+    }
+
+    void fetch(`/api/manual-submissions?${query.toString()}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as
+          | { submissions?: ProductiveManualSubmission[] }
+          | null;
+
+        if (response.ok) {
+          setProductiveHistory(payload?.submissions ?? []);
+        } else if (response.status !== 401) {
+          setProductiveHistory([]);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setProductiveHistory([]);
+        }
+      });
+
+    return () => controller.abort();
+  }, [activeLine, historyRefresh]);
 
   useEffect(() => {
     const branchId = formValues.branch_reported;
@@ -1637,20 +1723,6 @@ export function ManualMonthlyEntryDashboard() {
       return;
     }
 
-    const submissionKey = `${submission.businessLine}|${submission.branch}|${submission.period}`;
-    const alreadyPublished = historyEntries.some(
-      (entry) =>
-        `${entry.businessLine}|${entry.branch}|${entry.period}` ===
-          submissionKey && entry.status === "Publicado DEMO",
-    );
-
-    if (alreadyPublished && !formValues.edit_authorization_code?.trim()) {
-      setNotice(
-        "Ese cierre ya fue publicado. Para reemplazarlo necesitas autorizacion del administrador.",
-      );
-      return;
-    }
-
     if (!formValues.branch_reported?.trim()) {
       setNotice("Selecciona una sucursal valida antes de guardar el cierre.");
       return;
@@ -1679,15 +1751,7 @@ export function ManualMonthlyEntryDashboard() {
         return;
       }
 
-      const nextHistory = [
-        submission,
-        ...localHistory.filter(
-          (entry) =>
-            `${entry.businessLine}|${entry.branch}|${entry.period}` !==
-            submissionKey,
-        ),
-      ];
-      setLocalHistory(nextHistory);
+      setHistoryRefresh((currentValue) => currentValue + 1);
       const persistedStatus = apiResult?.status === "PUBLISHED"
         ? "Cierre publicado"
         : "Borrador guardado";
@@ -2032,9 +2096,9 @@ export function ManualMonthlyEntryDashboard() {
         />
         <ManualMetricCard
           icon={History}
-          label="Cierres historicos"
-          note={`${summary.publishedEntries} publicados DEMO.`}
-          value={`${summary.totalEntries}`}
+          label="Cierres productivos"
+          note={`${productiveHistory.filter((entry) => entry.status === "PUBLISHED").length} publicados.`}
+          value={`${productiveHistory.length}`}
         />
         <ManualMetricCard
           icon={Sparkles}
@@ -2050,6 +2114,21 @@ export function ManualMonthlyEntryDashboard() {
         />
       </div>
 
+      <section className="grid gap-3 rounded-md border border-emerald-200 bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold tracking-normal">
+              Historial productivo
+            </h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Datos persistidos en PostgreSQL y limitados al alcance del usuario.
+            </p>
+          </div>
+          <Badge>{productiveHistory.length} cierres</Badge>
+        </div>
+        <ProductiveHistoryTable entries={productiveHistory} />
+      </section>
+
       <YearToDateDashboard
         activeLine={activeLine}
         entries={scopedHistoryEntries}
@@ -2060,10 +2139,10 @@ export function ManualMonthlyEntryDashboard() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold tracking-normal">
-              Historico mensual guardado
+              Historico mensual DEMO
             </h3>
             <p className="text-sm leading-6 text-muted-foreground">
-              Cada mes queda separado por linea, sucursal, periodo y fuente DEMO.
+              Referencia simulada; nunca se combina con el historial productivo.
             </p>
           </div>
           <Badge className={tone.badge}>{historyLine}</Badge>

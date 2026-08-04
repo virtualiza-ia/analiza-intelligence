@@ -24,6 +24,7 @@ for (const expected of [
   "manual_monthly_submission_events",
   "export async function GET",
   "limit 50",
+  "Solo un administrador puede reemplazar un cierre publicado",
 ]) {
   assert.match(route, new RegExp(expected));
 }
@@ -32,6 +33,8 @@ for (const expected of [
   "ProductiveManualSubmission",
   "Borrador productivo recuperado",
   "/api/manual-submissions?${query.toString()}",
+  "Historial productivo",
+  "nunca se combina con el historial productivo",
 ]) {
   assert.ok(dashboard.includes(expected));
 }
