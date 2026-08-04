@@ -15,15 +15,29 @@ import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
 export { localSessionCookieName, localSessionDurationSeconds };
 
 type SessionRow = {
+  branch_id: string | null;
+  can_invite_operational_users: boolean;
+  company_id: string | null;
+  country_id: string | null;
   email: string;
   expires_at: Date;
+  operational_area_id: string | null;
+  organization_id: string;
   role_key: RoleKey;
   user_id: string;
 };
 
 export type AuthenticatedUser = {
+  canInviteOperationalUsers: boolean;
   email: string;
   expiresAt: Date;
+  scope: {
+    branchId?: string;
+    companyId?: string;
+    countryId?: string;
+    operationalAreaId?: string;
+    organizationId: string;
+  };
   roleKey: RoleKey;
   userId: string;
 };
@@ -78,17 +92,38 @@ async function loadAuthenticatedUser(): Promise<AuthenticatedUser | null> {
        u.id as user_id,
        u.email,
        s.expires_at,
-       selected_role.role_key
+       p.organization_id,
+       selected_role.role_key,
+       selected_role.country_id,
+       selected_role.company_id,
+       selected_role.operational_area_id,
+       selected_role.branch_id,
+       selected_role.can_invite_operational_users
      from app_auth.sessions s
      join auth.users u on u.id = s.user_id
      join public.profiles p on p.id = u.id
      join lateral (
-       select r.key as role_key
+       select
+         r.key as role_key,
+         ur.country_id,
+         ur.company_id,
+         ur.operational_area_id,
+         ur.branch_id,
+         exists (
+           select 1
+           from public.permission_delegations pd
+           join public.roles target_role on target_role.id = pd.target_role_id
+           where pd.delegator_role_id = ur.role_id
+             and target_role.key = 'usuario_operativo'
+             and pd.permission_key = 'users.invite'
+             and pd.is_enabled
+         ) as can_invite_operational_users
        from public.user_roles ur
        join public.roles r on r.id = ur.role_id
        left join public.role_hierarchy rh on rh.role_id = r.id
        where ur.user_id = u.id
          and coalesce(ur.status, 'active') = 'active'
+         and ur.organization_id = p.organization_id
        order by coalesce(rh.hierarchy_level, 0) desc, r.key
        limit 1
      ) selected_role on true
@@ -97,6 +132,7 @@ async function loadAuthenticatedUser(): Promise<AuthenticatedUser | null> {
        and s.expires_at > now()
        and p.status = 'active'
        and p.deleted_at is null
+       and p.organization_id is not null
      limit 1`,
     [hashSessionToken(token)],
   );
@@ -107,8 +143,18 @@ async function loadAuthenticatedUser(): Promise<AuthenticatedUser | null> {
   }
 
   return {
+    canInviteOperationalUsers: row.can_invite_operational_users,
     email: row.email,
     expiresAt: row.expires_at,
+    scope: {
+      ...(row.branch_id ? { branchId: row.branch_id } : {}),
+      ...(row.company_id ? { companyId: row.company_id } : {}),
+      ...(row.country_id ? { countryId: row.country_id } : {}),
+      ...(row.operational_area_id
+        ? { operationalAreaId: row.operational_area_id }
+        : {}),
+      organizationId: row.organization_id,
+    },
     roleKey: row.role_key,
     userId: row.user_id,
   };

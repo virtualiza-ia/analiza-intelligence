@@ -99,8 +99,8 @@ const removedSignUpFormExists = (() => {
   }
 })();
 
-if (!signUpPage.includes("Crear cuenta")) {
-  throw new Error("Controlled account creation page should say Crear cuenta.");
+if (!signUpPage.includes("Activa tu cuenta") || !signUpPage.includes("getInvitationPreview")) {
+  throw new Error("Invitation-only account activation page is missing.");
 }
 
 for (const requiredRoleText of [

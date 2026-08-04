@@ -2,7 +2,10 @@
 
 ## Login
 
-Users sign in with an assigned account. The UI shows `Crear cuenta`, but it is a controlled account-creation page that explains administrative provisioning. Public self-registration is not part of the product flow. Password recovery is available through Supabase Auth.
+Users sign in with an assigned account. Public self-registration is not part
+of the product flow. An administrator sends an invitation; the recipient opens
+the single-use link and creates their own password. Password recovery sends a
+thirty-minute link through the configured server-side SMTP provider.
 
 Access requires a PostgreSQL-backed account, an active profile, and an assigned
 role. The application does not provide public self-registration or a
@@ -20,7 +23,8 @@ Analiza Intelligence uses role-based workspaces:
 - Usuario operativo: completes assigned data-entry tasks without managerial privileges.
 - Viewer: reads authorized information only.
 
-In DEMO, the sidebar includes a role selector so the reduced menu and role workspace can be previewed as each role.
+Production does not expose a browser-controlled role selector. The server
+resolves the active role and scope from PostgreSQL for every protected request.
 
 ## Role Workspace
 
@@ -121,7 +125,10 @@ The DEMO module pages now include structured panels for:
 
 `Mi cuenta` is for profile, password recovery, preferences, and user-level settings. System-wide configuration remains an admin-only responsibility.
 
-Users are created by invitation. The system should not email manual passwords; each invited user creates their own password through the Auth provider. Only Webmaster / Administrador can create global users or change global roles. Gerente de operaciones can invite lower roles inside its scope and validate branch submissions for the business line. Gerente de sucursal can only work inside the assigned branch.
+Users are created by invitation. The system never emails manual passwords;
+each invited user creates their own password. Administrators can resend or
+revoke pending invitations. Gerentes can invite only lower roles inside their
+server-validated scope. Used, expired, or revoked links are rejected.
 
 ## Imports
 

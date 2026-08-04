@@ -1,37 +1,40 @@
 import Link from "next/link";
-import { ShieldAlert } from "lucide-react";
+import { Suspense } from "react";
 
+import { AcceptInvitationForm } from "@/components/accept-invitation-form";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getInvitationPreview } from "@/lib/auth/user-lifecycle";
 
-export default function Page() {
+type Props = { searchParams: Promise<{ invitation?: string }> };
+
+async function InvitationContent({ searchParams }: Props) {
+  const { invitation = "" } = await searchParams;
+  const preview = await getInvitationPreview(invitation);
+
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-md">
         <CardHeader>
-          <div className="mb-2 flex size-10 items-center justify-center rounded-md bg-muted">
-            <ShieldAlert className="size-5 text-primary" />
-          </div>
-          <CardTitle>Crear cuenta</CardTitle>
+          <CardTitle>{preview ? "Activa tu cuenta" : "Invitacion no valida"}</CardTitle>
           <CardDescription>
-            El superadministrador crea el acceso, asigna el rol y define el
-            alcance autorizado. No existe registro publico.
+            {preview
+              ? `Acceso preparado para ${preview.email}. Crea una contrasena segura para continuar.`
+              : "El enlace vencio, fue revocado, ya se utilizo o no existe."}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3">
-            <Button asChild className="w-full" variant="outline">
-              <Link href="/auth/login">Volver al login</Link>
-            </Button>
-          </div>
+          {preview ? (
+            <AcceptInvitationForm token={invitation} />
+          ) : (
+            <Button asChild className="w-full" variant="outline"><Link href="/auth/login">Volver al login</Link></Button>
+          )}
         </CardContent>
       </Card>
     </div>
   );
+}
+
+export default function Page(props: Props) {
+  return <Suspense><InvitationContent {...props} /></Suspense>;
 }
