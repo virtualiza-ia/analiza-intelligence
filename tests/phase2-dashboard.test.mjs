@@ -1,5 +1,5 @@
-import { readFileSync, statSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 const navigationPath = "lib/navigation.ts";
 const dashboardDataPath = "lib/analytics/demo-dashboard.ts";
@@ -852,26 +852,26 @@ for (const requiredTemplateText of [
   }
 }
 
-let starterReferences = "";
-try {
-  starterReferences = execFileSync(
-    "rg",
-    ["Next.js Supabase Starter|Supabase Starter Kit", "app", "components"],
-    { encoding: "utf8" },
-  );
-} catch (error) {
-  if (
-    typeof error !== "object" ||
-    error === null ||
-    !("status" in error) ||
-    error.status !== 1
-  ) {
-    throw error;
-  }
+function collectSourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    return entry.isDirectory()
+      ? collectSourceFiles(path)
+      : /\.(ts|tsx|js|jsx)$/.test(entry.name)
+        ? [path]
+        : [];
+  });
 }
 
-if (starterReferences.trim().length > 0) {
-  throw new Error(`Starter text should not be visible:\n${starterReferences}`);
+const starterPattern = /Next\.js Supabase Starter|Supabase Starter Kit/;
+const starterReferences = ["app", "components"]
+  .flatMap(collectSourceFiles)
+  .filter((path) => starterPattern.test(readFileSync(path, "utf8")));
+
+if (starterReferences.length > 0) {
+  throw new Error(
+    `Starter text should not be visible:\n${starterReferences.join("\n")}`,
+  );
 }
 
 console.log("Phase 2 dashboard checks passed.");
