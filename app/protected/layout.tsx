@@ -25,14 +25,14 @@ async function requireProtectedAccess(): Promise<ProtectedAccess> {
     cookieStore.get(demoAdminCookieName)?.value,
   );
 
-  if (hasDemoAdminSession) {
-    return { allowDemoRoleSwitch: true, roleKey: "super_admin" };
-  }
-
   const localSession = readLocalSession(cookieStore);
 
   if (localSession) {
     return { allowDemoRoleSwitch: false, roleKey: localSession.roleKey };
+  }
+
+  if (hasDemoAdminSession) {
+    return { allowDemoRoleSwitch: true, roleKey: "super_admin" };
   }
 
   if (!hasEnvVars) {
