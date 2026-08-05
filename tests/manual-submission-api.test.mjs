@@ -32,6 +32,7 @@ for (const expected of [
   "Indica un motivo de correccion de al menos 10 caracteres",
   "'REPLACED'",
   "El cierre cambio en otra sesion",
+  "company.unit_type = case",
 ]) {
   assert.match(route, new RegExp(expected));
 }
@@ -85,5 +86,7 @@ for (const expected of [
 }
 
 assert.ok(!readinessRoute.includes("error.message"));
+assert.ok(!validation.includes("(patient|paciente|password"));
+assert.ok(validation.includes("patient_(id|name|nombre|document"));
 
 console.log("Manual submission API checks passed.");
