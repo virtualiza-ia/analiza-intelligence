@@ -12,6 +12,9 @@ The server boundary is `/api/manual-submissions`:
 
 - `save` persists a draft;
 - `publish` revalidates all required fields and requires quality score 70 or higher;
+- the server ignores any client-provided quality score, enforces the field
+  allowlist and numeric ranges, calculates the canonical score and persists the
+  validation results with the version;
 - `GET` returns at most 50 active versions filtered by branch, business line and period;
 - branch access is derived from the authenticated account and database assignments;
 - published versions are immutable;

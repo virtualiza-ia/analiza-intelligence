@@ -14,6 +14,8 @@ const writableRoles = new Set([
 ]);
 
 class CorrectionDeniedError extends Error {}
+class CorrectionReasonRequiredError extends Error {}
+class VersionConflictError extends Error {}
 
 type BranchAccessRow = {
   branch_id: string;
@@ -214,36 +216,60 @@ export async function POST(request: Request) {
     if (!submission) throw new Error("Manual submission upsert returned no row.");
 
     if (
+      input.expectedVersion !== undefined &&
+      input.expectedVersion !== submission.active_version
+    ) {
+      throw new VersionConflictError();
+    }
+
+    if (
       submission.status === "PUBLISHED" &&
       !["super_admin", "webmaster_admin"].includes(user.roleKey)
     ) {
       throw new CorrectionDeniedError();
     }
 
-    const nextVersion = submission.status === "PUBLISHED"
+    if (
+      submission.status === "PUBLISHED" &&
+      (input.answers.correction_reason?.trim().length ?? 0) < 10
+    ) {
+      throw new CorrectionReasonRequiredError();
+    }
+
+    const activeVersionResult = await client.query<{ exists: boolean }>(
+      `select exists (
+         select 1
+         from public.manual_monthly_submission_versions
+         where submission_id = $1 and version_number = $2
+       ) as exists`,
+      [submission.id, submission.active_version],
+    );
+    const nextVersion = activeVersionResult.rows[0]?.exists
       ? submission.active_version + 1
       : submission.active_version;
     const status = input.action === "publish" ? "PUBLISHED" : "DRAFT";
 
-    if (status === "PUBLISHED") {
-      await client.query(
+    const replacedVersions = status === "PUBLISHED"
+      ? await client.query<{ id: string }>(
         `update public.manual_monthly_submission_versions
          set status = 'REPLACED'
-         where submission_id = $1 and status = 'PUBLISHED'`,
+         where submission_id = $1 and status = 'PUBLISHED'
+         returning id`,
         [submission.id],
-      );
-    }
+      )
+      : { rows: [] };
 
     const versionResult = await client.query<{ id: string }>(
       `insert into public.manual_monthly_submission_versions (
          submission_id, version_number, answers, validation_results,
          quality_score, status, created_by, published_by, published_at
-       ) values ($1, $2, $3::jsonb, '[]'::jsonb, $4, $5, $6,
-         case when $5 = 'PUBLISHED' then $6 else null end,
-         case when $5 = 'PUBLISHED' then now() else null end)
+       ) values ($1, $2, $3::jsonb, $4::jsonb, $5, $6, $7,
+         case when $6 = 'PUBLISHED' then $7 else null end,
+         case when $6 = 'PUBLISHED' then now() else null end)
        on conflict (submission_id, version_number)
        do update set
          answers = excluded.answers,
+         validation_results = excluded.validation_results,
          quality_score = excluded.quality_score,
          status = excluded.status,
          published_by = excluded.published_by,
@@ -254,6 +280,7 @@ export async function POST(request: Request) {
         submission.id,
         nextVersion,
         JSON.stringify(input.answers),
+        JSON.stringify(input.validationResults),
         input.qualityScore,
         status,
         user.userId,
@@ -263,6 +290,24 @@ export async function POST(request: Request) {
 
     if (!version) {
       return { conflict: true as const };
+    }
+
+    for (const replacedVersion of replacedVersions.rows) {
+      await client.query(
+        `insert into public.manual_monthly_submission_events (
+           submission_id, version_id, actor_id, event_type, metadata
+         ) values ($1, $2, $3, 'REPLACED', jsonb_build_object(
+           'replacementVersion', $4::integer,
+           'reason', $5::text
+         ))`,
+        [
+          submission.id,
+          replacedVersion.id,
+          user.userId,
+          nextVersion,
+          input.answers.correction_reason,
+        ],
+      );
     }
 
     await client.query(
@@ -288,10 +333,19 @@ export async function POST(request: Request) {
       id: submission.id,
       status,
       version: nextVersion,
+      qualityScore: input.qualityScore,
     };
   }).catch((error: unknown) => {
     if (error instanceof CorrectionDeniedError) {
       return { correctionDenied: true as const };
+    }
+
+    if (error instanceof CorrectionReasonRequiredError) {
+      return { correctionReasonRequired: true as const };
+    }
+
+    if (error instanceof VersionConflictError) {
+      return { versionConflict: true as const };
     }
 
     throw error;
@@ -312,6 +366,20 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Solo un administrador puede reemplazar un cierre publicado." },
       { status: 403 },
+    );
+  }
+
+  if ("correctionReasonRequired" in result) {
+    return NextResponse.json(
+      { error: "Indica un motivo de correccion de al menos 10 caracteres." },
+      { status: 400 },
+    );
+  }
+
+  if ("versionConflict" in result) {
+    return NextResponse.json(
+      { error: "El cierre cambio en otra sesion. Recarga antes de guardar." },
+      { status: 409 },
     );
   }
 

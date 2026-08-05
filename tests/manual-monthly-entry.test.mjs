@@ -67,7 +67,7 @@ assert(
 );
 assert(
   component.includes("getMonthlyLoadDeadline") &&
-    component.includes("edit_authorization_code") &&
+    component.includes("correction_reason") &&
     component.includes("Editar un cierre publicado requiere autorizacion"),
   "Manual monthly dashboard must enforce deadline and edit authorization rules.",
 );
