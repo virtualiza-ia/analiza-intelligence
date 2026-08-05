@@ -1,7 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 
 const modelPath = "lib/analytics/dashboard-validation-agent.ts";
-const componentPath = "components/dashboard-validation-agent.tsx";
 const apiRoutePath = "app/api/analia-chat/route.ts";
 const appLayoutPath = "app/layout.tsx";
 const globalStylesPath = "app/globals.css";
@@ -11,7 +10,6 @@ const packagePath = "package.json";
 
 for (const file of [
   modelPath,
-  componentPath,
   apiRoutePath,
   appLayoutPath,
   globalStylesPath,
@@ -23,7 +21,6 @@ for (const file of [
 }
 
 const model = readFileSync(modelPath, "utf8");
-const component = readFileSync(componentPath, "utf8");
 const apiRoute = readFileSync(apiRoutePath, "utf8");
 const appLayout = readFileSync(appLayoutPath, "utf8");
 const globalStyles = readFileSync(globalStylesPath, "utf8");
@@ -78,41 +75,6 @@ for (const requiredModelText of [
   }
 }
 
-for (const requiredComponentText of [
-  "DashboardValidationAgent",
-  "Hablar con AnaliA",
-  "Preguntar a AnaliA sobre esta pantalla",
-  "Resumeme los insights mas importantes",
-  "Hay algo critico?",
-  "Lee esta pantalla",
-  "Que hago primero?",
-  "getReadableScreenText",
-  "getFriendlyBullets",
-  "rounded-br-sm",
-  "rounded-bl-sm",
-  "max-w-[82%]",
-  "createAnaliaScreenChatResponse",
-  "/api/analia-chat",
-  "isThinking",
-  "AnaliA esta leyendo esta pantalla",
-  "closePanel",
-  "Cerrar ventana de AnaliA",
-  "Minimizar chat",
-  "event.key !== \"Escape\"",
-  "mode === \"ai\"",
-  "Fuentes:",
-  "data-analia-dashboard-mode",
-  "data-analia-dashboard-density",
-  "Chat con AnaliA",
-  "Ajustes aplicados",
-  "Validacion",
-  "usePathname",
-]) {
-  if (!component.includes(requiredComponentText)) {
-    throw new Error(`Dashboard validation component is missing: ${requiredComponentText}`);
-  }
-}
-
 for (const requiredApiRouteText of [
   "OPENAI_API_KEY",
   "ANALIA_OPENAI_MODEL",
@@ -130,8 +92,15 @@ for (const requiredApiRouteText of [
   }
 }
 
-if (!appLayout.includes("DashboardValidationAgent")) {
-  throw new Error("Root layout must mount DashboardValidationAgent.");
+for (const removedLayoutText of [
+  "DashboardValidationAgent",
+  "dashboard-validation-agent",
+]) {
+  if (appLayout.includes(removedLayoutText)) {
+    throw new Error(
+      `Root layout must not mount the disabled AnaliA floating chat: ${removedLayoutText}`,
+    );
+  }
 }
 
 for (const requiredStyleText of [

@@ -46,6 +46,7 @@ const contextChangeEvent = "analiza:context-change";
 const roleStorageKey = "analiza:demo-role";
 const roleChangeEvent = "analiza:role-change";
 const demoUsersStorageKey = "analiza:demo-users";
+const revokedDemoUserEmails = new Set(["info@tuvetsv.com"]);
 
 type StoredContext = {
   countryName: string;
@@ -179,7 +180,15 @@ function readDemoUsers() {
 
   try {
     const parsedUsers = JSON.parse(rawUsers) as DemoManagedUser[];
-    return parsedUsers.length > 0 ? parsedUsers : initialDemoUsers;
+    const visibleUsers = parsedUsers.filter(
+      (user) => !revokedDemoUserEmails.has(user.email.toLowerCase()),
+    );
+
+    if (visibleUsers.length !== parsedUsers.length) {
+      persistDemoUsers(visibleUsers.length > 0 ? visibleUsers : initialDemoUsers);
+    }
+
+    return visibleUsers.length > 0 ? visibleUsers : initialDemoUsers;
   } catch {
     window.localStorage.removeItem(demoUsersStorageKey);
     return initialDemoUsers;
