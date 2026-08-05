@@ -75,7 +75,7 @@ for (const table of [
 assert.match(rlsMigration, /current_user_can_access_branch/);
 
 for (const expected of [
-  "queryDatabase",
+  "getPostgresPool",
   "to_regclass('public.manual_monthly_submissions')",
   "Cache-Control",
   "status: ready ? 200 : 503",

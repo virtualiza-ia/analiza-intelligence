@@ -1604,10 +1604,6 @@ export function ManualMonthlyEntryDashboard() {
       branchNamesMatch(entry.branch, selectedBranchName),
     );
   }, [activeLine, historyEntries, selectedBranchName]);
-  const summary = useMemo(
-    () => calculateManualMonthlyHistorySummary(scopedHistoryEntries),
-    [scopedHistoryEntries],
-  );
   const tone = businessLineTone[activeLine];
   const deadlineDate =
     formValues.load_deadline_date || getMonthlyLoadDeadline(formValues.period ?? "");

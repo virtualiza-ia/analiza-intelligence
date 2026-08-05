@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { queryDatabase } from "@/lib/db/pool";
+import {
+  getDatabaseUrl,
+  getMissingDatabaseConfig,
+  getPostgresPool,
+} from "@/lib/server/database";
 
 type ReadinessRow = {
   events_table: string | null;
@@ -17,7 +21,7 @@ const noStoreHeaders = {
 };
 
 export async function GET() {
-  if (!process.env.DATABASE_URL) {
+  if (!getDatabaseUrl() && getMissingDatabaseConfig().length > 0) {
     return NextResponse.json(
       { ready: false, service: "manual-submissions" },
       { headers: noStoreHeaders, status: 503 },
@@ -25,7 +29,7 @@ export async function GET() {
   }
 
   try {
-    const result = await queryDatabase<ReadinessRow>(
+    const result = await getPostgresPool().query<ReadinessRow>(
       `select
          to_regclass('public.manual_monthly_submissions')::text as submissions_table,
          to_regclass('public.manual_monthly_submission_versions')::text as versions_table,

@@ -1,8 +1,10 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import type { PoolClient } from "pg";
 
-import { getAuthenticatedUser } from "@/lib/auth/session";
-import { withDatabaseTransaction } from "@/lib/db/pool";
+import { readLocalSession } from "@/lib/auth/local-session";
 import { validateManualSubmission } from "@/lib/manual-submissions/validation";
+import { getPostgresPool } from "@/lib/server/database";
 
 const writableRoles = new Set([
   "super_admin",
@@ -43,6 +45,28 @@ type ManualSubmissionListRow = {
   updated_at: string;
   version_number: number;
 };
+
+async function getAuthenticatedUser() {
+  return readLocalSession(await cookies());
+}
+
+async function withDatabaseTransaction<T>(
+  operation: (client: PoolClient) => Promise<T>,
+) {
+  const client = await getPostgresPool().connect();
+
+  try {
+    await client.query("begin");
+    const result = await operation(client);
+    await client.query("commit");
+    return result;
+  } catch (error: unknown) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 export async function GET(request: Request) {
   const user = await getAuthenticatedUser();
