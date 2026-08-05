@@ -52,12 +52,12 @@ restored into the temporary database `analiza_staging_restore_test`, verified,
 and the temporary database was dropped. The persistent staging database was not
 replaced during the rehearsal.
 
-## Remaining external action
+## Public staging endpoint
 
-`staging.analizabi.site` has no DNS record yet. The application remains bound to
-loopback and is not publicly exposed. Add the DNS A record to the existing VPS,
-then configure a dedicated Nginx virtual host and obtain a certificate before
-browser acceptance testing. Do not expose port 3002 directly.
+`staging.analizabi.site` points to the VPS with a 300-second TTL. Nginx terminates
+HTTPS and proxies only to the loopback-bound application on port 3002, so that
+port is never exposed directly. The certificate and public readiness endpoint
+were validated after installation.
 
 Production promotion also remains gated on merging the required pull requests
 into `main`. Staging validation is not authorization to deploy an unmerged
