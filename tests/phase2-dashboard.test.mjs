@@ -820,10 +820,11 @@ for (const requiredBusinessText of [
 }
 
 for (const requiredUserManagementText of [
-  "Invitar usuario DEMO",
+  "Invitar usuario",
   "Invitaciones y usuarios",
   "analiza:demo-users",
   "Enviar invitacion",
+  "/api/users/invite",
   "Reasignacion requerida",
   "Tu rol solo puede invitar usuarios de nivel inferior",
 ]) {

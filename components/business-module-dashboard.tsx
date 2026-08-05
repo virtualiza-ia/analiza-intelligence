@@ -46,6 +46,7 @@ const contextChangeEvent = "analiza:context-change";
 const roleStorageKey = "analiza:demo-role";
 const roleChangeEvent = "analiza:role-change";
 const demoUsersStorageKey = "analiza:demo-users";
+const revokedDemoUserEmails = new Set(["info@tuvetsv.com"]);
 
 type StoredContext = {
   countryName: string;
@@ -76,6 +77,15 @@ type DemoManagedUser = {
   deactivatedAt?: string;
   invitationStatus?: "Pendiente" | "Aceptada" | "Revocada";
   reassignmentRequired?: boolean;
+};
+
+type InviteUserApiResponse = {
+  error?: string;
+  expiresAt?: string;
+  invitationId?: string;
+  missingConfig?: string[];
+  ok?: boolean;
+  status?: "sent";
 };
 
 const businessHealth = [
@@ -170,7 +180,15 @@ function readDemoUsers() {
 
   try {
     const parsedUsers = JSON.parse(rawUsers) as DemoManagedUser[];
-    return parsedUsers.length > 0 ? parsedUsers : initialDemoUsers;
+    const visibleUsers = parsedUsers.filter(
+      (user) => !revokedDemoUserEmails.has(user.email.toLowerCase()),
+    );
+
+    if (visibleUsers.length !== parsedUsers.length) {
+      persistDemoUsers(visibleUsers.length > 0 ? visibleUsers : initialDemoUsers);
+    }
+
+    return visibleUsers.length > 0 ? visibleUsers : initialDemoUsers;
   } catch {
     window.localStorage.removeItem(demoUsersStorageKey);
     return initialDemoUsers;
@@ -231,6 +249,32 @@ function getDefaultRoleForActor(actorRole: RoleKey) {
   return getCreatableRoles(actorRole, {
     canInviteOperationalUsers: actorRole === "gerente_sucursal",
   })[0] ?? "viewer";
+}
+
+function readInviteUserApiResponse(value: unknown): InviteUserApiResponse {
+  if (typeof value !== "object" || value === null) {
+    return {};
+  }
+
+  const response = value as Record<string, unknown>;
+  const missingConfig = Array.isArray(response.missingConfig)
+    ? response.missingConfig.filter(
+        (configName): configName is string => typeof configName === "string",
+      )
+    : undefined;
+
+  return {
+    error: typeof response.error === "string" ? response.error : undefined,
+    expiresAt:
+      typeof response.expiresAt === "string" ? response.expiresAt : undefined,
+    invitationId:
+      typeof response.invitationId === "string"
+        ? response.invitationId
+        : undefined,
+    missingConfig,
+    ok: response.ok === true,
+    status: response.status === "sent" ? "sent" : undefined,
+  };
 }
 
 function getCountryScopeLabel(countryScope: string) {
@@ -469,6 +513,7 @@ function UsersAndPermissionsManager({
   const [businessScope, setBusinessScope] = useState(allBusinessScope);
   const [areaScope, setAreaScope] = useState(allAreaScope);
   const [branchScope, setBranchScope] = useState(allBranchScope);
+  const [isInviting, setIsInviting] = useState(false);
   const [message, setMessage] = useState("");
 
   const businessOptions = useMemo(
@@ -658,7 +703,7 @@ function UsersAndPermissionsManager({
     }
   }, [branchOptions, branchScope]);
 
-  function createDemoUser(event: FormEvent<HTMLFormElement>) {
+  async function createDemoUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const roleRequiresArea =
@@ -724,40 +769,81 @@ function UsersAndPermissionsManager({
     }
 
     if (users.some((user) => user.email.toLowerCase() === normalizedEmail)) {
-      setMessage("Ese correo ya existe en usuarios DEMO.");
+      setMessage("Ese correo ya existe en usuarios.");
       return;
     }
 
-    const nextUsers: DemoManagedUser[] = [
-      {
-        id: `demo-user-${Date.now()}`,
-        fullName: normalizedName,
-        email: normalizedEmail,
-        organizationScope: "Grupo Analiza DEMO",
-        countryScope: targetCountryScope,
-        roleKey,
-        businessScope: targetBusinessScope,
-        areaScope: targetAreaScope,
-        branchScope: targetBranchScope,
-        invitationStatus: "Pendiente",
-        status: "Pendiente invitacion",
-        createdAt: todayIsoDate(),
-      },
-      ...users,
-    ];
+    setIsInviting(true);
 
-    setUsers(nextUsers);
-    persistDemoUsers(nextUsers);
-    setFullName("");
-    setEmail("");
-    setRoleKey(getDefaultRoleForActor(activeRole));
-    setCountryScope(allCountryScope);
-    setBusinessScope(allBusinessScope);
-    setAreaScope(allAreaScope);
-    setBranchScope(allBranchScope);
-    setMessage(
-      "Invitacion DEMO creada. No se envio correo real porque falta activar el proveedor de correo/Auth; la cuenta queda pendiente hasta aceptar.",
-    );
+    try {
+      const response = await fetch("/api/users/invite", {
+        body: JSON.stringify({
+          actorRole: activeRole,
+          actorScope: actor.scope,
+          email: normalizedEmail,
+          fullName: normalizedName,
+          roleKey,
+          scope: targetScope,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const inviteResult = readInviteUserApiResponse(
+        await response.json().catch(() => null),
+      );
+
+      if (!response.ok || !inviteResult.ok) {
+        const missingConfig =
+          inviteResult.missingConfig && inviteResult.missingConfig.length > 0
+            ? ` Variables pendientes: ${inviteResult.missingConfig.join(", ")}.`
+            : "";
+
+        throw new Error(
+          `${inviteResult.error ?? "No se pudo enviar la invitacion."}${missingConfig}`,
+        );
+      }
+
+      const nextUsers: DemoManagedUser[] = [
+        {
+          id: inviteResult.invitationId ?? `demo-user-${Date.now()}`,
+          fullName: normalizedName,
+          email: normalizedEmail,
+          organizationScope: "Grupo Analiza DEMO",
+          countryScope: targetCountryScope,
+          roleKey,
+          businessScope: targetBusinessScope,
+          areaScope: targetAreaScope,
+          branchScope: targetBranchScope,
+          invitationStatus: "Pendiente",
+          status: "Pendiente invitacion",
+          createdAt: todayIsoDate(),
+        },
+        ...users,
+      ];
+
+      setUsers(nextUsers);
+      persistDemoUsers(nextUsers);
+      setFullName("");
+      setEmail("");
+      setRoleKey(getDefaultRoleForActor(activeRole));
+      setCountryScope(allCountryScope);
+      setBusinessScope(allBusinessScope);
+      setAreaScope(allAreaScope);
+      setBranchScope(allBranchScope);
+      setMessage(
+        inviteResult.expiresAt
+          ? `Invitacion enviada por correo. La cuenta queda pendiente hasta aceptar antes del ${inviteResult.expiresAt}.`
+          : "Invitacion enviada por correo. La cuenta queda pendiente hasta aceptar.",
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo enviar la invitacion.",
+      );
+    } finally {
+      setIsInviting(false);
+    }
   }
 
   function updateUserRole(userId: string, nextRole: RoleKey) {
@@ -866,7 +952,7 @@ function UsersAndPermissionsManager({
           <div className="grid gap-2">
             <div className="flex items-center gap-2 text-lg font-semibold tracking-normal">
               <UserPlus className="size-5 text-primary" />
-              Invitar usuario DEMO
+              Invitar usuario
             </div>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
               Crea usuarios por invitacion y define su alcance por pais, linea de
@@ -901,10 +987,9 @@ function UsersAndPermissionsManager({
         </div>
 
         <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm leading-6 text-emerald-900">
-          <strong>Correo y contrasena:</strong> el sistema no debe mandar una
-          contrasena por correo. En produccion enviara una invitacion segura para
-          que cada persona cree su propia contrasena; en este DEMO solo se deja
-          la invitacion registrada hasta conectar el envio real de correo.
+          <strong>Correo y contrasena:</strong> el sistema no manda contrasenas
+          manuales. Envia una invitacion segura por correo y la cuenta queda
+          pendiente hasta que la persona acepte el acceso.
         </div>
 
         <div className="grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -1056,9 +1141,9 @@ function UsersAndPermissionsManager({
             </span>
           )}
 
-          <Button disabled={!canCreateUsers} type="submit">
+          <Button disabled={!canCreateUsers || isInviting} type="submit">
             <UserPlus className="size-4" />
-            Enviar invitacion
+            {isInviting ? "Enviando..." : "Enviar invitacion"}
           </Button>
         </div>
       </form>
@@ -1074,7 +1159,7 @@ function UsersAndPermissionsManager({
               Revisa estado, alcance asignado y acciones disponibles por usuario.
             </p>
           </div>
-          <Badge variant="outline">{users.length} usuarios DEMO</Badge>
+          <Badge variant="outline">{users.length} usuarios</Badge>
         </div>
         <div className="min-w-0 overflow-x-auto">
           <table className="w-full min-w-[1040px] table-fixed text-left text-sm">

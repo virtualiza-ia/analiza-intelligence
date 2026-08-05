@@ -48,3 +48,4 @@ for (const rule of requiredRules) {
 }
 
 console.log("Phase 0 documentation checks passed.");
+

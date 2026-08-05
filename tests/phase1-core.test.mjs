@@ -163,11 +163,10 @@ if (signUpCalls.trim().length > 0) {
   throw new Error(`Unexpected public self-registration behavior:\n${signUpCalls}`);
 }
 
-if (
-  signUpPage.includes('type="password"') ||
-  signUpPage.includes('id="password"')
-) {
-  throw new Error("Controlled account creation page must not ask for a password.");
+if (!signUpPage.includes("AcceptInvitationForm")) {
+  throw new Error(
+    "Invitation-based account activation must render the password setup form.",
+  );
 }
 
 console.log("Phase 1 core checks passed.");

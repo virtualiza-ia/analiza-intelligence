@@ -14,13 +14,15 @@ La via manual principal para actualizar Analiza Intelligence sera un formulario 
 - En Laboratorio, el formulario ya no usa los campos genericos de capacidad/equipo. Sigue la plantilla de resultados y pide las secciones amarillas: financiero, datos generales, base de clientes, gastos, personal e inventario.
 - La seccion financiera de Laboratorio solo pide Meta, Venta Total y Costo de la Venta; margen, alcance y utilidad se calculan desde esos datos cuando aplique.
 - El primer paso de Laboratorio precarga mes, sucursal, gerente de sucursal, gerente de area, departamento, fecha de corte y fecha limite de carga desde el contexto y catalogo activo.
+- La fecha de corte queda bloqueada como el ultimo dia del mes reportado; no debe capturarse manualmente.
+- La fecha limite de carga queda bloqueada al dia 4 del mes siguiente.
 - Los renglones no amarillos de la plantilla, como totales, promedios o validaciones, deben calcularse desde los valores ingresados y no capturarse como texto libre.
 - Laboratorio captura personal de la sucursal, como flebotomistas, atencion al cliente, enfermeras, area tecnica y limpieza/vigilantes, para que productividad y bonos no dependan de texto fijo del dashboard.
 - El cierre de Laboratorio incluye cantidad y monto de consumibles, insumos y reactivos. AnaliA compara esos montos contra ingreso, ordenes, costos e historico antes de tratarlos como confiables.
 - La calidad ya no se captura como un score manual. AnaliA calcula el score con completitud, coherencia, archivos cargados, montos sospechosos, sucursal, periodo, duplicados y trazabilidad.
 - El Excel comercial de examenes medicos y montos vendidos se carga como una sola fuente de apoyo con columnas Fecha, Sucursal, Doctor, Examen, Especialidad, Area, Total y Visitador.
 - La evaluacion 360 se realizara por correo o formulario anonimo; sus resultados llenan automaticamente score, tema cualitativo y accion sugerida.
-- La pantalla muestra un bloque Year to date para revisar acumulado 2026 por linea y sucursal seleccionada.
+- La pantalla muestra un bloque Year to date para revisar acumulado 2026 por linea y sucursal seleccionada. Si la sucursal no tiene datos, no se debe rellenar con otras sucursales.
 - Cada registro conserva historial por linea, sucursal, periodo, fuente, estado y marca `DEMO`.
 - La vista consolidada solo muestra historial; no permite publicar cierres porque no se deben mezclar negocios distintos.
 - AnaliA puede usar estos cierres para Insights, alertas tempranas, metas sugeridas y lectura de salud financiera.
@@ -54,7 +56,15 @@ Cuando el usuario tiene rol `gerente_sucursal`, la sucursal reportada, gerente d
 
 ## Historial
 
-En el prototipo, los cierres guardados por el formulario viven en `localStorage` bajo `analiza:manual-monthly-history` para demostrar la experiencia de uso. En produccion, este historial debe persistir en base de datos con:
+El historial DEMO heredado puede seguir leyendose desde `localStorage` bajo `analiza:manual-monthly-history`, pero los guardados y publicaciones productivos usan `/api/manual-submissions` con sesion autenticada y nunca vuelven a almacenamiento del navegador como fallback. El historial productivo persiste en base de datos con:
+
+Al seleccionar sucursal, linea y periodo, el formulario consulta el historial autorizado del servidor y recupera automaticamente el borrador activo si existe. La consulta acepta filtros exactos y devuelve un maximo de 50 versiones activas dentro del alcance del usuario.
+
+La interfaz presenta el historial productivo en una tabla independiente con estado, version, calidad y fecha de actualizacion. Los ejemplos heredados permanecen en una seccion marcada como `DEMO`; no participan en conteos productivos, deteccion de publicaciones previas ni confirmaciones de guardado.
+
+Antes de persistir, el servidor aplica la lista exacta de campos permitidos para la linea, valida tipos y rangos, ignora cualquier score enviado por el navegador y calcula el score canonico. Cada guardado conserva una version nueva; si otra sesion avanzo el cierre, la version esperada no coincide y la API responde `409` sin sobrescribir datos.
+
+Las tres tablas tienen RLS habilitado mediante una migracion posterior. Los clientes autenticados solo pueden leer sucursales dentro de su alcance y no pueden escribir directamente; las escrituras pasan por el servidor. La readiness tambien comprueba RLS y que el rol privado de `DATABASE_URL` pueda escribir sin exponer su nombre.
 
 - Organizacion, pais, empresa, linea de negocio, sucursal y periodo.
 - Usuario responsable, gerente de sucursal, gerente de area, rol, fecha de captura, fecha de publicacion y estado.
@@ -62,13 +72,14 @@ En el prototipo, los cierres guardados por el formulario viven en `localStorage`
 - Fuente de datos: formulario, conector, carga Excel o correccion aprobada.
 - Score de calidad y lista de reglas bloqueantes o advertencias.
 - Archivos comerciales asociados: reporte de examenes medicos y montos vendidos, evaluaciones 360 anonimas y cualquier conector equivalente.
-- Deadline del dia 5 del mes siguiente, estado de puntualidad y efecto en score/bono.
+- Deadline del dia 4 del mes siguiente, estado de puntualidad y efecto en score/bono.
 
 ## Calidad y privacidad
 
 - No se deben capturar nombres, telefonos, documentos ni datos clinicos identificables de pacientes.
 - No se publica un cierre si faltan campos obligatorios.
-- Un cierre publicado solo puede reemplazarse con autorizacion de administrador.
+- Un cierre publicado solo puede reemplazarlo en el servidor un usuario con rol `super_admin` o `webmaster_admin`; los codigos ingresados en el navegador no conceden permisos.
+- Toda correccion requiere un motivo, crea una version superior y registra el evento `REPLACED` antes de la nueva publicacion.
 - La carga tardia queda marcada como penalizacion DEMO para score, disciplina y bono sugerido.
 - La evaluacion 360 debe guardarse como senal anonima y cualitativa; no debe exponer colaboradores ni usarse para represalias.
 - Si el score de calidad automatico baja de 70%, el cierre debe quedar bloqueado o marcado con advertencia.

@@ -5,6 +5,7 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   Globe2,
+  LockKeyhole,
   MapPin,
   SlidersHorizontal,
   UsersRound,
@@ -15,9 +16,15 @@ import {
   demoBusinessLineOptions,
   demoCompanyOptions,
   demoCountryOptions,
+  getBusinessLineForCompany,
   getCompanyForBusinessLine,
   getDefaultPeriod,
 } from "@/lib/tenant/demo-context";
+import {
+  fetchCurrentUserAccess,
+  isBranchManagerScopedAccess,
+  type CurrentUserAccess,
+} from "@/lib/tenant/current-user-access";
 
 const allBranchesValue = "__all__";
 const allManagersValue = "__all_managers__";
@@ -87,7 +94,45 @@ function formatPeriodLabel(periodStart: string, periodEnd: string) {
   return `${periodStart} a ${periodEnd}`;
 }
 
+function findBusinessLineByCompanyScope(companyId?: string | null, companyName?: string | null) {
+  const lineByCompanyId = companyId ? getBusinessLineForCompany(companyId) : null;
+
+  if (lineByCompanyId && !lineByCompanyId.isConsolidated) {
+    return lineByCompanyId;
+  }
+
+  const normalizedCompanyName = companyName?.toLowerCase() ?? "";
+
+  if (normalizedCompanyName.includes("laboratorio")) {
+    return (
+      demoBusinessLineOptions.find((line) => line.code === "LABORATORY") ??
+      demoBusinessLineOptions[0]
+    );
+  }
+
+  if (normalizedCompanyName.includes("fisioterapia")) {
+    return (
+      demoBusinessLineOptions.find((line) => line.code === "PHYSIOTHERAPY") ??
+      demoBusinessLineOptions[0]
+    );
+  }
+
+  if (
+    normalizedCompanyName.includes("imagen") ||
+    normalizedCompanyName.includes("image")
+  ) {
+    return (
+      demoBusinessLineOptions.find((line) => line.code === "IMAGING") ??
+      demoBusinessLineOptions[0]
+    );
+  }
+
+  return demoBusinessLineOptions[0];
+}
+
 export function TenantContextHeader() {
+  const [currentUserAccess, setCurrentUserAccess] =
+    useState<CurrentUserAccess | null>(null);
   const [countryId, setCountryId] = useState(getInitialCountryId());
   const [companyId, setCompanyId] = useState("");
   const [businessLineId, setBusinessLineId] = useState(
@@ -98,6 +143,15 @@ export function TenantContextHeader() {
   const [periodStart, setPeriodStart] = useState(`${getDefaultPeriod()}-01`);
   const [periodEnd, setPeriodEnd] = useState(`${getDefaultPeriod()}-31`);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const scopedBranchAccess = isBranchManagerScopedAccess(currentUserAccess)
+    ? currentUserAccess
+    : null;
+  const scopedBusinessLine = scopedBranchAccess
+    ? findBusinessLineByCompanyScope(
+        scopedBranchAccess.scope.companyId,
+        scopedBranchAccess.scope.companyName,
+      )
+    : null;
   const selectedCountry = demoCountryOptions.find(
     (country) => country.id === countryId,
   );
@@ -125,6 +179,20 @@ export function TenantContextHeader() {
         : countryBranches.filter((branch) => branch.companyId === companyId),
     [companyId, countryBranches, selectedCompany?.isConsolidated],
   );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchCurrentUserAccess().then((access) => {
+      if (isMounted) {
+        setCurrentUserAccess(access);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -174,72 +242,110 @@ export function TenantContextHeader() {
   }, []);
 
   useEffect(() => {
+    if (scopedBranchAccess) {
+      return;
+    }
+
     const nextCompanyId = companies[0]?.id ?? "";
     setCompanyId((currentCompanyId) =>
       companies.some((company) => company.id === currentCompanyId)
         ? currentCompanyId
         : nextCompanyId,
     );
-  }, [companies]);
+  }, [companies, scopedBranchAccess]);
 
   useEffect(() => {
+    if (scopedBranchAccess) {
+      return;
+    }
+
     setBranchId((currentBranchId) =>
       currentBranchId === allBranchesValue ||
       branches.some((branch) => branch.id === currentBranchId)
         ? currentBranchId
         : allBranchesValue,
     );
-  }, [branches]);
+  }, [branches, scopedBranchAccess]);
+
+  useEffect(() => {
+    if (!scopedBranchAccess) {
+      return;
+    }
+
+    setAdvancedFiltersOpen(false);
+    setBusinessLineId(scopedBusinessLine?.id ?? demoBusinessLineOptions[0]?.id ?? "");
+    setCompanyId(scopedBranchAccess.scope.companyId ?? scopedBusinessLine?.companyId ?? "");
+    setCountryId(scopedBranchAccess.scope.countryId ?? getInitialCountryId());
+    setBranchId(scopedBranchAccess.scope.branchId ?? scopedBranchAccess.scope.branchName);
+    setManagerId(allManagersValue);
+  }, [
+    scopedBranchAccess,
+    scopedBusinessLine?.companyId,
+    scopedBusinessLine?.id,
+  ]);
 
   useEffect(() => {
     const country = demoCountryOptions.find((item) => item.id === countryId);
     const company = demoCompanyOptions.find((item) => item.id === companyId);
-    const businessLine = demoBusinessLineOptions.find(
-      (item) => item.id === businessLineId,
-    );
+    const businessLine =
+      scopedBusinessLine ??
+      demoBusinessLineOptions.find((item) => item.id === businessLineId);
     const branch = demoBranches.find((item) => item.id === branchId);
 
-    if (!country || !company || !businessLine) {
+    if (!businessLine) {
       return;
     }
 
     const branchName =
+      scopedBranchAccess?.scope.branchName ??
       branch?.name ??
-      (country.scope === "regional"
+      (country?.scope === "regional"
         ? "Todas las sucursales de la region"
         : "Todas las sucursales permitidas");
-
+    const contextBranchId =
+      scopedBranchAccess?.scope.branchId ??
+      scopedBranchAccess?.scope.branchName ??
+      branchId;
+    const contextCountryId =
+      scopedBranchAccess?.scope.countryId ?? country?.id ?? getInitialCountryId();
+    const contextCompanyId =
+      scopedBranchAccess?.scope.companyId ?? company?.id ?? "";
     const context: StoredContext = {
-      countryId: country.id,
-      countryName: country.name,
-      companyId: company.id,
-      companyName: company.name,
+      countryId: contextCountryId,
+      countryName: scopedBranchAccess?.scope.countryName ?? country?.name ?? "Pais asignado",
+      companyId: contextCompanyId,
+      companyName:
+        scopedBranchAccess?.scope.companyName ??
+        company?.name ??
+        businessLine.name,
       businessLineId: businessLine.id,
       businessLineName: businessLine.name,
       businessLineCode: businessLine.code,
-      branchId,
+      branchId: contextBranchId,
       branchName,
-      managerId,
-      managerName: selectedManager.name,
+      managerId: scopedBranchAccess ? allManagersValue : managerId,
+      managerName: scopedBranchAccess
+        ? scopedBranchAccess.scope.branchName
+        : selectedManager.name,
       period: `${periodStart} a ${periodEnd}`,
       periodStart,
       periodEnd,
       year: periodStart.slice(0, 4),
       month: periodStart.slice(5, 7),
-      isDemo: true,
+      isDemo: !scopedBranchAccess,
     };
 
     window.localStorage.setItem(storageKey, JSON.stringify(context));
     window.sessionStorage.setItem(storageKey, JSON.stringify(context));
 
     const searchParams = new URLSearchParams(window.location.search);
-    searchParams.set("country", country.id);
-    searchParams.set("company", company.id);
+    searchParams.set("country", contextCountryId);
+    searchParams.set("company", contextCompanyId);
     searchParams.set("line", businessLine.id);
-    searchParams.set("branch", branchId);
+    searchParams.set("branch", contextBranchId);
     searchParams.set("from", periodStart);
     searchParams.set("to", periodEnd);
-    searchParams.set("manager", managerId);
+    searchParams.set("manager", scopedBranchAccess ? allManagersValue : managerId);
     searchParams.delete("channel");
     searchParams.delete("payer");
     searchParams.delete("service");
@@ -258,6 +364,8 @@ export function TenantContextHeader() {
     managerId,
     periodEnd,
     periodStart,
+    scopedBranchAccess,
+    scopedBusinessLine,
     selectedManager.name,
   ]);
 
@@ -270,11 +378,57 @@ export function TenantContextHeader() {
 
   const selectedBranch = demoBranches.find((item) => item.id === branchId);
   const branchName =
+    scopedBranchAccess?.scope.branchName ??
     selectedBranch?.name ??
     (selectedCountry?.scope === "regional"
       ? "Todas las sucursales de la region"
       : "Todas las sucursales");
   const periodLabel = formatPeriodLabel(periodStart, periodEnd);
+  const lineLabel =
+    scopedBusinessLine?.name ??
+    demoBusinessLineOptions.find((line) => line.id === businessLineId)?.name ??
+    "Linea asignada";
+  const companyLabel =
+    scopedBranchAccess?.scope.companyName ??
+    selectedCompany?.name ??
+    lineLabel;
+  const countryLabel =
+    scopedBranchAccess?.scope.countryName ??
+    selectedCountry?.name ??
+    "Pais asignado";
+
+  if (scopedBranchAccess) {
+    return (
+      <div className="grid min-w-0 flex-1 gap-2">
+        <div className="flex min-w-0 flex-col gap-2 2xl:flex-row 2xl:items-center">
+          <div className="flex min-h-12 min-w-0 items-center gap-3 rounded-md border-2 border-primary/50 bg-accent px-3 py-2 text-xs shadow-sm 2xl:min-w-[310px]">
+            <BriefcaseBusiness className="size-4 shrink-0 text-primary" />
+            <span className="grid min-w-0 flex-1 gap-0.5">
+              <span className="font-semibold uppercase text-primary">
+                Linea asignada
+              </span>
+              <span className="truncate text-base font-semibold text-accent-foreground">
+                {lineLabel}
+              </span>
+            </span>
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 rounded-md border bg-background p-2">
+            <div className="flex h-9 min-w-44 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+              <LockKeyhole className="size-3.5 shrink-0 text-primary" />
+              <span className="font-medium">Acceso de sucursal</span>
+            </div>
+            <div className="min-w-0 flex-1 truncate px-1 text-sm">
+              <span className="font-medium">{branchName}</span>
+              <span className="text-muted-foreground"> · {companyLabel}</span>
+              <span className="text-muted-foreground"> · {countryLabel}</span>
+              <span className="text-muted-foreground"> · {periodLabel}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid min-w-0 flex-1 gap-2">

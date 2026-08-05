@@ -85,3 +85,4 @@ export function formatPercentagePoints(value: number | null, decimals = 0) {
 
   return `${(value * 100).toFixed(decimals)} pp`;
 }
+

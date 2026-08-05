@@ -8,6 +8,7 @@ import {
   getDemoAdminEmail,
   hasDemoAdminCookie,
 } from "@/lib/auth/demo-admin";
+import { readLocalSession } from "@/lib/auth/local-session";
 import { hasEnvVars } from "@/lib/utils";
 
 export async function AuthButton() {
@@ -21,6 +22,19 @@ export async function AuthButton() {
       <div className="flex items-center gap-4">
         <span className="text-sm text-muted-foreground">
           {getDemoAdminEmail()}
+        </span>
+        <LogoutButton />
+      </div>
+    );
+  }
+
+  const localSession = readLocalSession(cookieStore);
+
+  if (localSession) {
+    return (
+      <div className="flex items-center gap-4">
+        <span className="text-sm text-muted-foreground">
+          {localSession.email}
         </span>
         <LogoutButton />
       </div>

@@ -42,8 +42,8 @@ assert(
   "Manual monthly dashboard must persist DEMO history locally.",
 );
 assert(
-  component.includes("Guardar avance DEMO") &&
-    component.includes("Publicar cierre DEMO"),
+  component.includes("Guardar borrador") &&
+    component.includes("Publicar cierre"),
   "Manual monthly dashboard must support draft and publish actions.",
 );
 assert(
@@ -67,9 +67,28 @@ assert(
 );
 assert(
   component.includes("getMonthlyLoadDeadline") &&
-    component.includes("edit_authorization_code") &&
-    component.includes("Ese cierre ya fue publicado"),
+    component.includes("2026-08-04") &&
+    component.includes("monthValue, 4") &&
+    component.includes("correction_reason") &&
+    component.includes("Editar un cierre publicado requiere autorizacion"),
   "Manual monthly dashboard must enforce deadline and edit authorization rules.",
+);
+assert(
+  component.includes("disabled={readOnly && isSystemDateField}") &&
+    component.includes('"data_cutoff_date"') &&
+    component.includes('"load_deadline_date"'),
+  "Manual monthly dashboard must lock system-owned cutoff and deadline dates.",
+);
+assert(
+  component.includes("scopedHistoryEntries") &&
+    component.includes("No se") &&
+    component.includes("muestran registros de otras sucursales"),
+  "Manual monthly dashboard must scope YTD and history to the selected branch.",
+);
+assert(
+  component.includes("scrollFormToTop") &&
+    component.includes("requestAnimationFrame"),
+  "Manual monthly dashboard must return to the form top when changing steps.",
 );
 assert(
   importDashboard.includes("ManualMonthlyEntryDashboard"),
@@ -142,6 +161,8 @@ for (const retiredLabField of [
   "lab_margin_rate",
   "lab_margin_amount",
   "lab_operating_profit",
+  "lab_no_doctor_patient_sales",
+  "lab_no_doctor_order_count",
   "lab_profiles_total",
   "doctors_sales_file",
   "medical_reps_sales_file",

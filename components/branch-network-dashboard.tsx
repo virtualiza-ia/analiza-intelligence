@@ -23,9 +23,15 @@ import {
   type RoleKey,
 } from "@/lib/tenant/demo-context";
 import {
+  fetchCurrentUserAccess,
+  isBranchManagerScopedAccess,
+  type CurrentUserAccess,
+} from "@/lib/tenant/current-user-access";
+import {
   branchScoreWeights,
   buildBranchTrendChart,
   getBranchNetworkScreen,
+  type BranchNetworkMetric,
   type BranchNetworkRecord,
   type BranchStatus,
 } from "@/lib/analytics/branch-network";
@@ -39,6 +45,7 @@ const roleChangeEvent = "analiza:role-change";
 const allOption = "Todos";
 
 type StoredContext = {
+  branchId?: string;
   countryName?: string;
   companyName?: string;
   businessLineId?: string;
@@ -230,6 +237,127 @@ function metricToneClass(tone: string) {
   return "border-border bg-card text-foreground";
 }
 
+function getMetricToneFromStatus(status: BranchStatus): BranchNetworkMetric["tone"] {
+  if (status === "Critica") {
+    return "negative";
+  }
+
+  if (status === "Precaucion") {
+    return "warning";
+  }
+
+  return "positive";
+}
+
+function buildBranchManagerMetrics(
+  record: BranchNetworkRecord | null,
+  branchName: string,
+): BranchNetworkMetric[] {
+  if (!record) {
+    return [
+      {
+        label: "Mi sucursal",
+        note: "No se muestran datos de otras sucursales.",
+        tone: "warning",
+        value: branchName,
+      },
+      {
+        label: "Cierre cargado",
+        note: "Pendiente de cargar o validar para el periodo seleccionado.",
+        tone: "warning",
+        value: "Pendiente",
+      },
+      {
+        label: "Datos visibles",
+        note: "El tablero queda vacio hasta tener datos propios.",
+        tone: "neutral",
+        value: "0",
+      },
+      {
+        label: "Accion",
+        note: "Completar el formulario mensual de la sucursal.",
+        tone: "warning",
+        value: "Cargar cierre",
+      },
+    ];
+  }
+
+  return [
+    {
+      label: "Mi sucursal",
+      note: record.branch,
+      tone: getMetricToneFromStatus(record.status),
+      value: record.city,
+    },
+    {
+      label: "Estado operativo",
+      note: record.priorityAction,
+      tone: getMetricToneFromStatus(record.status),
+      value: record.status,
+    },
+    {
+      label: "Venta neta",
+      note: "periodo seleccionado",
+      tone: record.netSales >= record.projectedClose ? "positive" : "warning",
+      value: formatCurrency(record.netSales),
+    },
+    {
+      label: "Pacientes",
+      note: "solo esta sucursal",
+      tone: "neutral",
+      value: record.patients.toLocaleString("en-US"),
+    },
+    {
+      label: "Score",
+      note: `${record.scoreDelta >= 0 ? "+" : ""}${record.scoreDelta} pts vs periodo previo`,
+      tone: record.score >= 80 ? "positive" : "warning",
+      value: `${record.score}`,
+    },
+    {
+      label: "Margen",
+      note: "salud financiera local",
+      tone: record.marginRate >= 0.4 ? "positive" : "warning",
+      value: formatRate(record.marginRate),
+    },
+    {
+      label: "Ocupacion",
+      note: "uso efectivo de capacidad",
+      tone: record.occupancyRate >= 0.7 ? "positive" : "warning",
+      value: formatRate(record.occupancyRate),
+    },
+    {
+      label: "Calidad de datos",
+      note: "base para bono y trazabilidad",
+      tone: record.dataQuality >= 80 ? "positive" : "warning",
+      value: `${record.dataQuality}`,
+    },
+  ];
+}
+
+function BranchManagerEmptyState({
+  branchName,
+}: {
+  branchName: string;
+}) {
+  return (
+    <section className="rounded-md border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
+      <div className="mb-2 flex items-center gap-2 font-semibold">
+        <AlertTriangle className="size-4" />
+        Sin cierre cargado para esta sucursal
+      </div>
+      <p>
+        {branchName} no tiene datos de resultados para el periodo seleccionado.
+        Por seguridad, el sistema no muestra la red completa ni usa otra
+        sucursal como reemplazo.
+      </p>
+      <p className="mt-2">
+        Siguiente paso: entrar a Formulario mensual y completar el cierre de la
+        sucursal asignada.
+      </p>
+    </section>
+  );
+}
+
 function heatClass(value: number) {
   if (value >= 88) {
     return "bg-emerald-600 text-white";
@@ -348,7 +476,7 @@ function BranchFiltersPanel({
 function BranchMetricGrid({
   metrics,
 }: {
-  metrics: ReturnType<typeof getBranchNetworkScreen>["metrics"];
+  metrics: BranchNetworkMetric[];
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1026,32 +1154,66 @@ function ScoreWeightsPanel() {
 
 export function BranchNetworkDashboard() {
   const [context, setContext] = useState<StoredContext | null>(null);
+  const [currentUserAccess, setCurrentUserAccess] =
+    useState<CurrentUserAccess | null>(null);
   const [activeRole, setActiveRole] = useState<RoleKey>("super_admin");
   const [filters, setFilters] = useState<BranchFilters>(() => createDefaultFilters());
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [trendBranchIds, setTrendBranchIds] = useState<string[]>([]);
-  const lineSlug = useMemo(() => resolveContextLine(context), [context]);
+  const scopedBranchAccess = isBranchManagerScopedAccess(currentUserAccess)
+    ? currentUserAccess
+    : null;
+  const effectiveRole = scopedBranchAccess?.roleKey ?? activeRole;
+  const isBranchManagerView = effectiveRole === "gerente_sucursal";
+  const lineSlug = useMemo(() => {
+    if (!scopedBranchAccess) {
+      return resolveContextLine(context);
+    }
+
+    return resolveBusinessLineSlug({
+      companyName: scopedBranchAccess.scope.companyName ?? undefined,
+    });
+  }, [context, scopedBranchAccess]);
   const screen = useMemo(() => getBranchNetworkScreen(lineSlug), [lineSlug]);
   const branchScopedRecords = useMemo(() => {
-    if (activeRole !== "gerente_sucursal") {
+    if (!isBranchManagerView) {
       return screen.records;
     }
 
+    const scopedBranchId = scopedBranchAccess?.scope.branchId ?? context?.branchId;
     const contextBranchName =
       context?.branchName && context.branchName !== "Todas las sucursales"
         ? context.branchName
         : "";
-    const exactRecords = contextBranchName
-      ? screen.records.filter(
-          (record) =>
-            branchNamesMatch(record.branch, contextBranchName) ||
-            branchNamesMatch(record.city, contextBranchName),
-        )
-      : [];
+    const scopedBranchName =
+      scopedBranchAccess?.scope.branchName ?? contextBranchName;
 
-    return exactRecords.length > 0 ? exactRecords : screen.records.slice(0, 1);
-  }, [activeRole, context?.branchName, screen.records]);
+    if (!scopedBranchId && !scopedBranchName) {
+      return [];
+    }
+
+    return screen.records.filter((record) => {
+      return (
+        (scopedBranchId ? record.id === scopedBranchId : false) ||
+        (scopedBranchName
+          ? branchNamesMatch(record.branch, scopedBranchName) ||
+            branchNamesMatch(record.city, scopedBranchName)
+          : false)
+      );
+    });
+  }, [
+    context?.branchId,
+    context?.branchName,
+    isBranchManagerView,
+    scopedBranchAccess?.scope.branchId,
+    scopedBranchAccess?.scope.branchName,
+    screen.records,
+  ]);
   const filteredRecords = useMemo(() => {
+    if (isBranchManagerView) {
+      return branchScopedRecords;
+    }
+
     return branchScopedRecords.filter((record) => {
       return (
         (filters.branch === allOption || record.branch === filters.branch) &&
@@ -1065,18 +1227,28 @@ export function BranchNetworkDashboard() {
           record.comparableGroup === filters.comparableGroup)
       );
     });
-  }, [branchScopedRecords, filters]);
+  }, [branchScopedRecords, filters, isBranchManagerView]);
   const selectedRecord =
     filteredRecords.find((record) => record.id === selectedBranchId) ??
     filteredRecords[0] ??
-    screen.records[0];
+    null;
   const trendRecords = useMemo(() => {
     const selected = filteredRecords.filter((record) =>
       trendBranchIds.includes(record.id),
     );
     return selected.length > 0 ? selected : filteredRecords.slice(0, 5);
   }, [filteredRecords, trendBranchIds]);
-  const trendChart = useMemo(() => buildBranchTrendChart(trendRecords), [trendRecords]);
+  const trendChart = useMemo(
+    () => (trendRecords.length > 0 ? buildBranchTrendChart(trendRecords) : null),
+    [trendRecords],
+  );
+  const scopedBranchName =
+    scopedBranchAccess?.scope.branchName ??
+    context?.branchName ??
+    "Mi sucursal";
+  const visibleMetrics = isBranchManagerView
+    ? buildBranchManagerMetrics(selectedRecord, scopedBranchName)
+    : screen.metrics;
 
   useEffect(() => {
     function refreshContext() {
@@ -1084,6 +1256,11 @@ export function BranchNetworkDashboard() {
     }
 
     function refreshRole() {
+      if (currentUserAccess) {
+        setActiveRole(currentUserAccess.roleKey);
+        return;
+      }
+
       setActiveRole(readActiveDemoRole());
     }
 
@@ -1099,6 +1276,26 @@ export function BranchNetworkDashboard() {
       window.removeEventListener(contextChangeEvent, refreshContext);
       window.removeEventListener("storage", refreshRole);
       window.removeEventListener(roleChangeEvent, refreshRole);
+    };
+  }, [currentUserAccess]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchCurrentUserAccess().then((access) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setCurrentUserAccess(access);
+
+      if (access) {
+        setActiveRole(access.roleKey);
+      }
+    });
+
+    return () => {
+      isMounted = false;
     };
   }, []);
 
@@ -1127,7 +1324,7 @@ export function BranchNetworkDashboard() {
             </Badge>
             <Badge variant="outline">Sucursales</Badge>
             <Badge variant="outline">{screen.subtitle}</Badge>
-            {activeRole === "gerente_sucursal" ? (
+            {isBranchManagerView ? (
               <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
                 Solo mi sucursal
               </Badge>
@@ -1150,12 +1347,10 @@ export function BranchNetworkDashboard() {
         <ScopeCard context={context} lineSlug={lineSlug} />
       </div>
 
-      {activeRole === "gerente_sucursal" ? (
+      {isBranchManagerView ? (
         <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">
-          Vista restringida por rol: el gerente de sucursal solo consulta su
-          sucursal asignada. En produccion esta regla se aplicara tambien en la
-          base de datos con organization_id, country_id, company_id,
-          operational_area_id y branch_id.
+          Vista restringida por rol: este usuario solo consulta y carga datos
+          de {scopedBranchName}. No hay filtros para cambiar de sucursal.
         </section>
       ) : (
         <BranchFiltersPanel
@@ -1165,39 +1360,56 @@ export function BranchNetworkDashboard() {
         />
       )}
 
-      <BranchMetricGrid metrics={getBranchNetworkScreen(lineSlug).metrics} />
+      <BranchMetricGrid metrics={visibleMetrics} />
 
-      <BranchRankingTable
-        onSelect={setSelectedBranchId}
-        records={filteredRecords}
-        selectedId={selectedRecord?.id ?? null}
-      />
+      {isBranchManagerView ? (
+        <>
+          {filteredRecords.length === 0 ? (
+            <BranchManagerEmptyState branchName={scopedBranchName} />
+          ) : (
+            <>
+              {trendChart ? <AnalyticsComparisonChart {...trendChart} /> : null}
+              {selectedRecord ? <BranchProfile record={selectedRecord} /> : null}
+              <HeatmapSection records={filteredRecords} />
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <BranchRankingTable
+            onSelect={setSelectedBranchId}
+            records={filteredRecords}
+            selectedId={selectedRecord?.id ?? null}
+          />
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <BranchMapPanel
-          onSelect={setSelectedBranchId}
-          records={filteredRecords}
-          selectedId={selectedRecord?.id ?? null}
-        />
-        <BubbleMatrix onSelect={setSelectedBranchId} records={filteredRecords} />
-      </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <BranchMapPanel
+              onSelect={setSelectedBranchId}
+              records={filteredRecords}
+              selectedId={selectedRecord?.id ?? null}
+            />
+            <BubbleMatrix onSelect={setSelectedBranchId} records={filteredRecords} />
+          </div>
 
-      <HeatmapSection records={filteredRecords} />
+          <HeatmapSection records={filteredRecords} />
 
-      <TrendBranchSelector
-        onChange={setTrendBranchIds}
-        records={filteredRecords}
-        selectedIds={trendBranchIds}
-      />
-      <AnalyticsComparisonChart {...trendChart} />
+          <TrendBranchSelector
+            onChange={setTrendBranchIds}
+            records={filteredRecords}
+            selectedIds={trendBranchIds}
+          />
+          {trendChart ? <AnalyticsComparisonChart {...trendChart} /> : null}
 
-      {selectedRecord ? <BranchProfile record={selectedRecord} /> : null}
+          {selectedRecord ? <BranchProfile record={selectedRecord} /> : null}
 
-      <ContributionAndLoss records={filteredRecords} />
+          <ContributionAndLoss records={filteredRecords} />
 
-      <ScoreWeightsPanel />
+          <ScoreWeightsPanel />
 
-      <ExecutiveActions actions={screen.executiveActions} />
+          <ExecutiveActions actions={screen.executiveActions} />
+        </>
+      )}
+
 
       <section className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
         <div className="flex items-start gap-2">

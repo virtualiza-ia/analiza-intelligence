@@ -15,6 +15,7 @@ This board prevents overlapping work while GitHub issues and pull requests remai
 | Issue | Task | Owner | Branch | Claimed paths or contracts | Status |
 | --- | --- | --- | --- | --- | --- |
 | — | Repository collaboration controls | Primary Codex | `codex/primary/collaboration-controls` | `AGENTS.md`, `.github/`, `docs/WORKBOARD.md`, `docs/collaboration-workflow.md` | In review |
+| #4 | Integrate functional base with PR #2 and PR #3 | Alberto / Primary Codex | `codex/alberto/integracion-final` | auth, RBAC, invitations, branches, manual forms, database contracts, dependencies, environment contracts | In review |
 
 Allowed statuses: `Planned`, `In progress`, `Blocked`, `In review`.
 

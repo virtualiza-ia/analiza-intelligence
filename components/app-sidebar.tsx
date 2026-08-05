@@ -24,6 +24,7 @@ const roleStorageKey = "analiza:demo-role";
 const roleChangeEvent = "analiza:role-change";
 
 type AppSidebarProps = {
+  allowDemoRoleSwitch: boolean;
   roleKey: RoleKey;
 };
 
@@ -31,7 +32,7 @@ function isActive(pathname: string, item: NavigationItem) {
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-export function AppSidebar({ roleKey }: AppSidebarProps) {
+export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [activeRole, setActiveRole] = useState<RoleKey>(roleKey);
@@ -41,12 +42,20 @@ export function AppSidebar({ roleKey }: AppSidebarProps) {
 
   useEffect(() => {
     setCollapsed(window.localStorage.getItem(storageKey) === "true");
+
+    if (!allowDemoRoleSwitch) {
+      setActiveRole(roleKey);
+      window.localStorage.setItem(roleStorageKey, roleKey);
+      window.dispatchEvent(new Event(roleChangeEvent));
+      return;
+    }
+
     const storedRole = window.localStorage.getItem(roleStorageKey);
 
     if (roleKeys.includes(storedRole as RoleKey)) {
       setActiveRole(storedRole as RoleKey);
     }
-  }, []);
+  }, [allowDemoRoleSwitch, roleKey]);
 
   function toggleCollapsed() {
     setCollapsed((currentValue) => {
@@ -151,6 +160,18 @@ export function AppSidebar({ roleKey }: AppSidebarProps) {
 
       <div className="border-t p-3">
         <div className={cn("grid gap-2", collapsed && "sr-only")}>
+          {!allowDemoRoleSwitch ? (
+            <div className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+              <div className="font-medium text-foreground">
+                {roleProfile.label}
+              </div>
+              <div>{roleProfile.accessSummary}</div>
+              <div className="mt-1">
+                {visibleItems.length} de {navigationItems.length} modulos visibles
+              </div>
+            </div>
+          ) : (
+            <>
           <label className="grid gap-1 text-xs">
             <span className="font-medium text-foreground">Rol DEMO</span>
             <select
@@ -172,6 +193,8 @@ export function AppSidebar({ roleKey }: AppSidebarProps) {
               {visibleItems.length} de {navigationItems.length} modulos visibles
             </div>
           </div>
+            </>
+          )}
         </div>
       </div>
     </aside>
