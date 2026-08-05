@@ -7,6 +7,7 @@ import {
   hashPassword,
   verifyPassword,
 } from "@/lib/server/passwords";
+import type { CurrentUserScope } from "@/lib/tenant/current-user-access";
 import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
 
 type InvitationActivationRow = {
@@ -31,9 +32,28 @@ type LocalAuthUserRow = {
   role_key: string | null;
 };
 
-type AuthenticatedLocalUser = {
+type LocalUserScopeRow = {
+  branch_city: string | null;
+  branch_code: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
+  company_id: string | null;
+  company_name: string | null;
+  country_id: string | null;
+  country_name: string | null;
+  email: string;
+  id: string;
+  operational_area_id: string | null;
+  operational_area_name: string | null;
+  organization_id: string | null;
+  organization_name: string | null;
+  role_key: string | null;
+};
+
+export type AuthenticatedLocalUser = {
   email: string;
   roleKey: RoleKey;
+  scope?: CurrentUserScope;
   userId: string;
 };
 
@@ -412,4 +432,91 @@ export async function authenticateLocalUser({
     roleKey: coerceRoleKey(user.role_key),
     userId: user.id,
   };
+}
+
+function buildCurrentUserScope(row: LocalUserScopeRow): CurrentUserScope {
+  return {
+    branchCity: row.branch_city,
+    branchCode: row.branch_code,
+    branchId: row.branch_id,
+    branchName: row.branch_name,
+    companyId: row.company_id,
+    companyName: row.company_name,
+    countryId: row.country_id,
+    countryName: row.country_name,
+    operationalAreaId: row.operational_area_id,
+    operationalAreaName: row.operational_area_name,
+    organizationId: row.organization_id,
+    organizationName: row.organization_name,
+  };
+}
+
+export async function getAuthenticatedLocalUserAccess(userId: string) {
+  const pool = getPostgresPool();
+  const result = await pool.query<LocalUserScopeRow>(
+    `
+      select
+        u.id,
+        u.email,
+        r.key as role_key,
+        coalesce(ur.organization_id, p.organization_id) as organization_id,
+        o.name as organization_name,
+        coalesce(ur.country_id, p.default_country_id, b.country_id) as country_id,
+        c.name as country_name,
+        coalesce(ur.company_id, p.default_company_id, b.company_id) as company_id,
+        co.name as company_name,
+        coalesce(ur.operational_area_id, b.operational_area_id) as operational_area_id,
+        oa.name as operational_area_name,
+        coalesce(ur.branch_id, p.default_branch_id) as branch_id,
+        b.name as branch_name,
+        b.code as branch_code,
+        b.city as branch_city
+      from auth.users u
+      join public.profiles p on p.id = u.id
+      left join public.user_roles ur
+        on ur.user_id = p.id
+        and coalesce(ur.status, 'active') = 'active'
+        and ur.deactivated_at is null
+      left join public.roles r on r.id = ur.role_id
+      left join public.branches b
+        on b.id = coalesce(ur.branch_id, p.default_branch_id)
+      left join public.organizations o
+        on o.id = coalesce(ur.organization_id, p.organization_id)
+      left join public.countries c
+        on c.id = coalesce(ur.country_id, p.default_country_id, b.country_id)
+      left join public.companies co
+        on co.id = coalesce(ur.company_id, p.default_company_id, b.company_id)
+      left join public.operational_areas oa
+        on oa.id = coalesce(ur.operational_area_id, b.operational_area_id)
+      where u.id = $1
+        and p.status = 'active'
+        and p.deactivated_at is null
+        and p.deleted_at is null
+      order by
+        case r.key
+          when 'super_admin' then 1
+          when 'webmaster_admin' then 2
+          when 'ceo' then 3
+          when 'gerente_operaciones' then 4
+          when 'gerente_area' then 5
+          when 'gerente_sucursal' then 6
+          when 'usuario_operativo' then 7
+          else 8
+        end
+      limit 1
+    `,
+    [userId],
+  );
+  const user = result.rows[0];
+
+  if (!user) {
+    return null;
+  }
+
+  return {
+    email: user.email,
+    roleKey: coerceRoleKey(user.role_key),
+    scope: buildCurrentUserScope(user),
+    userId: user.id,
+  } satisfies AuthenticatedLocalUser;
 }

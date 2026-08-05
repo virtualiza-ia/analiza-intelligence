@@ -7,7 +7,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/phase0-docs.test.mjs && node tests/phase1-core.test.mjs && node tests/phase2-dashboard.test.mjs && node tests/business-line-theme.test.mjs && node tests/dashboard-validation-agent.test.mjs && node tests/business-control-center.test.mjs && node tests/manual-monthly-entry.test.mjs && node tests/data-science-agent-cockpit.test.mjs && node tests/email-invitations.test.mjs && node --experimental-strip-types tests/delegation-policy.test.mjs && node --experimental-strip-types tests/phase3-operations.test.mjs"
+    "test": "node tests/phase0-docs.test.mjs && node tests/phase1-core.test.mjs && node tests/phase2-dashboard.test.mjs && node tests/business-line-theme.test.mjs && node tests/dashboard-validation-agent.test.mjs && node tests/business-control-center.test.mjs && node tests/manual-monthly-entry.test.mjs && node tests/data-science-agent-cockpit.test.mjs && node tests/email-invitations.test.mjs && node tests/branch-manager-scope.test.mjs && node --experimental-strip-types tests/delegation-policy.test.mjs && node --experimental-strip-types tests/phase3-operations.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.1",

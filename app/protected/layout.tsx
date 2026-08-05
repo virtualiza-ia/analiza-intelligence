@@ -7,26 +7,32 @@ import {
 } from "@/lib/auth/demo-admin";
 import { readLocalSession } from "@/lib/auth/local-session";
 import { createClient } from "@/lib/supabase/server";
+import type { RoleKey } from "@/lib/tenant/demo-context";
 import { hasEnvVars } from "@/lib/utils";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-async function requireProtectedAccess() {
+type ProtectedAccess = {
+  allowDemoRoleSwitch: boolean;
+  roleKey: RoleKey;
+};
+
+async function requireProtectedAccess(): Promise<ProtectedAccess> {
   const cookieStore = await cookies();
   const hasDemoAdminSession = hasDemoAdminCookie(
     cookieStore.get(demoAdminCookieName)?.value,
   );
 
   if (hasDemoAdminSession) {
-    return "super_admin" as const;
+    return { allowDemoRoleSwitch: true, roleKey: "super_admin" };
   }
 
   const localSession = readLocalSession(cookieStore);
 
   if (localSession) {
-    return localSession.roleKey;
+    return { allowDemoRoleSwitch: false, roleKey: localSession.roleKey };
   }
 
   if (!hasEnvVars) {
@@ -43,7 +49,7 @@ async function requireProtectedAccess() {
     redirect("/auth/login");
   }
 
-  return "super_admin" as const;
+  return { allowDemoRoleSwitch: true, roleKey: "super_admin" };
 }
 
 async function ProtectedShell({
@@ -51,12 +57,15 @@ async function ProtectedShell({
 }: {
   children: React.ReactNode;
 }) {
-  const roleKey = await requireProtectedAccess();
+  const access = await requireProtectedAccess();
 
   return (
     <main className="min-h-screen bg-muted/30">
       <div className="flex min-h-screen w-full">
-        <AppSidebar roleKey={roleKey} />
+        <AppSidebar
+          allowDemoRoleSwitch={access.allowDemoRoleSwitch}
+          roleKey={access.roleKey}
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           <nav className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
             <div className="flex min-h-16 w-full flex-col gap-3 px-4 py-3 text-sm lg:flex-row lg:items-start lg:justify-between lg:px-5">
