@@ -15,6 +15,10 @@ const migration = readFileSync(
   "supabase/migrations/20260804000200_manual_monthly_submissions.sql",
   "utf8",
 );
+const rlsMigration = readFileSync(
+  "supabase/migrations/20260804000300_manual_ingestion_rls.sql",
+  "utf8",
+);
 
 for (const expected of [
   "getAuthenticatedUser",
@@ -25,6 +29,9 @@ for (const expected of [
   "export async function GET",
   "limit 50",
   "Solo un administrador puede reemplazar un cierre publicado",
+  "Indica un motivo de correccion de al menos 10 caracteres",
+  "'REPLACED'",
+  "El cierre cambio en otra sesion",
 ]) {
   assert.match(route, new RegExp(expected));
 }
@@ -41,9 +48,11 @@ for (const expected of [
 
 for (const expected of [
   "getManualMonthlyFormStepsForLine",
-  "normalizedQualityScore < 70",
+  "UNKNOWN_FIELD",
+  "INVALID_NUMERIC_RANGE",
+  "qualityScore: Math.max(0, 94 - blockingCount * 10)",
+  "score calculado por el servidor",
   "forbiddenFieldPattern",
-  "Faltan ${missingFields.length} campos obligatorios",
 ]) {
   assert.ok(validation.includes(expected));
 }
@@ -53,11 +62,24 @@ assert.match(migration, /status.*PUBLISHED/);
 assert.match(migration, /answers jsonb not null/);
 assert.match(migration, /created_by uuid not null/);
 
+for (const table of [
+  "manual_monthly_submissions",
+  "manual_monthly_submission_versions",
+  "manual_monthly_submission_events",
+]) {
+  assert.ok(rlsMigration.includes(`alter table public.${table} enable row level security`));
+  assert.ok(rlsMigration.includes(`revoke all on public.${table} from anon`));
+}
+
+assert.match(rlsMigration, /current_user_can_access_branch/);
+
 for (const expected of [
   "queryDatabase",
   "to_regclass('public.manual_monthly_submissions')",
   "Cache-Control",
   "status: ready ? 200 : 503",
+  "relrowsecurity",
+  "server_can_write",
 ]) {
   assert.ok(readinessRoute.includes(expected));
 }

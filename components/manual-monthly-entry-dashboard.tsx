@@ -24,7 +24,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  calculateManualMonthlyHistorySummary,
   getManualMonthlyFormStepsForLine,
   getManualMonthlyHistoryForLine,
   importBusinessLines,
@@ -943,7 +942,7 @@ function ManualField({
     "load_deadline_date",
     "manager_attestation",
     "late_reason",
-    "edit_authorization_code",
+    "correction_reason",
   ];
   const isTemplateInput =
     field.required &&
@@ -1358,6 +1357,12 @@ export function ManualMonthlyEntryDashboard() {
     ProductiveManualSubmission[]
   >([]);
   const [historyRefresh, setHistoryRefresh] = useState(0);
+  const [activeSubmissionVersion, setActiveSubmissionVersion] = useState<
+    number | undefined
+  >(undefined);
+  const [submissionState, setSubmissionState] = useState<
+    "idle" | "publishing" | "saving"
+  >("idle");
   const [todayIsoDate, setTodayIsoDate] = useState("2026-07-29");
   const [notice, setNotice] = useState(
     "El formulario mensual sera la via manual principal mientras no haya conectores.",
@@ -1435,6 +1440,7 @@ export function ManualMonthlyEntryDashboard() {
       buildInitialFormValues(activeLine, context, branchOptions, activeRole),
     );
     setActiveStepIndex(0);
+    setActiveSubmissionVersion(undefined);
   }, [activeLine, activeRole, branchOptions, context]);
 
   useEffect(() => {
@@ -1519,6 +1525,7 @@ export function ManualMonthlyEntryDashboard() {
           branch_reported: draft.branchId,
           period: draft.period,
         }));
+        setActiveSubmissionVersion(draft.version);
         setNotice(
           `Borrador productivo recuperado: ${draft.branchName}, ${draft.period}, version ${draft.version}.`,
         );
@@ -1705,6 +1712,10 @@ export function ManualMonthlyEntryDashboard() {
   }
 
   async function saveSubmission(status: ManualMonthlySubmissionStatus) {
+    if (submissionState !== "idle") {
+      return;
+    }
+
     if (!canUseManualForm) {
       setNotice("Selecciona una linea de negocio arriba para llenar el cierre mensual.");
       return;
@@ -1729,12 +1740,16 @@ export function ManualMonthlyEntryDashboard() {
     }
 
     try {
+      setSubmissionState(
+        status === "Publicado DEMO" ? "publishing" : "saving",
+      );
       const apiResponse = await fetch("/api/manual-submissions", {
         body: JSON.stringify({
           action: status === "Publicado DEMO" ? "publish" : "save",
           answers: formValues,
           branchId: formValues.branch_reported,
           businessLine: activeLine,
+          expectedVersion: activeSubmissionVersion,
           period: submission.period,
           qualityScore: submission.dataQualityScore,
         }),
@@ -1752,6 +1767,7 @@ export function ManualMonthlyEntryDashboard() {
       }
 
       setHistoryRefresh((currentValue) => currentValue + 1);
+      setActiveSubmissionVersion(apiResult?.version);
       const persistedStatus = apiResult?.status === "PUBLISHED"
         ? "Cierre publicado"
         : "Borrador guardado";
@@ -1762,6 +1778,8 @@ export function ManualMonthlyEntryDashboard() {
       setNotice(
         "No se pudo contactar el servidor. El cierre no fue guardado y no se uso localStorage como fuente alternativa.",
       );
+    } finally {
+      setSubmissionState("idle");
     }
   }
 
@@ -1797,8 +1815,8 @@ export function ManualMonthlyEntryDashboard() {
         <div className="grid gap-4 p-5 lg:grid-cols-[1fr_320px] lg:items-center">
           <div className="grid gap-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
-                DEMO
+              <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                PRODUCTIVO · FORMULARIO
               </Badge>
               <Badge className={tone.badge}>{activeLine}</Badge>
               <Badge variant="outline">Formulario manual</Badge>
@@ -1963,7 +1981,11 @@ export function ManualMonthlyEntryDashboard() {
               </div>
 
               <div className="grid gap-3 rounded-md border bg-background p-4">
-                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <div
+                  aria-live="polite"
+                  className="flex items-start gap-2 text-sm text-muted-foreground"
+                  role="status"
+                >
                   <AlertCircle className="mt-0.5 size-4 shrink-0 text-primary" />
                   <span>{notice}</span>
                 </div>
@@ -1993,19 +2015,23 @@ export function ManualMonthlyEntryDashboard() {
                       <ArrowRight className="size-4" />
                     </Button>
                     <Button
+                      disabled={submissionState !== "idle"}
                       onClick={() => void saveSubmission("Borrador DEMO")}
                       type="button"
                       variant="secondary"
                     >
                       <Save className="size-4" />
-                      Guardar borrador
+                      {submissionState === "saving" ? "Guardando..." : "Guardar borrador"}
                     </Button>
                     <Button
+                      disabled={
+                        submissionState !== "idle" || requiredMissing.length > 0
+                      }
                       onClick={() => void saveSubmission("Publicado DEMO")}
                       type="button"
                     >
                       <CheckCircle2 className="size-4" />
-                      Publicar cierre
+                      {submissionState === "publishing" ? "Publicando..." : "Publicar cierre"}
                     </Button>
                   </div>
                 </div>
@@ -2102,19 +2128,28 @@ export function ManualMonthlyEntryDashboard() {
         />
         <ManualMetricCard
           icon={Sparkles}
-          label="Ultimo ingreso"
-          note={`Ultimo periodo: ${summary.lastPeriod}.`}
-          value={formatCurrency(summary.lastNetRevenue)}
+          label="Calidad publicada"
+          note="Promedio de cierres productivos publicados."
+          value={
+            productiveHistory.some((entry) => entry.status === "PUBLISHED")
+              ? formatPercent(
+                  productiveHistory
+                    .filter((entry) => entry.status === "PUBLISHED")
+                    .reduce((total, entry, _index, entries) =>
+                      total + entry.qualityScore / entries.length, 0),
+                )
+              : "Sin dato"
+          }
         />
         <ManualMetricCard
           icon={ShieldCheck}
           label="Calidad AnaliA"
-          note={`${summary.qualityWarnings} cierres con alerta.`}
+          note={`${requiredMissing.length} campos requeridos pendientes.`}
           value={formatPercent(automaticQualityScore)}
         />
       </div>
 
-      <section className="grid gap-3 rounded-md border border-emerald-200 bg-card p-4">
+      <section className="grid gap-3 rounded-md border bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold tracking-normal">

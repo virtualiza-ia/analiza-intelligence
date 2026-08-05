@@ -40,8 +40,11 @@ Expected response:
 ```
 
 HTTP `503` means `DATABASE_URL` is missing, PostgreSQL is unreachable, or one
-of the three required manual-ingestion tables has not been created. The endpoint
-does not return database names, connection errors or credentials.
+of the three required manual-ingestion tables has not been created, RLS is not
+enabled, or the server connection role cannot write while RLS is active. The
+server role must own the tables or have an approved `BYPASSRLS` role; browser
+roles retain read-only scoped policies. The endpoint does not return database
+names, role names, connection errors or credentials.
 
 ## 4. Role-based acceptance test
 
