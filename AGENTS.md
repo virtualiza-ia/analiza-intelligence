@@ -2,6 +2,18 @@
 
 These rules apply to all work in this repository.
 
+## Collaboration Protocol
+
+- Treat GitHub issues, pull requests, and Git history as the source of truth. Do not coordinate through files that exist only on a VPS.
+- Before editing, read `docs/WORKBOARD.md`, run `git status --short --branch`, and fetch the latest remote state when credentials are available.
+- Work in a dedicated `codex/<owner>/<task>` branch and a separate Git worktree. Never let two active Codex sessions edit the same working directory.
+- Add or claim one workboard row before implementation. Record the task, owner, branch, affected paths, and expected shared contracts.
+- Do not edit paths claimed by another active task without coordinating through its issue or pull request first.
+- Coordinate before changing shared contracts, authentication, authorization, KPI definitions, database schema, global routing, dependencies, or environment-variable contracts.
+- Rebase the task branch on `origin/main` before handoff when safe. Use a merge instead if the branch is already shared.
+- Deliver work through a small pull request. Direct pushes to `main` are not allowed.
+- Never deploy an unmerged task branch to the production VPS.
+
 ## Engineering Baseline
 
 - Use strict TypeScript.
@@ -53,4 +65,3 @@ After every phase:
 - Review modified screens visually when the phase changes UI.
 - Update documentation.
 - Create a descriptive Git commit.
-

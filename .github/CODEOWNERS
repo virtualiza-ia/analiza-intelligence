@@ -1,0 +1,8 @@
+# Replace or extend this owner when the second collaborator's GitHub username is known.
+* @majolinqui17
+
+# Sensitive areas always require repository-owner review.
+/supabase/migrations/ @majolinqui17
+/lib/auth/ @majolinqui17
+/lib/tenant/ @majolinqui17
+/lib/analytics/kpi-registry.ts @majolinqui17
