@@ -163,8 +163,14 @@ export async function POST(request: Request) {
     const branchResult = await client.query<BranchAccessRow>(
       `select b.id as branch_id, b.organization_id, b.country_id, b.company_id
        from public.branches b
+       join public.companies company on company.id = b.company_id
        join public.profiles p on p.id = $1 and p.organization_id = b.organization_id
        where b.id = $2
+         and company.unit_type = case $4::text
+           when 'Laboratorio' then 'laboratorio'
+           when 'Fisioterapia' then 'fisioterapia'
+           when 'Imagenes' then 'imagenes'
+         end
          and exists (
            select 1
            from public.user_roles ur
@@ -185,7 +191,7 @@ export async function POST(request: Request) {
              )
          )
        limit 1`,
-      [user.userId, input.branchId, user.roleKey],
+      [user.userId, input.branchId, user.roleKey, input.businessLine],
     );
     const branch = branchResult.rows[0];
 
@@ -263,9 +269,9 @@ export async function POST(request: Request) {
       `insert into public.manual_monthly_submission_versions (
          submission_id, version_number, answers, validation_results,
          quality_score, status, created_by, published_by, published_at
-       ) values ($1, $2, $3::jsonb, $4::jsonb, $5, $6, $7,
-         case when $6 = 'PUBLISHED' then $7 else null end,
-         case when $6 = 'PUBLISHED' then now() else null end)
+       ) values ($1, $2, $3::jsonb, $4::jsonb, $5::integer, $6::text, $7::uuid,
+         case when $6::text = 'PUBLISHED' then $7::uuid else null end,
+         case when $6::text = 'PUBLISHED' then now() else null end)
        on conflict (submission_id, version_number)
        do update set
          answers = excluded.answers,

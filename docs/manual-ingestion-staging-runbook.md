@@ -24,6 +24,13 @@ supabase/migrations/20260804000200_manual_monthly_submissions.sql
 
 Do not edit an already-applied migration. Corrections require a new migration.
 
+For an isolated Docker staging stack on an existing VPS, use
+`deploy/staging/docker-compose.yml`. It binds the application to loopback only,
+does not publish PostgreSQL, and uses the dedicated volume
+`analiza_staging_postgres_data`. Its `.env.staging` must be created directly on
+the server with mode `600` and must never reuse the production database URL or
+password.
+
 ## 3. Deploy and verify readiness
 
 Deploy the merged `main` image to staging and check:
@@ -74,3 +81,6 @@ If readiness or the acceptance test fails:
    the approved recovery procedure requires it.
 4. Record the failure in the GitHub issue or pull request with sanitized logs.
 5. Fix forward with a new migration or application commit.
+
+The first isolated execution and its sanitized results are recorded in
+`docs/staging-validation-2026-08-05.md`.

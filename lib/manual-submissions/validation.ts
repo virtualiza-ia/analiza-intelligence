@@ -37,7 +37,7 @@ export type ManualSubmissionValidation = {
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const monthPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
-const forbiddenFieldPattern = /(patient|paciente|password|contrasena|token|cookie|telefono|phone|email|correo)/i;
+const forbiddenFieldPattern = /(password|contrasena|token|cookie|telefono|phone|email|correo|patient_(id|name|nombre|document|documento|record|expediente)|paciente_(id|name|nombre|document|documento|record|expediente))/i;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
