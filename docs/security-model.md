@@ -2,11 +2,11 @@
 
 ## Authentication And Invitations
 
-Supabase Auth is the authentication provider. The app supports login, password recovery, logout, secure sessions, and protected routes. Public self-registration must be disabled from the product flow.
+Supabase Auth can be used as an authentication provider, but self-hosted deployments may authenticate invited users directly against PostgreSQL. The app supports login, invitation activation, logout, secure sessions, and protected routes. Public self-registration must be disabled from the product flow.
 
 Local DEMO administrator access is available for exploration before real users are provisioned. It uses an HTTP-only cookie, is labeled DEMO, is disabled in Vercel production, and can be disabled locally with `ANALIZA_DISABLE_DEMO_ADMIN=true`.
 
-Self-hosted deployments may keep operational data and invitations in PostgreSQL while email delivery uses an SMTP provider such as Google Workspace. User invitations are stored in `user_invitations` with a hashed token; the raw invitation token is sent only in the email link and must not be logged or stored in public data. SMTP credentials are server-only environment variables and are never exposed with `NEXT_PUBLIC_`.
+Self-hosted deployments may keep operational data, invitations, users, password hashes, and role assignments in PostgreSQL while email delivery uses an SMTP provider such as Google Workspace. User invitations are stored in `user_invitations` with a hashed token; the raw invitation token is sent only in the email link and must not be logged or stored in public data. When the user accepts the invitation, they create a password, the system stores only a server-side password hash in `auth.users.encrypted_password`, activates `profiles` and `user_roles`, clears the invitation token hash, and issues an HTTP-only local session cookie. SMTP credentials and local session secrets are server-only environment variables and are never exposed with `NEXT_PUBLIC_`.
 
 ## Roles
 

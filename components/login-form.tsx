@@ -45,12 +45,24 @@ export function LoginForm({
         return;
       }
 
+      const localResponse = await fetch("/api/auth/local-login", {
+        body: JSON.stringify({ email, password }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+
+      if (localResponse.ok) {
+        router.push("/protected/context");
+        router.refresh();
+        return;
+      }
+
       if (!hasEnvVars) {
-        const demoPayload = (await demoResponse.json().catch(() => null)) as
+        const localPayload = (await localResponse.json().catch(() => null)) as
           | { error?: string }
           | null;
         throw new Error(
-          demoPayload?.error ?? "Usuario o contrasena incorrectos.",
+          localPayload?.error ?? "Usuario o contrasena incorrectos.",
         );
       }
 

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { demoAdminCookieName, hasDemoAdminCookie } from "@/lib/auth/demo-admin";
+import { localSessionCookieName } from "@/lib/auth/local-session-cookie";
 import { hasEnvVars } from "../utils";
 
 export async function updateSession(request: NextRequest) {
@@ -10,6 +11,9 @@ export async function updateSession(request: NextRequest) {
 
   const hasDemoAdminSession = hasDemoAdminCookie(
     request.cookies.get(demoAdminCookieName)?.value,
+  );
+  const hasLocalSession = Boolean(
+    request.cookies.get(localSessionCookieName)?.value,
   );
 
   // If the env vars are not set, skip proxy check. You can remove this
@@ -58,6 +62,7 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname !== "/" &&
     !user &&
     !hasDemoAdminSession &&
+    !hasLocalSession &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {

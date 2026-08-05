@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { ExecutiveDashboard } from "@/components/executive-dashboard";
 import { demoAdminCookieName, hasDemoAdminCookie } from "@/lib/auth/demo-admin";
+import { readLocalSession } from "@/lib/auth/local-session";
 import { createClient } from "@/lib/supabase/server";
 import { hasEnvVars } from "@/lib/utils";
 
@@ -14,6 +15,12 @@ async function OverviewGate() {
   );
 
   if (hasDemoAdminSession) {
+    return <ExecutiveDashboard />;
+  }
+
+  const localSession = readLocalSession(cookieStore);
+
+  if (localSession) {
     return <ExecutiveDashboard />;
   }
 

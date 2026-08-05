@@ -8,6 +8,7 @@ import {
   getDemoAdminEmail,
   hasDemoAdminCookie,
 } from "@/lib/auth/demo-admin";
+import { readLocalSession } from "@/lib/auth/local-session";
 import { createClient } from "@/lib/supabase/server";
 import {
   demoBranches,
@@ -40,6 +41,20 @@ async function ContextSelectionGate() {
         companies={demoCompanyOptions}
         countries={demoCountryOptions}
         userEmail={getDemoAdminEmail()}
+      />
+    );
+  }
+
+  const localSession = readLocalSession(cookieStore);
+
+  if (localSession) {
+    return (
+      <ContextSelectionForm
+        branches={demoBranches}
+        businessLines={demoBusinessLineOptions}
+        companies={demoCompanyOptions}
+        countries={demoCountryOptions}
+        userEmail={localSession.email}
       />
     );
   }

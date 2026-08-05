@@ -33,6 +33,8 @@ SMTP_FROM="Analiza BI <analiza@interactivecore.app>"
 2. The server validates the role hierarchy and scope.
 3. The server creates a `user_invitations` record in PostgreSQL.
 4. The raw invitation token is sent by email; only its hash is stored.
-5. Audit records keep the action trace without storing secrets.
+5. The invited user opens the link, creates their password, and the server activates the matching `auth.users`, `profiles`, `user_roles`, and scoped access records.
+6. After activation, the invitation is marked as accepted and its token hash is cleared so the link cannot be reused.
+7. Audit records keep the action trace without storing secrets.
 
-The current self-hosted flow sends and records the invitation. Password creation on the invitation page is a separate auth phase and should be connected to the final authentication provider before real user onboarding.
+The self-hosted PostgreSQL flow lets each invited user crear su contrasena from the invitation link and then enter with email and password. Passwords are hashed server-side and are never sent back to the browser after submission.

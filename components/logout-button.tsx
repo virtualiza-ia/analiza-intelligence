@@ -10,6 +10,7 @@ export function LogoutButton() {
 
   const logout = async () => {
     await fetch("/auth/demo-admin", { method: "DELETE" });
+    await fetch("/api/auth/local-login", { method: "DELETE" });
 
     if (hasEnvVars) {
       const supabase = createClient();

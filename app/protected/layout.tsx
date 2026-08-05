@@ -5,6 +5,7 @@ import {
   demoAdminCookieName,
   hasDemoAdminCookie,
 } from "@/lib/auth/demo-admin";
+import { readLocalSession } from "@/lib/auth/local-session";
 import { createClient } from "@/lib/supabase/server";
 import { hasEnvVars } from "@/lib/utils";
 import { cookies } from "next/headers";
@@ -19,7 +20,13 @@ async function requireProtectedAccess() {
   );
 
   if (hasDemoAdminSession) {
-    return;
+    return "super_admin" as const;
+  }
+
+  const localSession = readLocalSession(cookieStore);
+
+  if (localSession) {
+    return localSession.roleKey;
   }
 
   if (!hasEnvVars) {
@@ -35,6 +42,8 @@ async function requireProtectedAccess() {
   if (error || !data?.claims) {
     redirect("/auth/login");
   }
+
+  return "super_admin" as const;
 }
 
 async function ProtectedShell({
@@ -42,12 +51,12 @@ async function ProtectedShell({
 }: {
   children: React.ReactNode;
 }) {
-  await requireProtectedAccess();
+  const roleKey = await requireProtectedAccess();
 
   return (
     <main className="min-h-screen bg-muted/30">
       <div className="flex min-h-screen w-full">
-        <AppSidebar roleKey="super_admin" />
+        <AppSidebar roleKey={roleKey} />
         <div className="flex min-w-0 flex-1 flex-col">
           <nav className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
             <div className="flex min-h-16 w-full flex-col gap-3 px-4 py-3 text-sm lg:flex-row lg:items-start lg:justify-between lg:px-5">
