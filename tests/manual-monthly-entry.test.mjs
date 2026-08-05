@@ -42,8 +42,8 @@ assert(
   "Manual monthly dashboard must persist DEMO history locally.",
 );
 assert(
-  component.includes("Guardar avance DEMO") &&
-    component.includes("Publicar cierre DEMO"),
+  component.includes("Guardar borrador") &&
+    component.includes("Publicar cierre"),
   "Manual monthly dashboard must support draft and publish actions.",
 );
 assert(
@@ -67,8 +67,8 @@ assert(
 );
 assert(
   component.includes("getMonthlyLoadDeadline") &&
-    component.includes("edit_authorization_code") &&
-    component.includes("Ese cierre ya fue publicado"),
+    component.includes("correction_reason") &&
+    component.includes("Editar un cierre publicado requiere autorizacion"),
   "Manual monthly dashboard must enforce deadline and edit authorization rules.",
 );
 assert(

@@ -1,6 +1,8 @@
 # Despliegue en Vercel
 
-Vercel es la ruta mas rapida para mostrar Analiza Intelligence con una URL publica sin depender de un servidor propio.
+El despliegue actual usa Docker, Nginx y PostgreSQL local en AWS. Vercel solo
+es viable si se conecta a una instancia PostgreSQL privada o administrada que
+sea accesible de forma segura desde sus funciones.
 
 ## Opcion recomendada: GitHub privado + Vercel
 
@@ -16,28 +18,12 @@ Vercel es la ruta mas rapida para mostrar Analiza Intelligence con una URL publi
 
 Configurar estas variables en Vercel Project Settings > Environment Variables:
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `DATABASE_URL`
 - `OPENAI_API_KEY`
 - `ANALIA_OPENAI_MODEL`
-- `ANALIZA_DISABLE_DEMO_ADMIN`
-- `ANALIZA_ENABLE_DEMO_ADMIN`
-- `ANALIZA_DEMO_ADMIN_EMAIL`
-- `ANALIZA_DEMO_ADMIN_PASSWORD`
-- `ANALIZA_DEMO_ADMIN_SESSION_TOKEN`
 
-Para pruebas internas sin datos reales, usar:
-
-- `ANALIZA_ENABLE_DEMO_ADMIN=true`
-- `ANALIZA_DISABLE_DEMO_ADMIN=false`
-- `ANALIZA_DEMO_ADMIN_EMAIL=admin.demo@analiza.local`
-- `ANALIZA_DEMO_ADMIN_PASSWORD`: una contrasena privada para la demo
-- `ANALIZA_DEMO_ADMIN_SESSION_TOKEN`: una cadena privada larga para firmar la sesion demo
-
-Para produccion real con datos reales:
-
-- `ANALIZA_ENABLE_DEMO_ADMIN=false`
-- `ANALIZA_DISABLE_DEMO_ADMIN=true`
+`DATABASE_URL` es server-only. Las cuentas y sesiones deben aprovisionarse en
+la misma base mediante las migraciones de `app_auth`.
 
 ## Configuracion de build
 

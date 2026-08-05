@@ -15,6 +15,7 @@ This board prevents overlapping work while GitHub issues and pull requests remai
 | Issue | Task | Owner | Branch | Claimed paths or contracts | Status |
 | --- | --- | --- | --- | --- | --- |
 | — | Repository collaboration controls | Primary Codex | `codex/primary/collaboration-controls` | `AGENTS.md`, `.github/`, `docs/WORKBOARD.md`, `docs/collaboration-workflow.md` | In review |
+| — | Productive manual monthly ingestion | Primary Codex | `codex/primary/manual-ingestion` | `app/api/manual-submissions/`, `components/manual-monthly-entry-dashboard.tsx`, `lib/manual-submissions/`, new migration, ingestion docs/tests | In progress |
 
 Allowed statuses: `Planned`, `In progress`, `Blocked`, `In review`.
 

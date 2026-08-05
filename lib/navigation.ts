@@ -270,6 +270,10 @@ export const navigationItems: NavigationItem[] = [
 ];
 
 export function getNavigationForRole(roleKey: RoleKey) {
+  if (adminRoles.includes(roleKey)) {
+    return navigationItems;
+  }
+
   return navigationItems.filter((item) => item.allowedRoles.includes(roleKey));
 }
 

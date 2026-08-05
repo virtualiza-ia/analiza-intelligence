@@ -54,7 +54,15 @@ Cuando el usuario tiene rol `gerente_sucursal`, la sucursal reportada, gerente d
 
 ## Historial
 
-En el prototipo, los cierres guardados por el formulario viven en `localStorage` bajo `analiza:manual-monthly-history` para demostrar la experiencia de uso. En produccion, este historial debe persistir en base de datos con:
+El historial DEMO heredado puede seguir leyendose desde `localStorage` bajo `analiza:manual-monthly-history`, pero los guardados y publicaciones productivos usan `/api/manual-submissions` con sesion autenticada y nunca vuelven a almacenamiento del navegador como fallback. El historial productivo persiste en base de datos con:
+
+Al seleccionar sucursal, linea y periodo, el formulario consulta el historial autorizado del servidor y recupera automaticamente el borrador activo si existe. La consulta acepta filtros exactos y devuelve un maximo de 50 versiones activas dentro del alcance del usuario.
+
+La interfaz presenta el historial productivo en una tabla independiente con estado, version, calidad y fecha de actualizacion. Los ejemplos heredados permanecen en una seccion marcada como `DEMO`; no participan en conteos productivos, deteccion de publicaciones previas ni confirmaciones de guardado.
+
+Antes de persistir, el servidor aplica la lista exacta de campos permitidos para la linea, valida tipos y rangos, ignora cualquier score enviado por el navegador y calcula el score canonico. Cada guardado conserva una version nueva; si otra sesion avanzo el cierre, la version esperada no coincide y la API responde `409` sin sobrescribir datos.
+
+Las tres tablas tienen RLS habilitado mediante una migracion posterior. Los clientes autenticados solo pueden leer sucursales dentro de su alcance y no pueden escribir directamente; las escrituras pasan por el servidor. La readiness tambien comprueba RLS y que el rol privado de `DATABASE_URL` pueda escribir sin exponer su nombre.
 
 - Organizacion, pais, empresa, linea de negocio, sucursal y periodo.
 - Usuario responsable, gerente de sucursal, gerente de area, rol, fecha de captura, fecha de publicacion y estado.
@@ -68,7 +76,8 @@ En el prototipo, los cierres guardados por el formulario viven en `localStorage`
 
 - No se deben capturar nombres, telefonos, documentos ni datos clinicos identificables de pacientes.
 - No se publica un cierre si faltan campos obligatorios.
-- Un cierre publicado solo puede reemplazarse con autorizacion de administrador.
+- Un cierre publicado solo puede reemplazarlo en el servidor un usuario con rol `super_admin` o `webmaster_admin`; los codigos ingresados en el navegador no conceden permisos.
+- Toda correccion requiere un motivo, crea una version superior y registra el evento `REPLACED` antes de la nueva publicacion.
 - La carga tardia queda marcada como penalizacion DEMO para score, disciplina y bono sugerido.
 - La evaluacion 360 debe guardarse como senal anonima y cualitativa; no debe exponer colaboradores ni usarse para represalias.
 - Si el score de calidad automatico baja de 70%, el cierre debe quedar bloqueado o marcado con advertencia.

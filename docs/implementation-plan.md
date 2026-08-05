@@ -107,3 +107,44 @@ Executive DEMO expansion now also includes:
 - Complete E2E coverage.
 - Harden security.
 - Finalize Supabase and deployment guides.
+
+## Local Authentication And RBAC Hardening
+
+Implemented after the PostgreSQL migration:
+
+- server-only `app_auth.accounts` and `app_auth.sessions`
+- migration of existing compatible password hashes
+- unique opaque sessions with hashed tokens and database revocation
+- failed-login lockout
+- PostgreSQL role resolution
+- server-side protected-shell and per-module authorization
+- removal of browser-controlled DEMO role elevation
+- production cookie hardening
+
+Still required in a later security phase:
+
+- single-use password-reset tokens and approved email delivery
+- MFA for privileged accounts
+- scope-aware PostgreSQL repositories for every business query
+
+## Interim production hardening: manual forms
+
+Implemented on `codex/primary/manual-ingestion`:
+
+- versioned PostgreSQL source of truth for drafts and published closures
+- authenticated, scope-aware save, history and draft recovery APIs
+- productive and DEMO history visually and analytically separated
+- server-side field allowlist, type/range validation and canonical quality score
+- optimistic version checks returning HTTP 409 instead of silent overwrite
+- administrative correction gate, mandatory reason and `REPLACED` audit event
+- RLS/read-only browser policies in a new migration
+- readiness checks for tables, RLS and the private server write role
+- double-submit prevention and accessible request status in the form
+- staging, acceptance and rollback runbook
+
+Production remains **No-Go** until staging provides `DATABASE_URL`, applies all
+migrations, provisions synthetic users in two organizations, verifies the three
+business lines and every role, and records successful backup/rollback evidence.
+The later product phases for normalized facts, maker-checker approval,
+connectors, exports and complete E2E coverage remain separate workstreams; they
+must not be marked complete based only on static or build checks.

@@ -2071,15 +2071,15 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
         appliesTo: nonLaboratoryOperationalLines,
       },
       {
-        id: "edit_authorization_code",
-        label: "Autorizacion para editar",
+        id: "correction_reason",
+        label: "Motivo de correccion",
         description:
-          "Solo se llena si el periodo ya fue publicado y un administrador autorizo reemplazarlo.",
+          "Un administrador debe explicar por que reemplaza un periodo publicado.",
         inputType: "text",
-        unit: "codigo",
+        unit: "texto",
         required: false,
-        placeholder: "Codigo DEMO de autorizacion",
-        appliesTo: nonLaboratoryOperationalLines,
+        placeholder: "Describe la correccion y su respaldo",
+        appliesTo: manualOperationalLines,
       },
       {
         id: "manager_attestation",

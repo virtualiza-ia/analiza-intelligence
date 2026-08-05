@@ -270,9 +270,8 @@ for (const requiredDashboardData of [
 
 for (const requiredSidebarText of [
   "Inicio por rol",
-  "Rol DEMO",
-  "demoRoleProfiles",
-  "analiza:demo-role",
+  "Rol autorizado",
+  "roleKey",
   "modulos visibles",
   "getGroupedNavigationForRole",
   "group.title",
