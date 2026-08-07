@@ -6,7 +6,14 @@ import { getMissingDatabaseConfig } from "@/lib/server/database";
 import { getAuthenticatedLocalUserAccess } from "@/lib/server/local-auth";
 
 export async function GET() {
-  const localSession = readLocalSession(await cookies());
+  const cookieStore = await cookies();
+  const localSession = (() => {
+    try {
+      return readLocalSession(cookieStore);
+    } catch {
+      return null;
+    }
+  })();
 
   if (!localSession) {
     return NextResponse.json({ ok: false }, { status: 401 });

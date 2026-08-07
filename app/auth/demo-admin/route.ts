@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 
 import {
   demoAdminCookieName,
+  demoRoleCookieName,
   getDemoAdminEmail,
   getDemoAdminPassword,
   getDemoAdminSessionValue,
+  getDemoSessionCookieOptions,
+  getExpiredDemoSessionCookieOptions,
   isDemoAdminEnabled,
 } from "@/lib/auth/demo-admin";
 
@@ -50,26 +53,32 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(demoAdminCookieName, getDemoAdminSessionValue(), {
-    httpOnly: true,
-    maxAge: 60 * 60 * 8,
-    path: "/",
-    sameSite: "lax",
-    secure: process.env.VERCEL_ENV === "production",
-  });
+  response.cookies.set(
+    demoAdminCookieName,
+    getDemoAdminSessionValue(),
+    getDemoSessionCookieOptions(),
+  );
+  response.cookies.set(
+    demoRoleCookieName,
+    "super_admin",
+    getDemoSessionCookieOptions(),
+  );
 
   return response;
 }
 
 export function DELETE() {
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(demoAdminCookieName, "", {
-    httpOnly: true,
-    maxAge: 0,
-    path: "/",
-    sameSite: "lax",
-    secure: process.env.VERCEL_ENV === "production",
-  });
+  response.cookies.set(
+    demoAdminCookieName,
+    "",
+    getExpiredDemoSessionCookieOptions(),
+  );
+  response.cookies.set(
+    demoRoleCookieName,
+    "",
+    getExpiredDemoSessionCookieOptions(),
+  );
 
   return response;
 }

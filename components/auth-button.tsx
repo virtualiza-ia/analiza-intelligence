@@ -1,40 +1,17 @@
 import Link from "next/link";
 import { Button } from "./ui/button";
-import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "./logout-button";
-import { cookies } from "next/headers";
-import {
-  demoAdminCookieName,
-  getDemoAdminEmail,
-  hasDemoAdminCookie,
-} from "@/lib/auth/demo-admin";
-import { readLocalSession } from "@/lib/auth/local-session";
+import { getCurrentAuthorizationActor } from "@/lib/server/authorization";
 import { hasEnvVars } from "@/lib/utils";
 
 export async function AuthButton() {
-  const cookieStore = await cookies();
-  const hasDemoAdminSession = hasDemoAdminCookie(
-    cookieStore.get(demoAdminCookieName)?.value,
-  );
+  const actor = await getCurrentAuthorizationActor();
 
-  if (hasDemoAdminSession) {
+  if (actor) {
     return (
       <div className="flex items-center gap-4">
         <span className="text-sm text-muted-foreground">
-          {getDemoAdminEmail()}
-        </span>
-        <LogoutButton />
-      </div>
-    );
-  }
-
-  const localSession = readLocalSession(cookieStore);
-
-  if (localSession) {
-    return (
-      <div className="flex items-center gap-4">
-        <span className="text-sm text-muted-foreground">
-          {localSession.email}
+          {actor.email}
         </span>
         <LogoutButton />
       </div>
@@ -51,21 +28,7 @@ export async function AuthButton() {
     );
   }
 
-  const supabase = await createClient();
-
-  // You can also use getUser() which will be slower.
-  const { data } = await supabase.auth.getClaims().catch(() => ({
-    data: null,
-  }));
-
-  const user = data?.claims;
-
-  return user ? (
-    <div className="flex items-center gap-4">
-      <span className="text-sm text-muted-foreground">{user.email}</span>
-      <LogoutButton />
-    </div>
-  ) : (
+  return (
     <div className="flex gap-2">
       <Button asChild size="sm" variant={"outline"}>
         <Link href="/auth/login">Ingresar</Link>

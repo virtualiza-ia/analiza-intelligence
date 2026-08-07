@@ -53,8 +53,18 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
     const storedRole = window.localStorage.getItem(roleStorageKey);
 
     if (roleKeys.includes(storedRole as RoleKey)) {
-      setActiveRole(storedRole as RoleKey);
+      const nextRole = storedRole as RoleKey;
+      setActiveRole(nextRole);
+      void fetch("/api/auth/demo-role", {
+        body: JSON.stringify({ roleKey: nextRole }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      return;
     }
+
+    setActiveRole(roleKey);
+    window.localStorage.setItem(roleStorageKey, roleKey);
   }, [allowDemoRoleSwitch, roleKey]);
 
   function toggleCollapsed() {
@@ -69,6 +79,12 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
     setActiveRole(nextRole);
     window.localStorage.setItem(roleStorageKey, nextRole);
     window.dispatchEvent(new Event(roleChangeEvent));
+
+    void fetch("/api/auth/demo-role", {
+      body: JSON.stringify({ roleKey: nextRole }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
   }
 
   return (

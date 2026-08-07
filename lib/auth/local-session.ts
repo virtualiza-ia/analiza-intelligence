@@ -4,6 +4,7 @@ import {
 } from "node:crypto";
 
 import { localSessionCookieName } from "@/lib/auth/local-session-cookie";
+import { isDemoRuntimeEnvironment } from "@/lib/security/environment";
 import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
 
 type CookieSource = {
@@ -24,7 +25,7 @@ function getLocalSessionSecret() {
     process.env.ANALIZA_LOCAL_AUTH_SECRET ??
     process.env.ANALIZA_DEMO_ADMIN_SESSION_TOKEN;
 
-  if (!secret && process.env.VERCEL_ENV === "production") {
+  if (!secret && !isDemoRuntimeEnvironment()) {
     throw new Error("Missing ANALIZA_LOCAL_AUTH_SECRET for local sessions.");
   }
 

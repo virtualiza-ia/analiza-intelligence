@@ -6,6 +6,8 @@ import {
   type AnaliaScreenChatIntent,
   type AnaliaScreenChatResponse,
 } from "@/lib/analytics/dashboard-validation-agent";
+import { getCurrentAuthorizationActor } from "@/lib/server/authorization";
+import { canPerformAction } from "@/lib/security/authorization-policy";
 
 type ChatHistoryItem = {
   question: string;
@@ -283,6 +285,15 @@ function withDemoCaveat(response: AnaliaScreenChatResponse) {
 }
 
 export async function POST(request: Request) {
+  const actor = await getCurrentAuthorizationActor();
+
+  if (!actor) {
+    return NextResponse.json(
+      { error: "Debes iniciar sesion para usar AnaliA." },
+      { status: 401 },
+    );
+  }
+
   const requestBody: unknown = await request.json().catch(() => null);
   const normalizedRequest = normalizeRequestBody(requestBody);
 
@@ -290,6 +301,17 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Pregunta invalida para AnaliA." },
       { status: 400 },
+    );
+  }
+
+  if (
+    !canPerformAction(actor, "route.access", {
+      pathname: normalizedRequest.pathname,
+    })
+  ) {
+    return NextResponse.json(
+      { error: "No tienes permiso para consultar esta pantalla." },
+      { status: 403 },
     );
   }
 

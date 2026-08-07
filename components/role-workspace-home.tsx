@@ -26,6 +26,11 @@ import { cn } from "@/lib/utils";
 const roleStorageKey = "analiza:demo-role";
 const roleChangeEvent = "analiza:role-change";
 
+type RoleWorkspaceHomeProps = {
+  allowDemoRoleSwitch: boolean;
+  roleKey: RoleKey;
+};
+
 type WorkspaceItem = {
   title: string;
   detail: string;
@@ -299,15 +304,25 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
   },
 };
 
-function readActiveRole() {
+function readActiveRole({
+  allowDemoRoleSwitch,
+  fallbackRole,
+}: {
+  allowDemoRoleSwitch: boolean;
+  fallbackRole: RoleKey;
+}) {
   if (typeof window === "undefined") {
-    return "super_admin";
+    return fallbackRole;
+  }
+
+  if (!allowDemoRoleSwitch) {
+    return fallbackRole;
   }
 
   const storedRole = window.localStorage.getItem(roleStorageKey);
   return roleKeys.includes(storedRole as RoleKey)
     ? (storedRole as RoleKey)
-    : "super_admin";
+    : fallbackRole;
 }
 
 function toneClass(tone: WorkspaceItem["tone"]) {
@@ -334,12 +349,20 @@ function toneIcon(tone: WorkspaceItem["tone"]) {
   return CheckCircle2;
 }
 
-export function RoleWorkspaceHome() {
-  const [activeRole, setActiveRole] = useState<RoleKey>("super_admin");
+export function RoleWorkspaceHome({
+  allowDemoRoleSwitch,
+  roleKey,
+}: RoleWorkspaceHomeProps) {
+  const [activeRole, setActiveRole] = useState<RoleKey>(roleKey);
 
   useEffect(() => {
     function refreshRole() {
-      setActiveRole(readActiveRole());
+      setActiveRole(
+        readActiveRole({
+          allowDemoRoleSwitch,
+          fallbackRole: roleKey,
+        }),
+      );
     }
 
     refreshRole();
@@ -350,7 +373,7 @@ export function RoleWorkspaceHome() {
       window.removeEventListener("storage", refreshRole);
       window.removeEventListener(roleChangeEvent, refreshRole);
     };
-  }, []);
+  }, [allowDemoRoleSwitch, roleKey]);
 
   const visibleNavigation = useMemo(
     () => getNavigationForRole(activeRole),

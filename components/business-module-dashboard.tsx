@@ -59,6 +59,7 @@ type StoredContext = {
 };
 
 type BusinessModuleDashboardProps = {
+  enableDemoFixtures?: boolean;
   module: string;
 };
 
@@ -116,6 +117,7 @@ const allBusinessScope = "Todas las lineas de negocio";
 const allCountryScope = "Todos los paises";
 const allAreaScope = "Todas las gerencias de area";
 const allBranchScope = "Todas las sucursales";
+const demoOrganizationId = "10000000-0000-4000-8000-000000000001";
 const formSelectClassName =
   "h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60";
 const tableSelectClassName =
@@ -168,7 +170,11 @@ function readActiveDemoRole(): RoleKey {
   return "super_admin";
 }
 
-function readDemoUsers() {
+function readDemoUsers(enableDemoFixtures: boolean) {
+  if (!enableDemoFixtures) {
+    return [];
+  }
+
   if (typeof window === "undefined") {
     return initialDemoUsers;
   }
@@ -220,7 +226,7 @@ function buildScopeBoundary({
     countryId: countryScope === allCountryScope ? null : countryScope,
     operationalAreaId:
       !areaScope || areaScope === allAreaScope ? null : areaScope,
-    organizationId: "Grupo Analiza DEMO",
+    organizationId: demoOrganizationId,
   };
 }
 
@@ -501,11 +507,15 @@ function ModuleRows({ config }: { config: ModuleConfig }) {
 
 function UsersAndPermissionsManager({
   context,
+  enableDemoFixtures,
 }: {
   context: StoredContext | null;
+  enableDemoFixtures: boolean;
 }) {
   const [activeRole, setActiveRole] = useState<RoleKey>("super_admin");
-  const [users, setUsers] = useState<DemoManagedUser[]>(initialDemoUsers);
+  const [users, setUsers] = useState<DemoManagedUser[]>(
+    enableDemoFixtures ? initialDemoUsers : [],
+  );
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [roleKey, setRoleKey] = useState<RoleKey>("gerente_area");
@@ -640,7 +650,7 @@ function UsersAndPermissionsManager({
   );
 
   useEffect(() => {
-    setUsers(readDemoUsers());
+    setUsers(readDemoUsers(enableDemoFixtures));
 
     function refreshRole() {
       setActiveRole(readActiveDemoRole());
@@ -654,7 +664,7 @@ function UsersAndPermissionsManager({
       window.removeEventListener("storage", refreshRole);
       window.removeEventListener(roleChangeEvent, refreshRole);
     };
-  }, []);
+  }, [enableDemoFixtures]);
 
   useEffect(() => {
     if (context?.countryName) {
@@ -778,8 +788,6 @@ function UsersAndPermissionsManager({
     try {
       const response = await fetch("/api/users/invite", {
         body: JSON.stringify({
-          actorRole: activeRole,
-          actorScope: actor.scope,
           email: normalizedEmail,
           fullName: normalizedName,
           roleKey,
@@ -822,7 +830,9 @@ function UsersAndPermissionsManager({
       ];
 
       setUsers(nextUsers);
-      persistDemoUsers(nextUsers);
+      if (enableDemoFixtures) {
+        persistDemoUsers(nextUsers);
+      }
       setFullName("");
       setEmail("");
       setRoleKey(getDefaultRoleForActor(activeRole));
@@ -886,7 +896,9 @@ function UsersAndPermissionsManager({
     );
 
     setUsers(nextUsers);
-    persistDemoUsers(nextUsers);
+    if (enableDemoFixtures) {
+      persistDemoUsers(nextUsers);
+    }
     setMessage("Rol actualizado en usuarios DEMO.");
   }
 
@@ -938,7 +950,9 @@ function UsersAndPermissionsManager({
     );
 
     setUsers(nextUsers);
-    persistDemoUsers(nextUsers);
+    if (enableDemoFixtures) {
+      persistDemoUsers(nextUsers);
+    }
     setMessage(deactivationPlan.reason);
   }
 
@@ -1264,7 +1278,10 @@ function UsersAndPermissionsManager({
   );
 }
 
-export function BusinessModuleDashboard({ module }: BusinessModuleDashboardProps) {
+export function BusinessModuleDashboard({
+  enableDemoFixtures = true,
+  module,
+}: BusinessModuleDashboardProps) {
   const [context, setContext] = useState<StoredContext | null>(null);
   const config = moduleConfigs[module];
 
@@ -1330,7 +1347,10 @@ export function BusinessModuleDashboard({ module }: BusinessModuleDashboardProps
       )}
 
       {module === "usuarios-permisos" ? (
-        <UsersAndPermissionsManager context={context} />
+        <UsersAndPermissionsManager
+          context={context}
+          enableDemoFixtures={enableDemoFixtures}
+        />
       ) : null}
 
       {config.explanation && module !== "usuarios-permisos" ? (

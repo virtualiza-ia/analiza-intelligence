@@ -1,23 +1,15 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import {
-  demoAdminCookieName,
-  hasDemoAdminCookie,
-} from "@/lib/auth/demo-admin";
+import { demoOrganizationId } from "@/lib/auth/demo-admin";
+import { getCurrentAuthorizationActor } from "@/lib/server/authorization";
 import { getMissingDatabaseConfig } from "@/lib/server/database";
 import { getMissingSmtpConfig, sendMail } from "@/lib/server/mail";
 import { createUserInvitation } from "@/lib/server/user-invitations";
 import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
-import {
-  canInviteUser,
-  type DelegationActor,
-  type ScopeBoundary,
-} from "@/lib/tenant/delegation-policy";
+import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
+import { canPerformAction } from "@/lib/security/authorization-policy";
 
 type InviteUserRequest = {
-  actorRole?: unknown;
-  actorScope?: unknown;
   email?: unknown;
   fullName?: unknown;
   roleKey?: unknown;
@@ -34,7 +26,10 @@ function readScope(value: unknown): ScopeBoundary | null {
   }
 
   const scope = value as Record<string, unknown>;
-  const organizationId = scope.organizationId;
+  const organizationId =
+    scope.organizationId === "Grupo Analiza DEMO"
+      ? demoOrganizationId
+      : scope.organizationId;
 
   if (typeof organizationId !== "string" || !organizationId) {
     return null;
@@ -68,12 +63,9 @@ function jsonError(error: string, status: number, missingConfig: string[] = []) 
 }
 
 export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const hasSession = hasDemoAdminCookie(
-    cookieStore.get(demoAdminCookieName)?.value,
-  );
+  const actor = await getCurrentAuthorizationActor();
 
-  if (!hasSession) {
+  if (!actor) {
     return jsonError("Debes iniciar sesion para invitar usuarios.", 401);
   }
 
@@ -112,23 +104,17 @@ export async function POST(request: Request) {
   }
 
   const targetScope = readScope(payload?.scope);
-  const actorScope = readScope(payload?.actorScope);
-  const actorRole = isRoleKey(payload?.actorRole)
-    ? payload.actorRole
-    : "super_admin";
 
-  if (!targetScope || !actorScope) {
+  if (!targetScope) {
     return jsonError("El alcance de la invitacion no esta completo.", 400);
   }
 
-  const actor: DelegationActor = {
-    canInviteOperationalUsers: actorRole === "gerente_sucursal",
-    roleKey: actorRole,
-    scope: actorScope,
-    userId: "demo-admin",
-  };
-
-  if (!canInviteUser(actor, { roleKey: payload.roleKey, scope: targetScope })) {
+  if (
+    !canPerformAction(actor, "users.invite", {
+      roleKey: payload.roleKey,
+      scope: targetScope,
+    })
+  ) {
     return jsonError(
       "Tu rol solo puede invitar usuarios de nivel inferior y dentro de tu alcance.",
       403,
@@ -142,6 +128,7 @@ export async function POST(request: Request) {
       fullName,
       roleKey: payload.roleKey,
       scope: targetScope,
+      actorUserId: actor.userId,
     });
 
     await sendMail({

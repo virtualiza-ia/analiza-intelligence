@@ -8,12 +8,14 @@ Este registro resume riesgos vigentes segun la auditoria principal y la revision
 
 | ID | Riesgo | Estado | Impacto | Evidencia |
 | --- | --- | --- | --- | --- |
-| P0-SEC-001 | RBAC server-side incompleto en rutas protegidas | Vigente | Usuarios podrian acceder por URL directa a modulos no permitidos | `app/protected/[module]/page.tsx`, `lib/navigation.ts` |
-| P0-SEC-002 | Autorizacion sensible delegada a cliente | Vigente | Invitaciones o acciones privilegiadas podrian ejecutarse con actor/scope manipulados | `app/api/users/invite/route.ts`, `components/business-module-dashboard.tsx` |
-| P0-SEC-003 | Selector `Rol DEMO` disponible en shell protegido | Vigente en modo demo | Riesgo de confundir demos con permisos reales o filtrar comportamiento a ambientes no demo | `components/app-sidebar.tsx` |
-| P0-SEC-004 | Separacion demo/staging/production insuficiente | Vigente | Riesgo de mezclar datos DEMO con datos reales | `lib/tenant/demo-context.ts`, `supabase/seed.sql`, `lib/analytics/*` |
-| P0-SEC-005 | Credenciales demo expuestas en DOM | No confirmado en fuente actual | Si reaparece en runtime, compromete acceso demo/admin | `components/login-form.tsx`, `lib/auth/demo-admin.ts` |
-| P0-DATA-001 | DEMO y estructuras reales conviven en runtime | Vigente | Ejecutivos podrian leer datos demo como si fueran reales | `lib/analytics/*`, `lib/tenant/*` |
+| P0-SEC-001 | RBAC server-side incompleto en rutas protegidas | Resuelto en aplicacion | Usuarios podrian acceder por URL directa a modulos no permitidos | `lib/server/authorization.ts`, `lib/security/authorization-policy.ts`, `app/protected/[module]/page.tsx`, `app/forbidden/page.tsx` |
+| P0-SEC-002 | Autorizacion sensible delegada a cliente | Resuelto para invitaciones | Invitaciones o acciones privilegiadas podrian ejecutarse con actor/scope manipulados | `app/api/users/invite/route.ts`, `lib/server/user-invitations.ts` |
+| P0-SEC-003 | Selector `Rol DEMO` disponible en shell protegido | Mitigado | Riesgo de confundir demos con permisos reales o filtrar comportamiento a ambientes no demo | `lib/security/environment.ts`, `app/api/auth/demo-role/route.ts`, `components/app-sidebar.tsx` |
+| P0-SEC-004 | Separacion demo/staging/production insuficiente | Mitigado parcialmente | Riesgo de mezclar datos DEMO con datos reales | `lib/security/environment.ts`, `lib/auth/demo-admin.ts`, `components/business-module-dashboard.tsx` |
+| P0-SEC-005 | Credenciales demo expuestas en DOM | No confirmado; mitigado por busqueda y gating | Si reaparece en runtime, compromete acceso demo/admin | `components/login-form.tsx`, `lib/auth/demo-admin.ts` |
+| P0-DATA-001 | DEMO y estructuras reales conviven en runtime | Parcial | Ejecutivos podrian leer datos demo como si fueran reales | `lib/analytics/*`, `lib/tenant/*` |
+
+Nota Sprint 1: la migracion `supabase/migrations/20260807000100_sprint1_harden_security_rbac.sql` endurece RLS para area/sucursal y agrega auditoria de cambios de rol, alcance y estado. La ejecucion remota queda pendiente hasta autorizacion segura sobre Supabase.
 
 ## P1
 

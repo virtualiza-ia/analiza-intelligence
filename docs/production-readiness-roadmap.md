@@ -2,7 +2,7 @@
 
 Fecha de revision: 2026-08-07  
 Fuente principal: `docs/audits/ANALIZA_INTELLIGENCE_AUDIT.md`  
-Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY sin iniciar correcciones hasta autorizacion explicita.
+Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Sprint 1 fue autorizado despues del cierre de Sprint 0.
 
 ## Estado actual del repo
 
@@ -10,7 +10,8 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY sin i
 - La auditoria principal esta presente en `docs/audits/ANALIZA_INTELLIGENCE_AUDIT.md`.
 - `git status` antes de crear esta documentacion mostraba `docs/audits/` como contenido no trackeado.
 - El producto contiene una mezcla importante de pantallas funcionales, datos DEMO tipados en TypeScript y migraciones Supabase para jerarquia, RLS y contexto semantico.
-- No se implemento Sprint 1 ni se corrigieron bugs en esta tarea.
+- Sprint 0 quedo cerrado con commit independiente.
+- Sprint 1 implementa controles P0 de seguridad y RBAC sin iniciar Sprint 2.
 
 ## Stack detectado
 
@@ -31,13 +32,14 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY sin i
 - Las importaciones reales aun no tienen pipeline server-side completo; los flujos actuales simulan validacion/publicacion DEMO en cliente.
 - Las migraciones Supabase incluyen RLS, jerarquia y contexto semantico, pero la aplicacion no depende de forma consistente de esas politicas para autorizacion de rutas/API.
 
-## Hallazgos P0 vigentes
+## Hallazgos P0 despues de Sprint 1
 
-- P0-SEC-001: RBAC server-side incompleto. Rutas protegidas dinamicas usan `allowedRoles` para navegacion, pero no bloquean render directo por rol en servidor.
-- P0-SEC-002: Selector `Rol DEMO` sigue existiendo en el sidebar cuando el modo demo lo permite. Debe quedar estrictamente aislado de staging/produccion.
-- P0-SEC-003: Endpoint de invitaciones confia en `actorRole` y `actorScope` enviados por cliente, y no deriva la autorizacion del usuario autenticado real.
-- P0-SEC-004: Separacion demo/staging/production aun depende de flags y datos demo en runtime; falta compuerta verificable de ambiente.
-- P0-DATA-001: Datos DEMO y estructuras reales conviven en el mismo codigo de dashboards y contexto. Falta aislamiento operacional fuerte.
+- P0-SEC-001: RBAC server-side para rutas dinamicas queda resuelto en aplicacion con `requireProtectedPath` y politica central. Viewer ya no debe renderizar modulos administrativos por URL directa.
+- P0-SEC-002: Selector `Rol DEMO` queda limitado por ambiente server-side y sincroniza rol contra `/api/auth/demo-role`; staging/production no lo habilitan.
+- P0-SEC-003: Invitaciones ya no aceptan `actorRole` ni `actorScope` desde cliente. El actor se deriva server-side y se valida con `canPerformAction`.
+- P0-SEC-004: Se agrega `lib/security/environment.ts` para separar demo/staging/production y bloquear demo auth/role switch fuera de demo.
+- P0-DATA-001: Usuarios DEMO automaticos ya no se cargan en Usuarios y permisos fuera de runtime demo. Persisten datasets DEMO BI para sprints posteriores.
+- P0-RLS-001: Se crea migracion nueva para endurecer RLS de area/sucursal y auditar cambios sensibles. Ejecucion remota pendiente.
 
 ## Hallazgos P0 no confirmados o parcialmente resueltos
 
@@ -136,19 +138,22 @@ Criterios de salida:
 
 ### Sprint 1 - Security y RBAC
 
-Objetivo: implementar autorizacion server-side por rol y alcance. No iniciado en esta tarea.
+Objetivo: implementar autorizacion server-side por rol y alcance.
 
 Alcance:
-- Middleware/guards server-side para rutas protegidas.
-- Autorizacion en APIs y acciones privilegiadas.
-- Eliminar o aislar selector `Rol DEMO` de ambientes no demo.
-- Derivar actor real de sesion server-side.
-- Validar pais, empresa, area, sucursal y rol en cada lectura/escritura.
+- AuthorizationService server-side para identidad y permisos.
+- Guards server-side para rutas protegidas y URL directa.
+- Autorizacion en APIs sensibles, empezando por invitaciones y AnaliA.
+- Aislamiento server-side de selector `Rol DEMO`.
+- Actor de invitacion derivado de sesion server-side.
+- Validacion de rol y alcance pais/empresa/area/sucursal para acciones P0.
+- Migracion RLS nueva para endurecer area/sucursal y auditoria de cambios sensibles.
 
 Criterios de salida:
 - Viewer no puede entrar por URL directa a modulos no permitidos.
 - Invitaciones no aceptan actor/scope desde cliente como fuente de verdad.
 - Pruebas de RBAC por rol y alcance.
+- `lint`, `typecheck`, `tests` y `build` deben pasar antes del commit.
 
 ### Sprint 2 - Integridad BI y filtros
 

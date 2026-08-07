@@ -1,0 +1,229 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+import {
+  demoAdminCookieName,
+  demoOrganizationId,
+  demoRoleCookieName,
+  getDemoAdminEmail,
+  getDemoRoleFromCookie,
+  hasDemoAdminCookie,
+  isDemoRoleSwitchEnabled,
+} from "@/lib/auth/demo-admin";
+import { readLocalSession } from "@/lib/auth/local-session";
+import { getMissingDatabaseConfig } from "@/lib/server/database";
+import { getAuthenticatedLocalUserAccess } from "@/lib/server/local-auth";
+import { createClient } from "@/lib/supabase/server";
+import type { CurrentUserScope } from "@/lib/tenant/current-user-access";
+import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
+import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
+import { hasEnvVars } from "@/lib/utils";
+import {
+  canAccessProtectedPath,
+  getForbiddenRedirectPath,
+  type AuthorizationActor,
+} from "@/lib/security/authorization-policy";
+
+type CookieSource = {
+  get(name: string): { value: string } | undefined;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function coerceRoleKey(value: unknown): RoleKey | null {
+  return roleKeys.includes(value as RoleKey) ? (value as RoleKey) : null;
+}
+
+function readClaimString(claims: Record<string, unknown>, key: string) {
+  const directValue = readString(claims[key]);
+
+  if (directValue) {
+    return directValue;
+  }
+
+  const appMetadata = claims.app_metadata;
+
+  if (isRecord(appMetadata)) {
+    return readString(appMetadata[key]);
+  }
+
+  return null;
+}
+
+function readRoleKeyFromClaims(claims: Record<string, unknown>) {
+  return (
+    coerceRoleKey(readClaimString(claims, "roleKey")) ??
+    coerceRoleKey(readClaimString(claims, "role_key")) ??
+    coerceRoleKey(readClaimString(claims, "role")) ??
+    "viewer"
+  );
+}
+
+function readScopeFromClaims(claims: Record<string, unknown>): ScopeBoundary {
+  return {
+    branchId: readClaimString(claims, "branch_id"),
+    companyId: readClaimString(claims, "company_id"),
+    countryId: readClaimString(claims, "country_id"),
+    operationalAreaId: readClaimString(claims, "operational_area_id"),
+    organizationId:
+      readClaimString(claims, "organization_id") ?? "__unscoped_supabase__",
+  };
+}
+
+function toScopeBoundary(scope: CurrentUserScope): ScopeBoundary | null {
+  if (!scope.organizationId) {
+    return null;
+  }
+
+  return {
+    branchId: scope.branchId,
+    companyId: scope.companyId,
+    countryId: scope.countryId,
+    operationalAreaId: scope.operationalAreaId,
+    organizationId: scope.organizationId,
+  };
+}
+
+async function getCookieSource(cookieSource?: CookieSource) {
+  return cookieSource ?? (await cookies());
+}
+
+async function readLocalAuthorizationActor(
+  cookieSource: CookieSource,
+): Promise<AuthorizationActor | null> {
+  const localSession = (() => {
+    try {
+      return readLocalSession(cookieSource);
+    } catch {
+      return null;
+    }
+  })();
+
+  if (!localSession) {
+    return null;
+  }
+
+  if (getMissingDatabaseConfig().length > 0) {
+    return null;
+  }
+
+  const user = await getAuthenticatedLocalUserAccess(localSession.userId).catch(
+    () => null,
+  );
+  const scope = user?.scope ? toScopeBoundary(user.scope) : null;
+
+  if (!user || !scope) {
+    return null;
+  }
+
+  return {
+    allowDemoRoleSwitch: false,
+    email: user.email,
+    roleKey: user.roleKey,
+    scope,
+    source: "local",
+    userId: user.userId,
+  };
+}
+
+function readDemoAuthorizationActor(
+  cookieSource: CookieSource,
+): AuthorizationActor | null {
+  if (
+    !hasDemoAdminCookie(cookieSource.get(demoAdminCookieName)?.value)
+  ) {
+    return null;
+  }
+
+  const roleKey =
+    getDemoRoleFromCookie(cookieSource.get(demoRoleCookieName)?.value) ??
+    "super_admin";
+
+  return {
+    allowDemoRoleSwitch: isDemoRoleSwitchEnabled(),
+    email: getDemoAdminEmail(),
+    roleKey,
+    scope: {
+      organizationId: demoOrganizationId,
+    },
+    source: "demo",
+    userId: "demo-admin",
+  };
+}
+
+async function readSupabaseAuthorizationActor(): Promise<AuthorizationActor | null> {
+  if (!hasEnvVars) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.getClaims().catch(() => ({
+    data: null,
+    error: new Error("Supabase claims unavailable"),
+  }));
+  const claims = data?.claims;
+
+  if (error || !isRecord(claims)) {
+    return null;
+  }
+
+  const userId = readString(claims.sub);
+
+  if (!userId) {
+    return null;
+  }
+
+  return {
+    allowDemoRoleSwitch: false,
+    email: readString(claims.email) ?? "supabase-user",
+    roleKey: readRoleKeyFromClaims(claims),
+    scope: readScopeFromClaims(claims),
+    source: "supabase",
+    userId,
+  };
+}
+
+export async function getCurrentAuthorizationActor(
+  cookieSource?: CookieSource,
+) {
+  const resolvedCookieSource = await getCookieSource(cookieSource);
+  const localActor = await readLocalAuthorizationActor(resolvedCookieSource);
+
+  if (localActor) {
+    return localActor;
+  }
+
+  const demoActor = readDemoAuthorizationActor(resolvedCookieSource);
+
+  if (demoActor) {
+    return demoActor;
+  }
+
+  return readSupabaseAuthorizationActor();
+}
+
+export async function requireProtectedAccess() {
+  const actor = await getCurrentAuthorizationActor();
+
+  if (!actor) {
+    redirect("/auth/login");
+  }
+
+  return actor;
+}
+
+export async function requireProtectedPath(pathname: string) {
+  const actor = await requireProtectedAccess();
+
+  if (!canAccessProtectedPath(actor, pathname)) {
+    redirect(getForbiddenRedirectPath(pathname));
+  }
+
+  return actor;
+}

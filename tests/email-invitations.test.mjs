@@ -58,7 +58,8 @@ const dockerEnvExample = readFileSync(dockerEnvExamplePath, "utf8");
 for (const requiredRouteText of [
   "getMissingDatabaseConfig",
   "getMissingSmtpConfig",
-  "canInviteUser",
+  "getCurrentAuthorizationActor",
+  "canPerformAction",
   "sendMail",
   "No se pudo enviar la invitacion",
 ]) {

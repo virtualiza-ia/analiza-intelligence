@@ -21,6 +21,8 @@ import { ServicePortfolioDashboard } from "@/components/service-portfolio-dashbo
 import { Badge } from "@/components/ui/badge";
 import { moduleConfigs } from "@/lib/analytics/demo-business-modules";
 import { navigationItems } from "@/lib/navigation";
+import { requireProtectedPath } from "@/lib/server/authorization";
+import { isDemoRuntimeEnvironment } from "@/lib/security/environment";
 
 type ModulePageProps = {
   params: Promise<{
@@ -49,6 +51,8 @@ export default async function ModulePage({ params }: ModulePageProps) {
   if (!item) {
     notFound();
   }
+
+  await requireProtectedPath(item.href);
 
   const Icon = item.icon;
 
@@ -129,7 +133,12 @@ export default async function ModulePage({ params }: ModulePageProps) {
   }
 
   if (moduleConfigs[module]) {
-    return <BusinessModuleDashboard module={module} />;
+    return (
+      <BusinessModuleDashboard
+        enableDemoFixtures={isDemoRuntimeEnvironment()}
+        module={module}
+      />
+    );
   }
 
   return (

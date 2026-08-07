@@ -1,6 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
 
 const protectedLayoutPath = "app/protected/layout.tsx";
+const authorizationPath = "lib/server/authorization.ts";
 const sidebarPath = "components/app-sidebar.tsx";
 const headerPath = "components/tenant-context-header.tsx";
 const branchDashboardPath = "components/branch-network-dashboard.tsx";
@@ -10,6 +11,7 @@ const localAuthPath = "lib/server/local-auth.ts";
 
 for (const file of [
   protectedLayoutPath,
+  authorizationPath,
   sidebarPath,
   headerPath,
   branchDashboardPath,
@@ -21,6 +23,7 @@ for (const file of [
 }
 
 const protectedLayout = readFileSync(protectedLayoutPath, "utf8");
+const authorization = readFileSync(authorizationPath, "utf8");
 const sidebar = readFileSync(sidebarPath, "utf8");
 const header = readFileSync(headerPath, "utf8");
 const branchDashboard = readFileSync(branchDashboardPath, "utf8");
@@ -35,9 +38,10 @@ function assert(condition, message) {
 }
 
 assert(
-  protectedLayout.includes("allowDemoRoleSwitch: false") &&
-    protectedLayout.includes("readLocalSession"),
-  "Protected layout must disable demo role switching for real local sessions.",
+  protectedLayout.includes("requireProtectedAccess") &&
+    authorization.includes("allowDemoRoleSwitch: false") &&
+    authorization.includes("readLocalSession"),
+  "Protected access must disable demo role switching for real local sessions.",
 );
 
 assert(

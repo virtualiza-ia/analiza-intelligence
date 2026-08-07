@@ -4,7 +4,6 @@ import { getPostgresPool } from "@/lib/server/database";
 import { demoRoleProfiles, type RoleKey } from "@/lib/tenant/demo-context";
 import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
 
-const demoOrganizationId = "10000000-0000-4000-8000-000000000001";
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -19,6 +18,7 @@ type InvitationRow = {
 
 export type CreateInvitationInput = {
   appUrl: string;
+  actorUserId: string;
   email: string;
   fullName: string;
   roleKey: RoleKey;
@@ -36,6 +36,16 @@ export type CreatedInvitation = {
 
 function nullableUuid(value: string | null | undefined) {
   return value && uuidPattern.test(value) ? value : null;
+}
+
+function requiredUuid(value: string | null | undefined, fieldName: string) {
+  const uuid = nullableUuid(value);
+
+  if (!uuid) {
+    throw new Error(`${fieldName} must be a valid UUID.`);
+  }
+
+  return uuid;
 }
 
 function normalizeAppUrl(appUrl: string) {
@@ -107,6 +117,7 @@ function buildEmailContent({
 
 export async function createUserInvitation({
   appUrl,
+  actorUserId,
   email,
   fullName,
   roleKey,
@@ -116,7 +127,8 @@ export async function createUserInvitation({
   const client = await pool.connect();
   const token = randomBytes(32).toString("base64url");
   const invitationTokenHash = createHash("sha256").update(token).digest("hex");
-  const organizationId = nullableUuid(scope.organizationId) ?? demoOrganizationId;
+  const organizationId = requiredUuid(scope.organizationId, "organizationId");
+  const auditableActorUserId = nullableUuid(actorUserId);
 
   try {
     await client.query("begin");
@@ -141,10 +153,11 @@ export async function createUserInvitation({
           company_id,
           operational_area_id,
           branch_id,
+          invited_by,
           invitation_token_hash,
           metadata
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
         returning id, expires_at
       `,
       [
@@ -155,6 +168,7 @@ export async function createUserInvitation({
         nullableUuid(scope.companyId),
         nullableUuid(scope.operationalAreaId),
         nullableUuid(scope.branchId),
+        auditableActorUserId,
         invitationTokenHash,
         JSON.stringify({
           delivery_provider: "smtp",
@@ -179,9 +193,10 @@ export async function createUserInvitation({
           country_id,
           company_id,
           branch_id,
+          actor_user_id,
           metadata
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
       `,
       [
         organizationId,
@@ -191,6 +206,7 @@ export async function createUserInvitation({
         nullableUuid(scope.countryId),
         nullableUuid(scope.companyId),
         nullableUuid(scope.branchId),
+        auditableActorUserId,
         JSON.stringify({
           invited_email_domain: email.split("@")[1] ?? "unknown",
           invited_role: roleKey,

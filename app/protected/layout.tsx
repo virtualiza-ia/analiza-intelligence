@@ -1,56 +1,9 @@
 import { AuthButton } from "@/components/auth-button";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TenantContextHeader } from "@/components/tenant-context-header";
-import {
-  demoAdminCookieName,
-  hasDemoAdminCookie,
-} from "@/lib/auth/demo-admin";
-import { readLocalSession } from "@/lib/auth/local-session";
-import { createClient } from "@/lib/supabase/server";
-import type { RoleKey } from "@/lib/tenant/demo-context";
-import { hasEnvVars } from "@/lib/utils";
-import { cookies } from "next/headers";
+import { requireProtectedAccess } from "@/lib/server/authorization";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
-
-type ProtectedAccess = {
-  allowDemoRoleSwitch: boolean;
-  roleKey: RoleKey;
-};
-
-async function requireProtectedAccess(): Promise<ProtectedAccess> {
-  const cookieStore = await cookies();
-  const hasDemoAdminSession = hasDemoAdminCookie(
-    cookieStore.get(demoAdminCookieName)?.value,
-  );
-
-  const localSession = readLocalSession(cookieStore);
-
-  if (localSession) {
-    return { allowDemoRoleSwitch: false, roleKey: localSession.roleKey };
-  }
-
-  if (hasDemoAdminSession) {
-    return { allowDemoRoleSwitch: true, roleKey: "super_admin" };
-  }
-
-  if (!hasEnvVars) {
-    redirect("/auth/login");
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims().catch(() => ({
-    data: null,
-    error: new Error("Supabase claims unavailable"),
-  }));
-
-  if (error || !data?.claims) {
-    redirect("/auth/login");
-  }
-
-  return { allowDemoRoleSwitch: true, roleKey: "super_admin" };
-}
 
 async function ProtectedShell({
   children,

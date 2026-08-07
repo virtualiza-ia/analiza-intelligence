@@ -4,7 +4,7 @@ Fecha de revision: 2026-08-07
 
 ## Resumen
 
-ANALIZA INTELLIGENCE es una aplicacion BI multipais y multiempresa construida sobre Next.js App Router. El producto ya contiene pantallas ejecutivas, dashboards operativos, modelos de jerarquia, migraciones Supabase y datos DEMO extensos. La arquitectura actual permite navegar y simular flujos clave, pero todavia no garantiza production readiness porque autorizacion, filtros, KPI contracts, importaciones y conectores no estan centralizados ni aplicados de forma uniforme server-side.
+ANALIZA INTELLIGENCE es una aplicacion BI multipais y multiempresa construida sobre Next.js App Router. El producto ya contiene pantallas ejecutivas, dashboards operativos, modelos de jerarquia, migraciones Supabase y datos DEMO extensos. Despues de Sprint 1, autenticacion, autorizacion de rutas, permisos de invitacion y aislamiento demo/production tienen una capa server-side central. Filtros, KPI contracts, importaciones y conectores siguen para sprints posteriores.
 
 ## Stack
 
@@ -21,31 +21,34 @@ ANALIZA INTELLIGENCE es una aplicacion BI multipais y multiempresa construida so
 
 ### Rutas y shell protegido
 
-- `app/protected/layout.tsx` actua como compuerta de acceso general.
-- `app/protected/overview/page.tsx` renderiza el dashboard ejecutivo.
-- `app/protected/[module]/page.tsx` resuelve modulos dinamicos desde `lib/navigation.ts`.
+- `app/protected/layout.tsx` actua como compuerta de acceso general via `requireProtectedAccess`.
+- `app/protected/overview/page.tsx` renderiza el dashboard ejecutivo despues de `requireProtectedPath`.
+- `app/protected/[module]/page.tsx` resuelve modulos dinamicos desde `lib/navigation.ts` y aplica `requireProtectedPath` antes de renderizar.
 - `components/app-sidebar.tsx` controla navegacion visible por rol en cliente.
+- `app/forbidden/page.tsx` presenta denegacion profesional cuando el servidor bloquea una ruta.
 
-Riesgo principal: el layout valida sesion, pero el modulo dinamico no aplica `allowedRoles` server-side antes de renderizar.
+Estado Sprint 1: el modulo dinamico ya no depende solo del sidebar. `lib/security/authorization-policy.ts` aplica `allowedRoles` server-side y superadministradores tienen override controlado.
 
 ### Autenticacion
 
 - `proxy.ts` llama `updateSession` para refrescar/verificar sesion.
 - `lib/supabase/proxy.ts` maneja redireccion de usuarios no autenticados.
-- `lib/auth/demo-admin.ts` habilita acceso demo admin con cookie server-side y password desde variable de entorno.
+- `lib/auth/demo-admin.ts` habilita acceso demo admin solo cuando `lib/security/environment.ts` permite runtime demo.
 - `lib/auth/local-session.ts` firma sesiones locales con HMAC y cookies httpOnly.
 - `components/login-form.tsx` intenta demo admin, login local y Supabase.
+- `lib/server/authorization.ts` resuelve el actor actual desde sesion local, sesion demo o claims Supabase.
 
-Riesgo principal: autenticacion y autorizacion estan separadas de forma incompleta. Hay compuertas de sesion, pero permisos por ruta/API deben derivarse de servidor y alcance real.
+Estado Sprint 1: las rutas protegidas y APIs sensibles derivan actor server-side. Sesiones locales requieren secreto configurado fuera de demo.
 
 ### RBAC y permisos
 
 - `lib/navigation.ts` define roles permitidos por modulo.
 - `lib/tenant/delegation-policy.ts` define reglas de delegacion para operaciones, area, sucursal y usuarios operativos.
 - Migraciones Supabase agregan tablas, funciones y politicas RLS.
-- `app/api/users/invite/route.ts` valida invitaciones con `actorRole` y `actorScope` recibidos del cliente.
+- `app/api/users/invite/route.ts` valida invitaciones con actor server-side y ya no acepta `actorRole` ni `actorScope` como fuente de verdad.
+- `app/api/analia-chat/route.ts` exige sesion y permiso para la ruta consultada.
 
-Riesgo principal: existen modelos y politicas, pero la aplicacion aun confia demasiado en UI/cliente para flujos sensibles.
+Estado Sprint 1: existe una politica pura en `lib/security/authorization-policy.ts` y una capa server-side en `lib/server/authorization.ts`.
 
 ### Contexto global
 
@@ -96,12 +99,23 @@ Riesgo principal: conectores estan en etapa demo/diseno. Las credenciales reales
 
 ## Arquitectura objetivo recomendada
 
-- `AuthorizationService` server-side para rutas, APIs, acciones, importaciones, exportaciones y conectores.
+- `AuthorizationService` server-side para rutas, APIs, acciones, importaciones, exportaciones y conectores. La base inicial ya existe para rutas, invitaciones y AnaliA.
 - `TenantScope` obligatorio en cada request: organization, country, company, operational area, branch, role y assignments.
 - `KpiSemanticService` con contratos versionados, required fields, formulas, filtros soportados y lineage.
 - `ImportPipeline` server-side con staging, validation, publish, rollback, audit log y data quality score.
 - `ConnectorRuntime` server-only con adapters reales y DEMO separados.
 - `EnvironmentGuard` que impida mezclar DEMO/staging/production y bloquee datos demo en produccion.
+
+## Cambios Sprint 1
+
+- Capa de ambiente server-side en `lib/security/environment.ts`.
+- Politica pura RBAC en `lib/security/authorization-policy.ts`.
+- Resolucion server-side de actor en `lib/server/authorization.ts`.
+- Guard de URL directa en `app/protected/[module]/page.tsx`, `app/protected/overview/page.tsx`, `app/protected/context/page.tsx` y `app/protected/page.tsx`.
+- Pantalla `/forbidden`.
+- Endpoint `/api/auth/demo-role` para sincronizar rol DEMO server-side solo en runtime demo.
+- Invitaciones protegidas por actor server-side y auditoria con `actor_user_id` cuando existe UUID.
+- Migracion `supabase/migrations/20260807000100_sprint1_harden_security_rbac.sql` para RLS estricto por area/sucursal y auditoria de cambios de rol/alcance/estado.
 
 ## Archivos clave
 
