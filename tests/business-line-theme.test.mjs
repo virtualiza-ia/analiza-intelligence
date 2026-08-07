@@ -67,8 +67,8 @@ for (const requiredLayoutText of [
 for (const requiredHeaderText of [
   "businessLineId",
   "handleBusinessLineChange",
-  "analiza:context-change",
-  'searchParams.set("line"',
+  "globalContextChangeEvent",
+  "toGlobalFilterSearchParams",
 ]) {
   if (!contextHeader.includes(requiredHeaderText)) {
     throw new Error(`Context header line identity is missing: ${requiredHeaderText}`);

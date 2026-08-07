@@ -22,10 +22,15 @@ import {
   getCompanyForBusinessLine,
   getDefaultPeriod,
 } from "@/lib/tenant/demo-context";
-
-const allBranchesValue = "__all__";
-const storageKey = "analiza:selected-context";
-const contextChangeEvent = "analiza:context-change";
+import {
+  allBranchesValue,
+  createGlobalFilterContextFromSearchParams,
+  globalContextChangeEvent as contextChangeEvent,
+  globalContextStorageKey as storageKey,
+  resolveGlobalFilterContext,
+  toGlobalFilterSearchParams,
+  type GlobalFilterInput,
+} from "@/lib/analytics/global-filters";
 
 type ContextSelectionFormProps = {
   userEmail: string;
@@ -35,23 +40,23 @@ type ContextSelectionFormProps = {
   branches: BranchOption[];
 };
 
-type StoredContext = {
-  countryId: string;
-  countryName: string;
-  companyId: string;
-  companyName: string;
-  businessLineId: string;
-  businessLineName: string;
-  businessLineCode: string;
-  branchId: string;
-  branchName: string;
-  period: string;
-  periodStart: string;
-  periodEnd: string;
-  year: string;
-  month: string;
-  isDemo: boolean;
-};
+function readStoredContext() {
+  const rawContext =
+    window.localStorage.getItem(storageKey) ??
+    window.sessionStorage.getItem(storageKey);
+
+  if (!rawContext) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawContext) as GlobalFilterInput;
+  } catch {
+    window.localStorage.removeItem(storageKey);
+    window.sessionStorage.removeItem(storageKey);
+    return null;
+  }
+}
 
 export function ContextSelectionForm({
   userEmail,
@@ -128,6 +133,20 @@ export function ContextSelectionForm({
     periodStart.length > 0 &&
     periodEnd.length > 0;
 
+  useEffect(() => {
+    const nextContext = createGlobalFilterContextFromSearchParams(
+      new URLSearchParams(window.location.search),
+      readStoredContext(),
+    );
+
+    setCountryId(nextContext.countryId);
+    setCompanyId(nextContext.companyId);
+    setBusinessLineId(nextContext.businessLineId);
+    setBranchId(nextContext.branchId);
+    setPeriodStart(nextContext.periodStart);
+    setPeriodEnd(nextContext.periodEnd);
+  }, []);
+
   function handleCompanyChange(nextCompanyId: string) {
     setCompanyId(nextCompanyId);
     setBusinessLineId(getBusinessLineForCompany(nextCompanyId).id);
@@ -147,36 +166,28 @@ export function ContextSelectionForm({
       return;
     }
 
-    const context: StoredContext = {
-      countryId: selectedCountry.id,
-      countryName: selectedCountry.name,
-      companyId: selectedCompany.id,
-      companyName: selectedCompany.name,
+    const context = resolveGlobalFilterContext({
+      branchId,
+      businessLineCode: selectedBusinessLine.code,
       businessLineId: selectedBusinessLine.id,
       businessLineName: selectedBusinessLine.name,
-      businessLineCode: selectedBusinessLine.code,
-      branchId,
-      branchName: selectedBranch?.name ?? allBranchesLabel,
+      companyId: selectedCompany.id,
+      companyName: selectedCompany.name,
+      countryId: selectedCountry.id,
+      countryName: selectedCountry.name,
+      dateFrom: periodStart,
+      dateTo: periodEnd,
+      isDemo: true,
       period: `${periodStart} a ${periodEnd}`,
       periodStart,
       periodEnd,
-      year: periodStart.slice(0, 4),
-      month: periodStart.slice(5, 7),
-      isDemo: true,
-    };
+    });
 
     window.localStorage.setItem(storageKey, JSON.stringify(context));
     window.sessionStorage.setItem(storageKey, JSON.stringify(context));
     window.dispatchEvent(new Event(contextChangeEvent));
 
-    const params = new URLSearchParams({
-      branch: branchId,
-      company: selectedCompany.id,
-      country: selectedCountry.id,
-      from: periodStart,
-      line: selectedBusinessLine.id,
-      to: periodEnd,
-    });
+    const params = toGlobalFilterSearchParams(context);
 
     router.push(`/protected/overview?${params.toString()}`);
   }

@@ -1,9 +1,9 @@
-import { elSalvadorBranchResultTemplates } from "@/lib/analytics/el-salvador-result-templates";
-import type { BusinessLineCode } from "@/lib/analytics/kpi-registry";
+import { elSalvadorBranchResultTemplates } from "../analytics/el-salvador-result-templates.ts";
+import type { BusinessLineCode } from "../analytics/kpi-registry.ts";
 import {
   managedBranchRecords,
   type ManagedBranchRecord,
-} from "@/lib/tenant/managed-branch-records";
+} from "./managed-branch-records.ts";
 
 export type CountryOption = {
   id: string;

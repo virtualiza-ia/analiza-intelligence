@@ -1,4 +1,4 @@
-import type { BusinessLineCode } from "@/lib/analytics/kpi-registry";
+import type { BusinessLineCode } from "../analytics/kpi-registry.ts";
 
 export type ManagedBranchRecord = {
   id: string;

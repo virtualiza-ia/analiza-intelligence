@@ -1,13 +1,13 @@
 import {
   formatCurrency,
   formatRate,
-} from "@/lib/analytics/el-salvador-result-templates";
+} from "./el-salvador-result-templates.ts";
 import {
   formatKpiValue,
   getKpiStatusLabel,
   kpiRegistry,
   type BusinessLineCode,
-} from "@/lib/analytics/kpi-registry";
+} from "./kpi-registry.ts";
 
 export const allInsightOption = "Todos";
 
@@ -1977,6 +1977,30 @@ function overlapsPeriod(insight: InsightModel, filterPeriod: string) {
   return true;
 }
 
+export function isInsightConclusionBlocked(insight: InsightModel) {
+  return (
+    insight.confidence < 70 ||
+    insight.data_quality_status === "Pendiente de conexion de datos" ||
+    insight.data_quality_status === "Datos incompletos" ||
+    insight.data_quality_status === "Requiere conciliacion"
+  );
+}
+
+export function getInsightConclusionGate(insight: InsightModel) {
+  if (!isInsightConclusionBlocked(insight)) {
+    return {
+      blocked: false,
+      message: "Conclusion ejecutiva permitida con lectura cautelosa.",
+    };
+  }
+
+  return {
+    blocked: true,
+    message:
+      "Datos insuficientes para conclusion ejecutiva. Complete o concilie la fuente antes de presentar una decision.",
+  };
+}
+
 export function filterInsights(
   insights: InsightModel[],
   filters: InsightFilters,
@@ -2533,6 +2557,7 @@ export function createDemoAiResponse({
   );
   const actionDraft =
     mode === "Actuar" ? createActionDraftFromInsight(selectedInsight) : undefined;
+  const conclusionGate = getInsightConclusionGate(selectedInsight);
   const simulationNote =
     mode === "Simular"
       ? "Simulacion DEMO: si la accion recupera 62% del impacto estimado, el beneficio esperado seria " +
@@ -2540,7 +2565,9 @@ export function createDemoAiResponse({
         "."
       : "";
   const directAnswer =
-    mode === "Simular"
+    conclusionGate.blocked
+      ? conclusionGate.message
+      : mode === "Simular"
       ? simulationNote
       : mode === "Actuar"
         ? "Prepare un borrador de accion. No se ejecuta hasta que una persona lo confirme."
@@ -2549,9 +2576,13 @@ export function createDemoAiResponse({
   return {
     actionDraft,
     answer:
-      "AnaliA responde usando datos filtrados, registro de KPIs y trazabilidad. Todo valor demo se marca como DEMO y toda fuente faltante se marca como Pendiente de conexion de datos.",
+      conclusionGate.blocked
+        ? "AnaliA encontro una senal, pero bloquea la conclusion ejecutiva por calidad insuficiente o fuente pendiente."
+        : "AnaliA responde usando datos filtrados, registro de KPIs y trazabilidad. Todo valor demo se marca como DEMO y toda fuente faltante se marca como Pendiente de conexion de datos.",
     assumptions: selectedInsight.assumptions,
-    confidence: selectedInsight.confidence,
+    confidence: conclusionGate.blocked
+      ? Math.min(selectedInsight.confidence, 64)
+      : selectedInsight.confidence,
     directAnswer,
     evidence: selectedInsight.evidence.map(
       (item) =>
@@ -2564,6 +2595,7 @@ export function createDemoAiResponse({
     ],
     interpretation: selectedInsight.operational_impact,
     limitations: [
+      ...(conclusionGate.blocked ? [conclusionGate.message] : []),
       ...selectedInsight.assumptions,
       selectedInsight.data_quality_status === "Pendiente de conexion de datos"
         ? "No se puede responder con precision porque falta la fuente de datos de agenda, costos, SLA o equipos."
@@ -2581,8 +2613,10 @@ export function createDemoAiResponse({
       })),
     ],
     recommendedAction:
-      selectedInsight.recommended_actions[0]?.action ??
-      "Revisar evidencia y crear accion con responsable.",
+      conclusionGate.blocked
+        ? "Completar o conciliar la fuente antes de ejecutar acciones ejecutivas."
+        : selectedInsight.recommended_actions[0]?.action ??
+          "Revisar evidencia y crear accion con responsable.",
     relatedLinks: [
       {
         href: selectedInsight.related_dashboard_link,

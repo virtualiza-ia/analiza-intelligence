@@ -20,6 +20,7 @@ import {
 } from "@/lib/analytics/business-line-operations";
 import {
   getCapacityOccupancyScreen,
+  getCapacityOccupancyScreenForContext,
   type CapacityBlock,
   type CapacityBranchRow,
   type CapacityComparisonRow,
@@ -27,18 +28,36 @@ import {
   type CapacityMetricStatus,
   type CapacityUtilizationRow,
 } from "@/lib/analytics/capacity-occupancy";
+import {
+  globalContextChangeEvent as contextChangeEvent,
+  globalContextStorageKey as storageKey,
+} from "@/lib/analytics/global-filters";
 import { cn } from "@/lib/utils";
 
-const storageKey = "analiza:selected-context";
-const contextChangeEvent = "analiza:context-change";
 const allBranchesLabel = "Todas las sucursales";
 
 type StoredContext = {
+  countryId?: string;
   countryName?: string;
+  companyId?: string;
   companyName?: string;
   businessLineId?: string;
   businessLineName?: string;
+  businessLineCode?: string;
+  branchId?: string;
   branchName?: string;
+  operationalAreaId?: string;
+  operationalAreaName?: string;
+  managerId?: string;
+  managerName?: string;
+  professionalId?: string;
+  professionalName?: string;
+  serviceId?: string;
+  serviceName?: string;
+  payerId?: string;
+  payerName?: string;
+  channelId?: string;
+  channelName?: string;
   period?: string;
   periodStart?: string;
   periodEnd?: string;
@@ -155,6 +174,17 @@ function CapacityMetricCard({ metric }: { metric: CapacityMetric }) {
       <div className="text-2xl font-semibold tracking-normal">{metric.value}</div>
       <p className="text-xs leading-5 text-muted-foreground">{metric.note}</p>
     </article>
+  );
+}
+
+function CapacityNoDataState({ reason }: { reason: string }) {
+  return (
+    <section className="rounded-md border border-dashed bg-card p-6 text-sm leading-6 text-muted-foreground">
+      <div className="mb-2 font-semibold text-foreground">
+        Sin datos disponibles para este filtro
+      </div>
+      <p>{reason}</p>
+    </section>
   );
 }
 
@@ -624,7 +654,34 @@ function createDefaultSelection(
 export function CapacityOccupancyDashboard() {
   const [context, setContext] = useState<StoredContext | null>(null);
   const lineSlug = useMemo(() => resolveContextLine(context), [context]);
-  const screen = useMemo(() => getCapacityOccupancyScreen(lineSlug), [lineSlug]);
+  const screen = useMemo(
+    () =>
+      getCapacityOccupancyScreenForContext(
+        {
+          branchId: context?.branchId,
+          branchName: context?.branchName,
+          businessLineCode: context?.businessLineCode,
+          businessLineId: context?.businessLineId,
+          businessLineName: context?.businessLineName,
+          channelId: context?.channelId,
+          companyId: context?.companyId,
+          companyName: context?.companyName,
+          countryId: context?.countryId,
+          countryName: context?.countryName,
+          managerId: context?.managerId,
+          managerName: context?.managerName,
+          operationalAreaId: context?.operationalAreaId,
+          operationalAreaName: context?.operationalAreaName,
+          payerId: context?.payerId,
+          periodEnd: context?.periodEnd,
+          periodStart: context?.periodStart,
+          professionalId: context?.professionalId,
+          serviceId: context?.serviceId,
+        },
+        lineSlug,
+      ),
+    [context, lineSlug],
+  );
   const [selection, setSelection] = useState(() => createDefaultSelection(screen));
   const branchOptions = useMemo(
     () => [allBranchesLabel, ...screen.branchRows.map((row) => row.branch)],
@@ -654,8 +711,19 @@ export function CapacityOccupancyDashboard() {
   }, []);
 
   useEffect(() => {
-    setSelection(createDefaultSelection(screen));
-  }, [screen]);
+    const nextSelection = createDefaultSelection(screen);
+    const contextBranch = context?.branchName;
+
+    if (
+      contextBranch &&
+      !/^Todas/i.test(contextBranch) &&
+      branchOptions.includes(contextBranch)
+    ) {
+      nextSelection.branch = contextBranch;
+    }
+
+    setSelection(nextSelection);
+  }, [branchOptions, context?.branchName, screen]);
 
   return (
     <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
@@ -702,39 +770,45 @@ export function CapacityOccupancyDashboard() {
         ))}
       </div>
 
-      <CapacitySuccessChart
-        description={screen.mainChartDescription}
-        rows={screen.utilizationRows}
-        title={screen.mainChartTitle}
-      />
+      {screen.noDataReason ? (
+        <CapacityNoDataState reason={screen.noDataReason} />
+      ) : (
+        <>
+          <CapacitySuccessChart
+            description={screen.mainChartDescription}
+            rows={screen.utilizationRows}
+            title={screen.mainChartTitle}
+          />
 
-      <AnalyticsComparisonChart {...screen.trendChart} />
+          <AnalyticsComparisonChart {...screen.trendChart} />
 
-      {screen.comparisonRows ? (
-        <CapacityComparisonTable rows={screen.comparisonRows} />
-      ) : null}
+          {screen.comparisonRows ? (
+            <CapacityComparisonTable rows={screen.comparisonRows} />
+          ) : null}
 
-      <BranchCapacityTable rows={filteredBranchRows} />
+          <BranchCapacityTable rows={filteredBranchRows} />
 
-      <section className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
-        <div className="flex items-start gap-2">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          <span>
-            Regla: esta pantalla mide cuanto podia producirse, cuanto se
-            planifico, cuanto se uso y cuanto termino exitosamente. Operacion
-            ejecutiva mide lo realizado y Salud financiera mide el dinero y el
-            margen perdido por esa brecha.
-          </span>
-        </div>
-      </section>
+          <section className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              <span>
+                Regla: esta pantalla mide cuanto podia producirse, cuanto se
+                planifico, cuanto se uso y cuanto termino exitosamente. Operacion
+                ejecutiva mide lo realizado y Salud financiera mide el dinero y el
+                margen perdido por esa brecha.
+              </span>
+            </div>
+          </section>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        {screen.blocks.map((block) => (
-          <CapacityBlockSection key={`${screen.slug}-${block.title}`} block={block} />
-        ))}
-      </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {screen.blocks.map((block) => (
+              <CapacityBlockSection key={`${screen.slug}-${block.title}`} block={block} />
+            ))}
+          </div>
 
-      <ExecutiveActionPanel actions={screen.executiveActions} />
+          <ExecutiveActionPanel actions={screen.executiveActions} />
+        </>
+      )}
     </section>
   );
 }

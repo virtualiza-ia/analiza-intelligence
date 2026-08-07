@@ -1,4 +1,4 @@
-import type { RoleKey } from "@/lib/tenant/demo-context";
+import type { RoleKey } from "../tenant/demo-context.ts";
 
 export type BusinessLineCode =
   | "CONSOLIDATED"

@@ -16,28 +16,36 @@ import {
   demoBusinessLineOptions,
   demoCompanyOptions,
   demoCountryOptions,
+  demoOperationalAreas,
   getBusinessLineForCompany,
   getCompanyForBusinessLine,
   getDefaultPeriod,
 } from "@/lib/tenant/demo-context";
 import {
+  allBranchesValue,
+  allChannelsValue,
+  allManagersValue,
+  allOperationalAreasValue,
+  allPayersValue,
+  allProfessionalsValue,
+  allServicesValue,
+  createGlobalFilterContextFromSearchParams,
+  demoChannelOptions,
+  demoManagerOptions as managerOptions,
+  demoPayerOptions,
+  demoProfessionalOptions,
+  demoServiceOptions,
+  globalContextChangeEvent as contextChangeEvent,
+  globalContextStorageKey as storageKey,
+  resolveGlobalFilterContext,
+  toGlobalFilterSearchParams,
+  type GlobalFilterInput,
+} from "@/lib/analytics/global-filters";
+import {
   fetchCurrentUserAccess,
   isBranchManagerScopedAccess,
   type CurrentUserAccess,
 } from "@/lib/tenant/current-user-access";
-
-const allBranchesValue = "__all__";
-const allManagersValue = "__all_managers__";
-const storageKey = "analiza:selected-context";
-const contextChangeEvent = "analiza:context-change";
-
-const managerOptions = [
-  { id: allManagersValue, name: "Todos los gerentes" },
-  { id: "manager-operations-lab", name: "Gerencia operaciones Laboratorio" },
-  { id: "manager-operations-physio", name: "Gerencia operaciones Fisioterapia" },
-  { id: "manager-operations-img", name: "Gerencia operaciones Imagenes" },
-  { id: "manager-branch-sv", name: "Gerentes sucursales SV" },
-];
 
 type StoredContext = {
   countryId: string;
@@ -49,8 +57,18 @@ type StoredContext = {
   businessLineCode: string;
   branchId: string;
   branchName: string;
+  operationalAreaId?: string;
+  operationalAreaName?: string;
   managerId: string;
   managerName: string;
+  professionalId?: string;
+  professionalName?: string;
+  serviceId?: string;
+  serviceName?: string;
+  payerId?: string;
+  payerName?: string;
+  channelId?: string;
+  channelName?: string;
   period: string;
   periodStart: string;
   periodEnd: string;
@@ -73,7 +91,7 @@ function readStoredContext() {
   }
 
   try {
-    return JSON.parse(rawContext) as StoredContext;
+    return JSON.parse(rawContext) as StoredContext & GlobalFilterInput;
   } catch {
     window.localStorage.removeItem(storageKey);
     window.sessionStorage.removeItem(storageKey);
@@ -139,7 +157,14 @@ export function TenantContextHeader() {
     demoBusinessLineOptions[0]?.id ?? "",
   );
   const [branchId, setBranchId] = useState(allBranchesValue);
+  const [operationalAreaId, setOperationalAreaId] = useState(
+    allOperationalAreasValue,
+  );
   const [managerId, setManagerId] = useState(allManagersValue);
+  const [professionalId, setProfessionalId] = useState(allProfessionalsValue);
+  const [serviceId, setServiceId] = useState(allServicesValue);
+  const [payerId, setPayerId] = useState(allPayersValue);
+  const [channelId, setChannelId] = useState(allChannelsValue);
   const [periodStart, setPeriodStart] = useState(`${getDefaultPeriod()}-01`);
   const [periodEnd, setPeriodEnd] = useState(`${getDefaultPeriod()}-31`);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
@@ -161,6 +186,18 @@ export function TenantContextHeader() {
   const selectedManager =
     managerOptions.find((manager) => manager.id === managerId) ??
     managerOptions[0];
+  const selectedProfessional =
+    demoProfessionalOptions.find((professional) => professional.id === professionalId) ??
+    demoProfessionalOptions[0];
+  const selectedService =
+    demoServiceOptions.find((service) => service.id === serviceId) ??
+    demoServiceOptions[0];
+  const selectedPayer =
+    demoPayerOptions.find((payer) => payer.id === payerId) ??
+    demoPayerOptions[0];
+  const selectedChannel =
+    demoChannelOptions.find((channel) => channel.id === channelId) ??
+    demoChannelOptions[0];
 
   const countryBranches = useMemo(
     () =>
@@ -180,6 +217,21 @@ export function TenantContextHeader() {
     [companyId, countryBranches, selectedCompany?.isConsolidated],
   );
 
+  const operationalAreas = useMemo(
+    () =>
+      demoOperationalAreas.filter(
+        (area) =>
+          (selectedCountry?.scope === "regional" || area.countryId === countryId) &&
+          (selectedCompany?.isConsolidated || area.companyId === companyId),
+      ),
+    [
+      companyId,
+      countryId,
+      selectedCompany?.isConsolidated,
+      selectedCountry?.scope,
+    ],
+  );
+
   useEffect(() => {
     let isMounted = true;
 
@@ -197,48 +249,23 @@ export function TenantContextHeader() {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const storedContext = readStoredContext();
+    const nextContext = createGlobalFilterContextFromSearchParams(
+      searchParams,
+      storedContext,
+    );
 
-    const nextCountryId =
-      searchParams.get("country") ?? storedContext?.countryId;
-    const nextCompanyId =
-      searchParams.get("company") ?? storedContext?.companyId;
-    const nextBusinessLineId =
-      searchParams.get("line") ?? storedContext?.businessLineId;
-    const nextBranchId = searchParams.get("branch") ?? storedContext?.branchId;
-    const nextManagerId =
-      searchParams.get("manager") ?? storedContext?.managerId;
-    const nextPeriodStart =
-      searchParams.get("from") ?? storedContext?.periodStart;
-    const nextPeriodEnd = searchParams.get("to") ?? storedContext?.periodEnd;
-
-    if (nextCountryId) {
-      setCountryId(nextCountryId);
-    }
-
-    if (nextCompanyId) {
-      setCompanyId(nextCompanyId);
-    }
-
-    if (nextBusinessLineId) {
-      setBusinessLineId(nextBusinessLineId);
-      setCompanyId(getCompanyForBusinessLine(nextBusinessLineId).id);
-    }
-
-    if (nextBranchId) {
-      setBranchId(nextBranchId);
-    }
-
-    if (nextManagerId) {
-      setManagerId(nextManagerId);
-    }
-
-    if (nextPeriodStart) {
-      setPeriodStart(nextPeriodStart);
-    }
-
-    if (nextPeriodEnd) {
-      setPeriodEnd(nextPeriodEnd);
-    }
+    setCountryId(nextContext.countryId);
+    setCompanyId(nextContext.companyId);
+    setBusinessLineId(nextContext.businessLineId);
+    setBranchId(nextContext.branchId);
+    setOperationalAreaId(nextContext.operationalAreaId);
+    setManagerId(nextContext.managerId);
+    setProfessionalId(nextContext.professionalId);
+    setServiceId(nextContext.serviceId);
+    setPayerId(nextContext.payerId);
+    setChannelId(nextContext.channelId);
+    setPeriodStart(nextContext.periodStart);
+    setPeriodEnd(nextContext.periodEnd);
   }, []);
 
   useEffect(() => {
@@ -263,9 +290,22 @@ export function TenantContextHeader() {
       currentBranchId === allBranchesValue ||
       branches.some((branch) => branch.id === currentBranchId)
         ? currentBranchId
-        : allBranchesValue,
+      : allBranchesValue,
     );
   }, [branches, scopedBranchAccess]);
+
+  useEffect(() => {
+    if (scopedBranchAccess) {
+      return;
+    }
+
+    setOperationalAreaId((currentOperationalAreaId) =>
+      currentOperationalAreaId === allOperationalAreasValue ||
+      operationalAreas.some((area) => area.id === currentOperationalAreaId)
+        ? currentOperationalAreaId
+        : allOperationalAreasValue,
+    );
+  }, [operationalAreas, scopedBranchAccess]);
 
   useEffect(() => {
     if (!scopedBranchAccess) {
@@ -277,7 +317,12 @@ export function TenantContextHeader() {
     setCompanyId(scopedBranchAccess.scope.companyId ?? scopedBusinessLine?.companyId ?? "");
     setCountryId(scopedBranchAccess.scope.countryId ?? getInitialCountryId());
     setBranchId(scopedBranchAccess.scope.branchId ?? scopedBranchAccess.scope.branchName);
+    setOperationalAreaId(allOperationalAreasValue);
     setManagerId(allManagersValue);
+    setProfessionalId(allProfessionalsValue);
+    setServiceId(allServicesValue);
+    setPayerId(allPayersValue);
+    setChannelId(allChannelsValue);
   }, [
     scopedBranchAccess,
     scopedBusinessLine?.companyId,
@@ -291,6 +336,9 @@ export function TenantContextHeader() {
       scopedBusinessLine ??
       demoBusinessLineOptions.find((item) => item.id === businessLineId);
     const branch = demoBranches.find((item) => item.id === branchId);
+    const operationalArea = demoOperationalAreas.find(
+      (item) => item.id === operationalAreaId,
+    );
 
     if (!businessLine) {
       return;
@@ -310,46 +358,45 @@ export function TenantContextHeader() {
       scopedBranchAccess?.scope.countryId ?? country?.id ?? getInitialCountryId();
     const contextCompanyId =
       scopedBranchAccess?.scope.companyId ?? company?.id ?? "";
-    const context: StoredContext = {
-      countryId: contextCountryId,
-      countryName: scopedBranchAccess?.scope.countryName ?? country?.name ?? "Pais asignado",
+    const context = resolveGlobalFilterContext({
+      branchId: contextBranchId,
+      branchName,
+      businessLineCode: businessLine.code,
+      businessLineId: businessLine.id,
+      businessLineName: businessLine.name,
       companyId: contextCompanyId,
       companyName:
         scopedBranchAccess?.scope.companyName ??
         company?.name ??
         businessLine.name,
-      businessLineId: businessLine.id,
-      businessLineName: businessLine.name,
-      businessLineCode: businessLine.code,
-      branchId: contextBranchId,
-      branchName,
+      countryId: contextCountryId,
+      countryName:
+        scopedBranchAccess?.scope.countryName ?? country?.name ?? "Pais asignado",
+      dateFrom: periodStart,
+      dateTo: periodEnd,
+      isDemo: !scopedBranchAccess,
       managerId: scopedBranchAccess ? allManagersValue : managerId,
       managerName: scopedBranchAccess
         ? scopedBranchAccess.scope.branchName
         : selectedManager.name,
-      period: `${periodStart} a ${periodEnd}`,
+      operationalAreaId: scopedBranchAccess
+        ? allOperationalAreasValue
+        : operationalAreaId,
+      operationalAreaName: scopedBranchAccess
+        ? undefined
+        : operationalArea?.name,
+      payerId,
       periodStart,
       periodEnd,
-      year: periodStart.slice(0, 4),
-      month: periodStart.slice(5, 7),
-      isDemo: !scopedBranchAccess,
-    };
+      professionalId,
+      serviceId,
+      channelId,
+    });
 
     window.localStorage.setItem(storageKey, JSON.stringify(context));
     window.sessionStorage.setItem(storageKey, JSON.stringify(context));
 
-    const searchParams = new URLSearchParams(window.location.search);
-    searchParams.set("country", contextCountryId);
-    searchParams.set("company", contextCompanyId);
-    searchParams.set("line", businessLine.id);
-    searchParams.set("branch", contextBranchId);
-    searchParams.set("from", periodStart);
-    searchParams.set("to", periodEnd);
-    searchParams.set("manager", scopedBranchAccess ? allManagersValue : managerId);
-    searchParams.delete("channel");
-    searchParams.delete("payer");
-    searchParams.delete("service");
-    searchParams.delete("professional");
+    const searchParams = toGlobalFilterSearchParams(context);
     window.history.replaceState(
       null,
       "",
@@ -359,14 +406,19 @@ export function TenantContextHeader() {
   }, [
     branchId,
     businessLineId,
+    channelId,
     companyId,
     countryId,
     managerId,
+    operationalAreaId,
+    payerId,
     periodEnd,
     periodStart,
+    professionalId,
     scopedBranchAccess,
     scopedBusinessLine,
     selectedManager.name,
+    serviceId,
   ]);
 
   function handleBusinessLineChange(nextBusinessLineId: string) {
@@ -377,6 +429,9 @@ export function TenantContextHeader() {
   }
 
   const selectedBranch = demoBranches.find((item) => item.id === branchId);
+  const selectedOperationalArea = demoOperationalAreas.find(
+    (item) => item.id === operationalAreaId,
+  );
   const branchName =
     scopedBranchAccess?.scope.branchName ??
     selectedBranch?.name ??
@@ -396,6 +451,7 @@ export function TenantContextHeader() {
     scopedBranchAccess?.scope.countryName ??
     selectedCountry?.name ??
     "Pais asignado";
+  const areaLabel = selectedOperationalArea?.name ?? "Todas las areas";
 
   if (scopedBranchAccess) {
     return (
@@ -476,6 +532,7 @@ export function TenantContextHeader() {
               {selectedCompany?.name ?? "Vista consolidada"}
             </span>
             <span className="text-muted-foreground"> · {branchName}</span>
+            <span className="text-muted-foreground"> · {areaLabel}</span>
             <span className="text-muted-foreground"> · {periodLabel}</span>
           </div>
 
@@ -488,8 +545,11 @@ export function TenantContextHeader() {
             Filtros
           </button>
 
-          <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
-            {selectedManager.name} · DEMO
+          <span
+            className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
+            title={`${selectedProfessional.name} · ${selectedPayer.name} · ${selectedChannel.name}`}
+          >
+            {selectedManager.name} · {selectedService.name} · DEMO
           </span>
         </div>
       </div>
@@ -499,6 +559,21 @@ export function TenantContextHeader() {
           <div className="px-2 text-xs font-semibold text-muted-foreground">
             Filtros avanzados
           </div>
+          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+            <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
+            <select
+              className="min-w-48 bg-transparent outline-none"
+              value={operationalAreaId}
+              onChange={(event) => setOperationalAreaId(event.target.value)}
+            >
+              <option value={allOperationalAreasValue}>Todas las areas</option>
+              {operationalAreas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
             <MapPin className="size-3.5 text-muted-foreground" />
             <select
@@ -529,6 +604,66 @@ export function TenantContextHeader() {
               {managerOptions.map((manager) => (
                 <option key={manager.id} value={manager.id}>
                   {manager.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+            <UsersRound className="size-3.5 text-muted-foreground" />
+            <select
+              className="min-w-44 bg-transparent outline-none"
+              value={professionalId}
+              onChange={(event) => setProfessionalId(event.target.value)}
+            >
+              {demoProfessionalOptions.map((professional) => (
+                <option key={professional.id} value={professional.id}>
+                  {professional.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+            <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
+            <select
+              className="min-w-44 bg-transparent outline-none"
+              value={serviceId}
+              onChange={(event) => setServiceId(event.target.value)}
+            >
+              {demoServiceOptions.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+            <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
+            <select
+              className="min-w-40 bg-transparent outline-none"
+              value={payerId}
+              onChange={(event) => setPayerId(event.target.value)}
+            >
+              {demoPayerOptions.map((payer) => (
+                <option key={payer.id} value={payer.id}>
+                  {payer.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+            <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
+            <select
+              className="min-w-40 bg-transparent outline-none"
+              value={channelId}
+              onChange={(event) => setChannelId(event.target.value)}
+            >
+              {demoChannelOptions.map((channel) => (
+                <option key={channel.id} value={channel.id}>
+                  {channel.name}
                 </option>
               ))}
             </select>

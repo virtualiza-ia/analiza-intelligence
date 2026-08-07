@@ -16,21 +16,33 @@ import { Badge } from "@/components/ui/badge";
 import {
   demoDashboardMeta,
   getAppointmentStatusByLine,
+  getExecutiveBranchRowsForDashboard,
+  getExecutiveKpisForDashboard,
+  getExecutiveManagerRowsForDashboard,
+  getInsightPreviewsForDashboard,
   getBusinessLinesForDashboard,
   getManagerPerformanceByLine,
+  getNoDataReasonForDashboard,
   getOccupancyByLine,
   getRevenueShareData,
   getTargetVsActualByLine,
-  insightPreviews,
   type BarPoint,
   type BusinessLineDashboard,
   type BusinessLineKey,
   type BusinessLineStatus,
+  type ExecutiveKpi,
 } from "@/lib/analytics/demo-dashboard";
+import {
+  formatSemanticCurrency,
+  formatSemanticPercent,
+  type ExecutiveBranchRow,
+  type ExecutiveManagerRow,
+} from "@/lib/analytics/semantic-bi";
+import {
+  globalContextChangeEvent as contextChangeEvent,
+  globalContextStorageKey as storageKey,
+} from "@/lib/analytics/global-filters";
 import { cn } from "@/lib/utils";
-
-const storageKey = "analiza:selected-context";
-const contextChangeEvent = "analiza:context-change";
 
 type StoredContext = {
   countryId?: string;
@@ -42,6 +54,18 @@ type StoredContext = {
   businessLineCode?: string;
   branchId?: string;
   branchName: string;
+  operationalAreaId?: string;
+  operationalAreaName?: string;
+  managerId?: string;
+  managerName?: string;
+  professionalId?: string;
+  professionalName?: string;
+  serviceId?: string;
+  serviceName?: string;
+  payerId?: string;
+  payerName?: string;
+  channelId?: string;
+  channelName?: string;
   period?: string;
   periodStart?: string;
   periodEnd?: string;
@@ -185,6 +209,151 @@ function BarList({
         </div>
       ))}
     </div>
+  );
+}
+
+function NoDataState({ reason }: { reason: string }) {
+  return (
+    <section className="rounded-md border border-dashed bg-card p-6 text-sm leading-6 text-muted-foreground">
+      <div className="mb-2 font-semibold text-foreground">
+        Sin datos disponibles para este filtro
+      </div>
+      <p>{reason}</p>
+    </section>
+  );
+}
+
+function ExecutiveKpiGrid({ kpis }: { kpis: ExecutiveKpi[] }) {
+  return (
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      {kpis.map((kpi) => (
+        <article className="grid min-h-32 gap-3 rounded-md border bg-card p-4" key={kpi.label}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-sm font-medium text-muted-foreground">
+              {kpi.label}
+            </div>
+            <Badge
+              className={cn(
+                kpi.tone === "positive" &&
+                  "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
+                kpi.tone === "warning" &&
+                  "bg-amber-100 text-amber-800 hover:bg-amber-100",
+                kpi.tone === "negative" &&
+                  "bg-red-100 text-red-800 hover:bg-red-100",
+                kpi.tone === "neutral" &&
+                  "bg-slate-100 text-slate-800 hover:bg-slate-100",
+              )}
+            >
+              {kpi.change}
+            </Badge>
+          </div>
+          <div className="text-2xl font-semibold tracking-normal">{kpi.value}</div>
+          <p className="text-xs leading-5 text-muted-foreground">{kpi.definition}</p>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <div className="mb-4 grid gap-1">
+        <h2 className="text-lg font-semibold tracking-normal">
+          Tabla ejecutiva por sucursal
+        </h2>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Ordenada por riesgo de calidad y cumplimiento, no por ingreso absoluto.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[980px] text-left text-sm">
+          <thead className="text-xs text-muted-foreground">
+            <tr className="border-b">
+              <th className="py-2 pr-4 font-medium">Sucursal</th>
+              <th className="py-2 pr-4 font-medium">Empresa</th>
+              <th className="py-2 pr-4 font-medium">Gerente</th>
+              <th className="py-2 pr-4 font-medium">Ingresos</th>
+              <th className="py-2 pr-4 font-medium">Meta</th>
+              <th className="py-2 pr-4 font-medium">Margen contribucion</th>
+              <th className="py-2 pr-4 font-medium">Ocupacion / utilizacion</th>
+              <th className="py-2 pr-4 font-medium">Calidad</th>
+              <th className="py-2 pr-4 font-medium">Alerta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr className="border-b last:border-b-0" key={`${row.company}-${row.branch}`}>
+                <td className="py-3 pr-4 font-medium">{row.branch}</td>
+                <td className="py-3 pr-4">{row.company}</td>
+                <td className="py-3 pr-4">{row.manager}</td>
+                <td className="py-3 pr-4">{formatSemanticCurrency(row.revenue)}</td>
+                <td className="py-3 pr-4">{formatSemanticPercent(row.targetFulfillment)}</td>
+                <td className="py-3 pr-4">
+                  {formatSemanticPercent(row.contributionMarginRate)}
+                </td>
+                <td className="py-3 pr-4">
+                  {formatSemanticPercent(row.effectiveOccupancy)}
+                </td>
+                <td className="py-3 pr-4">
+                  {row.qualityLevel} {row.qualityScore}%
+                </td>
+                <td className="py-3 pr-4 text-muted-foreground">{row.alert}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <div className="mb-4 grid gap-1">
+        <h2 className="text-lg font-semibold tracking-normal">
+          Tabla ejecutiva por gerente
+        </h2>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Compara responsabilidad, calidad, meta, margen y ocupacion efectiva.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[920px] text-left text-sm">
+          <thead className="text-xs text-muted-foreground">
+            <tr className="border-b">
+              <th className="py-2 pr-4 font-medium">Gerente</th>
+              <th className="py-2 pr-4 font-medium">Sucursales</th>
+              <th className="py-2 pr-4 font-medium">Meta promedio</th>
+              <th className="py-2 pr-4 font-medium">Margen contribucion</th>
+              <th className="py-2 pr-4 font-medium">Ocupacion / utilizacion</th>
+              <th className="py-2 pr-4 font-medium">Calidad</th>
+              <th className="py-2 pr-4 font-medium">Accion</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr className="border-b last:border-b-0" key={row.manager}>
+                <td className="py-3 pr-4 font-medium">{row.manager}</td>
+                <td className="py-3 pr-4">{row.branches}</td>
+                <td className="py-3 pr-4">{formatSemanticPercent(row.targetFulfillment)}</td>
+                <td className="py-3 pr-4">
+                  {formatSemanticPercent(row.contributionMarginRate)}
+                </td>
+                <td className="py-3 pr-4">
+                  {formatSemanticPercent(row.effectiveOccupancy)}
+                </td>
+                <td className="py-3 pr-4">
+                  {row.qualityLevel} {row.qualityScore}%
+                </td>
+                <td className="py-3 pr-4 text-muted-foreground">{row.action}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -534,14 +703,58 @@ export function ExecutiveDashboard() {
     (context?.periodStart && context?.periodEnd
       ? `${context.periodStart} a ${context.periodEnd}`
       : demoDashboardMeta.selectedPeriod);
+  const dashboardContext = useMemo(
+    () => ({
+      branchId: context?.branchId,
+      branchName: context?.branchName,
+      businessLineCode: context?.businessLineCode,
+      businessLineId: context?.businessLineId,
+      businessLineName: context?.businessLineName,
+      channelId: context?.channelId,
+      channelName: context?.channelName,
+      companyId: context?.companyId,
+      companyName: context?.companyName,
+      countryId: context?.countryId,
+      countryName: context?.countryName,
+      managerId: context?.managerId,
+      managerName: context?.managerName,
+      operationalAreaId: context?.operationalAreaId,
+      operationalAreaName: context?.operationalAreaName,
+      payerId: context?.payerId,
+      payerName: context?.payerName,
+      periodEnd: context?.periodEnd,
+      periodStart: context?.periodStart,
+      professionalId: context?.professionalId,
+      professionalName: context?.professionalName,
+      serviceId: context?.serviceId,
+      serviceName: context?.serviceName,
+    }),
+    [context],
+  );
 
   const lines = useMemo(
-    () =>
-      getBusinessLinesForDashboard({
-        branchId: context?.branchId,
-        companyName: context?.companyName,
-      }),
-    [context?.branchId, context?.companyName],
+    () => getBusinessLinesForDashboard(dashboardContext),
+    [dashboardContext],
+  );
+  const kpis = useMemo(
+    () => getExecutiveKpisForDashboard(dashboardContext),
+    [dashboardContext],
+  );
+  const branchRows = useMemo(
+    () => getExecutiveBranchRowsForDashboard(dashboardContext),
+    [dashboardContext],
+  );
+  const managerRows = useMemo(
+    () => getExecutiveManagerRowsForDashboard(dashboardContext),
+    [dashboardContext],
+  );
+  const noDataReason = useMemo(
+    () => getNoDataReasonForDashboard(dashboardContext),
+    [dashboardContext],
+  );
+  const insightPreviews = useMemo(
+    () => getInsightPreviewsForDashboard(dashboardContext),
+    [dashboardContext],
   );
 
   const revenueShare = useMemo(() => getRevenueShareData(lines), [lines]);
@@ -622,132 +835,143 @@ export function ExecutiveDashboard() {
         </div>
       </div>
 
-      <ExecutiveStatusTable lines={lines} />
-      <BusinessLineSummary lines={lines} />
-      <FinancialHealthByLine lines={lines} />
+      <ExecutiveKpiGrid kpis={kpis} />
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <section className="rounded-md border bg-card p-4">
-          <div className="mb-4 flex items-center gap-2 text-sm font-medium">
-            <BarChart3 className="size-4 text-primary" />
-            Participacion por empresa
+      {noDataReason ? (
+        <NoDataState reason={noDataReason} />
+      ) : (
+        <>
+          <ExecutiveStatusTable lines={lines} />
+          <BusinessLineSummary lines={lines} />
+          <FinancialHealthByLine lines={lines} />
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <section className="rounded-md border bg-card p-4">
+              <div className="mb-4 flex items-center gap-2 text-sm font-medium">
+                <BarChart3 className="size-4 text-primary" />
+                Participacion por empresa
+              </div>
+              <BarList data={revenueShare} suffix="%" />
+            </section>
+
+            <section className="rounded-md border bg-card p-4">
+              <div className="mb-4 flex items-center gap-2 text-sm font-medium">
+                <Target className="size-4 text-primary" />
+                Metas vs resultados por empresa
+              </div>
+              <BarList data={targetVsActual} suffix="K" />
+            </section>
           </div>
-          <BarList data={revenueShare} suffix="%" />
-        </section>
 
-        <section className="rounded-md border bg-card p-4">
-          <div className="mb-4 flex items-center gap-2 text-sm font-medium">
-            <Target className="size-4 text-primary" />
-            Metas vs resultados por empresa
-          </div>
-          <BarList data={targetVsActual} suffix="K" />
-        </section>
-      </div>
+          <MonthlyRevenueByLine lines={lines} />
 
-      <MonthlyRevenueByLine lines={lines} />
+          <OperationalLineSelector
+            lines={lines}
+            onSelectedLineKeyChange={setSelectedOperationalLineKey}
+            selectedLineKey={selectedOperationalLine?.key ?? ""}
+          />
 
-      <OperationalLineSelector
-        lines={lines}
-        onSelectedLineKeyChange={setSelectedOperationalLineKey}
-        selectedLineKey={selectedOperationalLine?.key ?? ""}
-      />
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <section className="rounded-md border bg-card p-4">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <LineChart className="size-4 text-primary" />
-              {getOperationalStatusTitle(selectedOperationalLine)}
-            </div>
-            {selectedOperationalLine ? (
-              <Badge variant="outline">{selectedOperationalLine.shortName}</Badge>
-            ) : null}
-          </div>
-          <BarList data={appointmentStatus} />
-        </section>
-
-        <section className="rounded-md border bg-card p-4">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Database className="size-4 text-primary" />
-              Ocupacion efectiva
-            </div>
-            {selectedOperationalLine ? (
-              <Badge variant="outline">{selectedOperationalLine.shortName}</Badge>
-            ) : null}
-          </div>
-          <BarList data={selectedOccupancy} suffix="%" />
-        </section>
-
-        <section className="rounded-md border bg-card p-4">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <AlertTriangle className="size-4 text-primary" />
-              Rendimiento de la linea seleccionada
-            </div>
-            {selectedOperationalLine ? (
-              <Badge variant="outline">{selectedOperationalLine.shortName}</Badge>
-            ) : null}
-          </div>
-          <BarList data={managerPerformance} suffix="%" />
-          <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            Cambia con el selector superior de negocio, sucursal y fechas, y
-            con el selector de linea de negocio de este bloque.
-          </p>
-        </section>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
-        <section className="rounded-md border bg-card p-4">
-          <div className="mb-4 text-sm font-medium">Insights DEMO</div>
-          <div className="grid gap-3">
-            {insightPreviews.map((insight) => (
-              <article
-                className="grid gap-2 border-t py-3 first:border-t-0 first:pt-0 last:pb-0"
-                key={insight.title}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge
-                    className={cn(
-                      insight.priority === "alta" &&
-                        "bg-red-100 text-red-800 hover:bg-red-100",
-                      insight.priority === "media" &&
-                        "bg-amber-100 text-amber-800 hover:bg-amber-100",
-                      insight.priority === "baja" &&
-                        "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
-                    )}
-                  >
-                    {insight.priority}
-                  </Badge>
-                  <span className="text-sm font-medium">{insight.title}</span>
+          <div className="grid gap-4 xl:grid-cols-3">
+            <section className="rounded-md border bg-card p-4">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <LineChart className="size-4 text-primary" />
+                  {getOperationalStatusTitle(selectedOperationalLine)}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Indicador: {insight.affectedIndicator}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {insight.recommendation}
-                </p>
-              </article>
-            ))}
-          </div>
-        </section>
+                {selectedOperationalLine ? (
+                  <Badge variant="outline">{selectedOperationalLine.shortName}</Badge>
+                ) : null}
+              </div>
+              <BarList data={appointmentStatus} />
+            </section>
 
-        <section className="rounded-md border bg-card p-4">
-          <div className="mb-4 text-sm font-medium">Fuentes utilizadas</div>
-          <ul className="grid gap-3 text-sm text-muted-foreground">
-            {demoDashboardMeta.sources.map((source) => (
-              <li className="flex items-center gap-2" key={source}>
-                <CheckCircle2 className="size-4 text-emerald-600" />
-                {source}
-              </li>
-            ))}
-          </ul>
-          <div className="mt-4 rounded-md bg-amber-50 p-3 text-xs leading-5 text-amber-800">
-            Las metricas son DEMO. No usar como informacion operativa,
-            financiera o clinica real.
+            <section className="rounded-md border bg-card p-4">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Database className="size-4 text-primary" />
+                  Ocupacion efectiva
+                </div>
+                {selectedOperationalLine ? (
+                  <Badge variant="outline">{selectedOperationalLine.shortName}</Badge>
+                ) : null}
+              </div>
+              <BarList data={selectedOccupancy} suffix="%" />
+            </section>
+
+            <section className="rounded-md border bg-card p-4">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <AlertTriangle className="size-4 text-primary" />
+                  Rendimiento de la linea seleccionada
+                </div>
+                {selectedOperationalLine ? (
+                  <Badge variant="outline">{selectedOperationalLine.shortName}</Badge>
+                ) : null}
+              </div>
+              <BarList data={managerPerformance} suffix="%" />
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                Cambia con el selector superior de negocio, sucursal y fechas, y
+                con el selector de linea de negocio de este bloque.
+              </p>
+            </section>
           </div>
-        </section>
-      </div>
+
+          <ExecutiveBranchTable rows={branchRows} />
+          <ExecutiveManagerTable rows={managerRows} />
+
+          <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+            <section className="rounded-md border bg-card p-4">
+              <div className="mb-4 text-sm font-medium">Insights DEMO</div>
+              <div className="grid gap-3">
+                {insightPreviews.map((insight) => (
+                  <article
+                    className="grid gap-2 border-t py-3 first:border-t-0 first:pt-0 last:pb-0"
+                    key={insight.title}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        className={cn(
+                          insight.priority === "alta" &&
+                            "bg-red-100 text-red-800 hover:bg-red-100",
+                          insight.priority === "media" &&
+                            "bg-amber-100 text-amber-800 hover:bg-amber-100",
+                          insight.priority === "baja" &&
+                            "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
+                        )}
+                      >
+                        {insight.priority}
+                      </Badge>
+                      <span className="text-sm font-medium">{insight.title}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Indicador: {insight.affectedIndicator}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {insight.recommendation}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-md border bg-card p-4">
+              <div className="mb-4 text-sm font-medium">Fuentes utilizadas</div>
+              <ul className="grid gap-3 text-sm text-muted-foreground">
+                {demoDashboardMeta.sources.map((source) => (
+                  <li className="flex items-center gap-2" key={source}>
+                    <CheckCircle2 className="size-4 text-emerald-600" />
+                    {source}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 rounded-md bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                Las metricas son DEMO. No usar como informacion operativa,
+                financiera o clinica real.
+              </div>
+            </section>
+          </div>
+        </>
+      )}
     </section>
   );
 }

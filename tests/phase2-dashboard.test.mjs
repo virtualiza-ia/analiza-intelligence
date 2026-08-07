@@ -342,7 +342,10 @@ for (const requiredRoleScopeText of [
   }
 }
 
-if (!contextHeader.includes("analiza:selected-context")) {
+if (
+  !contextHeader.includes("analiza:selected-context") &&
+  !contextHeader.includes("globalContextStorageKey")
+) {
   throw new Error("Header context selector must persist selected context.");
 }
 
@@ -353,29 +356,22 @@ for (const requiredContextText of [
   "Filtros avanzados",
   "Fecha desde",
   "Fecha hasta",
-  "analiza:context-change",
+  "globalContextChangeEvent",
   "businessLineId",
   "managerName",
+  "professionalName",
+  "serviceName",
+  "payerName",
+  "channelName",
+  "demoChannelOptions",
+  "demoPayerOptions",
+  "demoServiceOptions",
+  "demoProfessionalOptions",
   "window.sessionStorage.setItem",
-  'searchParams.set("line"',
+  "toGlobalFilterSearchParams",
 ]) {
   if (!contextHeader.includes(requiredContextText)) {
     throw new Error(`Header selector is missing: ${requiredContextText}`);
-  }
-}
-
-for (const removedContextFilter of [
-  "Todos los canales",
-  "Todos los pagadores",
-  "Todos los servicios",
-  "Todos los profesionales",
-  "channelName",
-  "payerName",
-  "serviceName",
-  "professionalName",
-]) {
-  if (contextHeader.includes(removedContextFilter)) {
-    throw new Error(`Header selector should not include: ${removedContextFilter}`);
   }
 }
 

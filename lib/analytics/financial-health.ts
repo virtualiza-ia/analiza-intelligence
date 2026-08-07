@@ -4,6 +4,14 @@ import {
   formatCurrency,
   formatRate,
 } from "@/lib/analytics/el-salvador-result-templates";
+import type { GlobalFilterInput } from "@/lib/analytics/global-filters";
+import {
+  formatSemanticCurrency,
+  formatSemanticPercent,
+  getExecutiveBiSnapshot,
+  semanticMessages,
+  type SemanticLine,
+} from "@/lib/analytics/semantic-bi";
 import type {
   TrendChartOption,
   TrendInsight,
@@ -61,6 +69,7 @@ export type FinancialHealthScreen = {
   trendChart: FinancialTrendChart;
   blocks: FinancialBlock[];
   comparisonRows?: FinancialComparisonRow[];
+  noDataReason?: string;
 };
 
 const monthlyLabels = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul"];
@@ -853,4 +862,369 @@ export const financialHealthScreens: Record<
 
 export function getFinancialHealthScreen(slug: BusinessLineSlug) {
   return financialHealthScreens[slug];
+}
+
+function slugFromSemanticLine(line: SemanticLine): BusinessLineSlug {
+  if (line.key === "fisioterapia") {
+    return "fisioterapia";
+  }
+
+  if (line.key === "laboratorio") {
+    return "laboratorio";
+  }
+
+  return "imagenes";
+}
+
+function buildNoDataFinancialScreen(
+  slug: BusinessLineSlug,
+  reason: string,
+): FinancialHealthScreen {
+  return {
+    blocks: [],
+    description:
+      "Finanzas bloquea conclusiones cuando faltan datos esenciales del filtro activo.",
+    noDataReason: reason,
+    primaryMetrics: [
+      {
+        label: "Facturacion neta",
+        note: reason,
+        status: "pending-upload",
+        value: semanticMessages.pending,
+      },
+      {
+        label: "Cobros",
+        note: semanticMessages.notCalculable,
+        status: "pending-upload",
+        value: semanticMessages.pending,
+      },
+      {
+        label: "Margen de contribucion",
+        note: semanticMessages.notCalculable,
+        status: "pending-upload",
+        value: semanticMessages.pending,
+      },
+      {
+        label: "Calidad financiera",
+        note: semanticMessages.insufficientExecutiveData,
+        status: "critical",
+        value: "Insuficiente",
+      },
+    ],
+    slug,
+    subtitle: "Sin datos conciliados",
+    title: "Salud financiera",
+    trendChart: {
+      description: reason,
+      insights: [],
+      series: [],
+      title: "Sin tendencia financiera para el filtro",
+      xLabels: [],
+      yLabel: "USD",
+    },
+  };
+}
+
+function aggregateLines(lines: SemanticLine[]) {
+  return {
+    accountsReceivable: lines.reduce(
+      (sum, line) => sum + line.finance.accountsReceivable,
+      0,
+    ),
+    channelRevenue: lines.flatMap((line) =>
+      line.finance.channelRevenue.map((item) => ({
+        label: `${line.shortName} ${item.label}`,
+        amount: item.amount,
+      })),
+    ),
+    collections: lines.reduce((sum, line) => sum + line.finance.collections, 0),
+    contributionMargin: lines.reduce(
+      (sum, line) => sum + line.finance.contributionMargin,
+      0,
+    ),
+    directCost: lines.reduce((sum, line) => sum + line.finance.directCost, 0),
+    grossBilling: lines.reduce((sum, line) => sum + line.finance.grossBilling, 0),
+    netBilling: lines.reduce((sum, line) => sum + line.finance.netBilling, 0),
+    paymentCollections: lines.flatMap((line) =>
+      line.finance.paymentCollections.map((item) => ({
+        label: `${line.shortName} ${item.label}`,
+        amount: item.amount,
+      })),
+    ),
+    target: lines.reduce((sum, line) => sum + line.finance.target, 0),
+  };
+}
+
+export function getFinancialHealthScreenForContext(
+  context: GlobalFilterInput,
+): FinancialHealthScreen {
+  const snapshot = getExecutiveBiSnapshot(context);
+  const fallbackSlug = getFinancialHealthScreen("consolidado").slug;
+
+  if (snapshot.noDataReason || snapshot.lines.length === 0) {
+    return buildNoDataFinancialScreen(
+      fallbackSlug,
+      snapshot.noDataReason ?? semanticMessages.noData,
+    );
+  }
+
+  const slug =
+    snapshot.lines.length === 1 ? slugFromSemanticLine(snapshot.lines[0]) : "consolidado";
+  const aggregate = aggregateLines(snapshot.lines);
+  const contributionMarginRate =
+    aggregate.netBilling > 0
+      ? aggregate.contributionMargin / aggregate.netBilling
+      : null;
+  const targetFulfillment =
+    aggregate.target > 0 ? aggregate.netBilling / aggregate.target : null;
+  const comparisonRows: FinancialComparisonRow[] | undefined =
+    snapshot.lines.length > 1
+      ? snapshot.lines.map((line) => ({
+          directCost: formatSemanticCurrency(line.finance.directCost),
+          insight:
+            line.qualityLevel === "Insuficiente"
+              ? semanticMessages.insufficientExecutiveData
+              : `${line.shortName}: ${formatSemanticPercent(line.finance.targetFulfillment)} de meta y calidad ${line.qualityLevel}.`,
+          line: line.shortName,
+          margin: formatSemanticPercent(line.finance.contributionMarginRate),
+          netSales: formatSemanticCurrency(line.finance.netBilling),
+          operatingExpense: "No aplica a contribucion",
+          operatingProfit: formatSemanticCurrency(line.finance.contributionMargin),
+        }))
+      : undefined;
+  const invariantMetrics = snapshot.lines.flatMap((line) =>
+    line.finance.invariants.map((invariant) => ({
+      label: `${line.shortName}: ${invariant.label}`,
+      note: invariant.message,
+      status: invariant.passed ? "calculated" : "critical",
+      value: invariant.passed ? "OK" : "Revisar",
+    }) satisfies FinancialMetric),
+  );
+  const channelMetrics = aggregate.channelRevenue.map((item) => ({
+    label: item.label,
+    note: "Suma reconciliada contra facturacion neta.",
+    status: "calculated" as const,
+    value: formatSemanticCurrency(item.amount),
+  }));
+  const paymentMetrics = aggregate.paymentCollections.map((item) => ({
+    label: item.label,
+    note: "Suma reconciliada contra cobros.",
+    status: "calculated" as const,
+    value: formatSemanticCurrency(item.amount),
+  }));
+
+  return {
+    blocks: [
+      {
+        description:
+          "Contratos financieros P1: bruto, descuentos, notas, neto, cobros, cuentas por cobrar y margen de contribucion.",
+        metrics: [
+          {
+            label: "Facturacion bruta",
+            note: "Antes de descuentos y notas de credito.",
+            status: "calculated",
+            value: formatSemanticCurrency(aggregate.grossBilling),
+          },
+          {
+            label: "Facturacion neta",
+            note: "Base oficial para margen y meta.",
+            status: "calculated",
+            value: formatSemanticCurrency(aggregate.netBilling),
+          },
+          {
+            label: "Cobros",
+            note: "Pagos aplicados al periodo.",
+            status: "calculated",
+            value: formatSemanticCurrency(aggregate.collections),
+          },
+          {
+            label: "Cuentas por cobrar",
+            note: "Facturacion neta menos cobros.",
+            status: "warning",
+            value: formatSemanticCurrency(aggregate.accountsReceivable),
+          },
+          {
+            label: "Costo directo",
+            note: "Costo de producir la atencion, prueba o estudio.",
+            status: "calculated",
+            value: formatSemanticCurrency(aggregate.directCost),
+          },
+          {
+            label: "Margen de contribucion",
+            note: "No es utilidad neta; excluye gastos no directos.",
+            status: "calculated",
+            value: formatSemanticCurrency(aggregate.contributionMargin),
+          },
+          {
+            label: "Margen de contribucion %",
+            note: "Margen de contribucion / facturacion neta.",
+            status: "calculated",
+            value: formatSemanticPercent(contributionMarginRate),
+          },
+          {
+            label: "Cumplimiento de meta",
+            note: "Contra meta explicita del periodo.",
+            status: "calculated",
+            value: formatSemanticPercent(targetFulfillment),
+          },
+        ],
+        title: "Estado financiero reconciliado",
+      },
+      {
+        description:
+          "Cada canal debe reconciliar contra el total neto filtrado.",
+        metrics: channelMetrics,
+        title: "Ventas por canal",
+      },
+      {
+        description:
+          "Cada forma de pago debe reconciliar contra cobros, no contra facturacion.",
+        metrics: paymentMetrics,
+        title: "Formas de pago",
+      },
+      {
+        description:
+          "Validaciones que evitan NaN, Infinity, ceros silenciosos, mezclas de moneda y periodos incomparables.",
+        metrics: invariantMetrics,
+        title: "Invariantes financieros",
+      },
+    ],
+    comparisonRows,
+    description:
+      "Vista financiera reconciliada por filtro global. Usa margen de contribucion y bloquea conclusiones cuando faltan datos.",
+    primaryMetrics: [
+      {
+        label: "Facturacion neta",
+        note: "Periodo filtrado.",
+        status: "calculated",
+        value: formatSemanticCurrency(aggregate.netBilling),
+      },
+      {
+        label: "Cobros",
+        note: "Suma de formas de pago conciliadas.",
+        status: "calculated",
+        value: formatSemanticCurrency(aggregate.collections),
+      },
+      {
+        label: "Cuentas por cobrar",
+        note: "Facturacion neta menos cobros.",
+        status: "warning",
+        value: formatSemanticCurrency(aggregate.accountsReceivable),
+      },
+      {
+        label: "Margen de contribucion",
+        note: "Facturacion neta menos costo directo.",
+        status: "calculated",
+        value: formatSemanticPercent(contributionMarginRate),
+      },
+      {
+        label: "Cumplimiento de meta",
+        note: "Meta explicita del periodo.",
+        status: "calculated",
+        value: formatSemanticPercent(targetFulfillment),
+      },
+      {
+        label: "Calidad financiera",
+        note: "Bloquea conclusion si baja de 70%.",
+        status: snapshot.kpis.some((kpi) => kpi.status === "blocked")
+          ? "critical"
+          : "available",
+        value:
+          snapshot.kpis.find((kpi) => kpi.label === "Calidad de datos")?.value ??
+          "Pendiente",
+      },
+    ],
+    slug,
+    subtitle:
+      snapshot.lines.length === 1
+        ? snapshot.lines[0].scopeName
+        : "Consolidado filtrado",
+    title:
+      snapshot.lines.length === 1
+        ? `Finanzas de ${snapshot.lines[0].shortName}`
+        : "Salud financiera consolidada",
+    trendChart: {
+      description:
+        "Tendencia DEMO derivada del periodo filtrado; no mezcla MTD/YTD sin etiqueta.",
+      insights: [
+        {
+          label: "Periodo",
+          note: `${snapshot.context.periodStart} a ${snapshot.context.periodEnd}`,
+          tone: "neutral",
+          value: "Explicito",
+        },
+        {
+          label: "Conciliacion",
+          note: "Canales y pagos cuadran con sus totales correspondientes.",
+          tone: "positive",
+          value: "OK",
+        },
+        {
+          label: "Lectura",
+          note: "Margen de contribucion, no utilidad neta.",
+          tone: "neutral",
+          value: "P1",
+        },
+      ],
+      metricOptions: financialTrendOptions[slug],
+      series:
+        snapshot.lines.length === 1
+          ? [
+              {
+                color: "blue" as const,
+                label: "Facturacion neta",
+                points: snapshot.lines[0].monthlyRevenue.map((point) => point.value),
+                value: formatSemanticCurrency(snapshot.lines[0].finance.netBilling),
+              },
+              {
+                color: "rose" as const,
+                label: "Costo directo",
+                points: snapshot.lines[0].monthlyRevenue.map((point) =>
+                  Math.round(point.value * (snapshot.lines[0].finance.directCost / Math.max(snapshot.lines[0].finance.netBilling, 1))),
+                ),
+                value: formatSemanticCurrency(snapshot.lines[0].finance.directCost),
+              },
+              {
+                color: "teal" as const,
+                label: "Margen contribucion",
+                points: snapshot.lines[0].monthlyRevenue.map((point) =>
+                  Math.round(point.value * ((snapshot.lines[0].finance.contributionMarginRate ?? 0))),
+                ),
+                value: formatSemanticCurrency(snapshot.lines[0].finance.contributionMargin),
+              },
+            ]
+          : [
+              {
+                color: "blue" as const,
+                label: "Facturacion neta",
+                points: snapshot.lines.map((line) =>
+                  Math.round(line.finance.netBilling / 1000),
+                ),
+                value: formatSemanticCurrency(aggregate.netBilling),
+              },
+              {
+                color: "rose" as const,
+                label: "Costo directo",
+                points: snapshot.lines.map((line) =>
+                  Math.round(line.finance.directCost / 1000),
+                ),
+                value: formatSemanticCurrency(aggregate.directCost),
+              },
+              {
+                color: "teal" as const,
+                label: "Margen contribucion",
+                points: snapshot.lines.map((line) =>
+                  Math.round(line.finance.contributionMargin / 1000),
+                ),
+                value: formatSemanticCurrency(aggregate.contributionMargin),
+              },
+            ],
+      title: "Facturacion neta, costo directo y margen de contribucion",
+      xLabels:
+        snapshot.lines.length === 1
+          ? ["Ene", "Feb", "Mar", "Abr", "May", "Jun"]
+          : snapshot.lines.map((line) => line.shortName),
+      yLabel: "USD miles",
+    },
+  };
 }

@@ -16,23 +16,40 @@ import {
   type BusinessLineSlug,
 } from "@/lib/analytics/business-line-operations";
 import {
-  getFinancialHealthScreen,
+  getFinancialHealthScreenForContext,
   type FinancialBlock,
   type FinancialComparisonRow,
   type FinancialMetric,
   type FinancialMetricStatus,
 } from "@/lib/analytics/financial-health";
+import {
+  globalContextChangeEvent as contextChangeEvent,
+  globalContextStorageKey as storageKey,
+} from "@/lib/analytics/global-filters";
 import { cn } from "@/lib/utils";
 
-const storageKey = "analiza:selected-context";
-const contextChangeEvent = "analiza:context-change";
-
 type StoredContext = {
+  countryId?: string;
   countryName?: string;
+  companyId?: string;
   companyName?: string;
   businessLineId?: string;
   businessLineName?: string;
+  businessLineCode?: string;
+  branchId?: string;
   branchName?: string;
+  operationalAreaId?: string;
+  operationalAreaName?: string;
+  managerId?: string;
+  managerName?: string;
+  professionalId?: string;
+  professionalName?: string;
+  serviceId?: string;
+  serviceName?: string;
+  payerId?: string;
+  payerName?: string;
+  channelId?: string;
+  channelName?: string;
   period?: string;
   periodStart?: string;
   periodEnd?: string;
@@ -124,6 +141,17 @@ function FinancialMetricCard({ metric }: { metric: FinancialMetric }) {
   );
 }
 
+function FinancialNoDataState({ reason }: { reason: string }) {
+  return (
+    <section className="rounded-md border border-dashed bg-card p-6 text-sm leading-6 text-muted-foreground">
+      <div className="mb-2 font-semibold text-foreground">
+        Sin datos disponibles para este filtro
+      </div>
+      <p>{reason}</p>
+    </section>
+  );
+}
+
 function FinancialRows({ metrics }: { metrics: FinancialMetric[] }) {
   return (
     <dl className="grid divide-y text-sm">
@@ -181,7 +209,7 @@ function FinancialComparisonTable({ rows }: { rows: FinancialComparisonRow[] }) 
               <th className="py-2 pr-4 font-medium">Costo directo</th>
               <th className="py-2 pr-4 font-medium">Margen</th>
               <th className="py-2 pr-4 font-medium">Gastos operativos</th>
-              <th className="py-2 pr-4 font-medium">Utilidad</th>
+              <th className="py-2 pr-4 font-medium">Margen contribucion</th>
               <th className="py-2 pr-4 font-medium">Insight</th>
             </tr>
           </thead>
@@ -249,7 +277,31 @@ export function FinancialHealthDashboard() {
   }, []);
 
   const lineSlug = useMemo(() => resolveContextLine(context), [context]);
-  const screen = useMemo(() => getFinancialHealthScreen(lineSlug), [lineSlug]);
+  const screen = useMemo(
+    () =>
+      getFinancialHealthScreenForContext({
+        branchId: context?.branchId,
+        branchName: context?.branchName,
+        businessLineCode: context?.businessLineCode,
+        businessLineId: context?.businessLineId,
+        businessLineName: context?.businessLineName,
+        channelId: context?.channelId,
+        companyId: context?.companyId,
+        companyName: context?.companyName,
+        countryId: context?.countryId,
+        countryName: context?.countryName,
+        managerId: context?.managerId,
+        managerName: context?.managerName,
+        operationalAreaId: context?.operationalAreaId,
+        operationalAreaName: context?.operationalAreaName,
+        payerId: context?.payerId,
+        periodEnd: context?.periodEnd,
+        periodStart: context?.periodStart,
+        professionalId: context?.professionalId,
+        serviceId: context?.serviceId,
+      }),
+    [context],
+  );
 
   return (
     <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
@@ -287,40 +339,46 @@ export function FinancialHealthDashboard() {
         ))}
       </div>
 
-      <AnalyticsComparisonChart {...screen.trendChart} />
+      {screen.noDataReason ? (
+        <FinancialNoDataState reason={screen.noDataReason} />
+      ) : (
+        <>
+          <AnalyticsComparisonChart {...screen.trendChart} />
 
-      {screen.comparisonRows ? (
-        <FinancialComparisonTable rows={screen.comparisonRows} />
-      ) : null}
+          {screen.comparisonRows ? (
+            <FinancialComparisonTable rows={screen.comparisonRows} />
+          ) : null}
 
-      <section className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
-        <div className="flex items-start gap-2">
-          <Scale className="mt-0.5 size-4 shrink-0" />
-          <span>
-            Regla para no duplicar informacion: Operacion muestra volumen,
-            tiempos, capacidad y errores. Finanzas muestra ingreso, costo,
-            margen, utilidad y perdida producida por esa operacion.
-          </span>
-        </div>
-      </section>
+          <section className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            <div className="flex items-start gap-2">
+              <Scale className="mt-0.5 size-4 shrink-0" />
+              <span>
+                Regla para no duplicar informacion: Operacion muestra volumen,
+                tiempos, capacidad y errores. Finanzas muestra ingreso, costo,
+                margen de contribucion y perdida producida por esa operacion.
+              </span>
+            </div>
+          </section>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        {screen.blocks.map((block) => (
-          <FinancialBlockSection key={`${screen.slug}-${block.title}`} block={block} />
-        ))}
-      </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {screen.blocks.map((block) => (
+              <FinancialBlockSection key={`${screen.slug}-${block.title}`} block={block} />
+            ))}
+          </div>
 
-      <section className="rounded-md border bg-card p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-          <CircleDollarSign className="size-4 text-primary" />
-          Insight financiero clave
-        </div>
-        <div className="grid gap-3 text-sm text-muted-foreground md:grid-cols-3">
-          <span>El crecimiento solo es sano si margen y utilidad acompanan.</span>
-          <span>Los atrasos, fallas y repeticiones deben medirse como dinero perdido.</span>
-          <span>CAPEX, inventario y cuentas pendientes explican rentabilidad real.</span>
-        </div>
-      </section>
+          <section className="rounded-md border bg-card p-4">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+              <CircleDollarSign className="size-4 text-primary" />
+              Insight financiero clave
+            </div>
+            <div className="grid gap-3 text-sm text-muted-foreground md:grid-cols-3">
+              <span>El crecimiento solo es sano si el margen de contribucion acompana.</span>
+              <span>Los atrasos, fallas y repeticiones deben medirse como dinero perdido.</span>
+              <span>CAPEX, inventario y cuentas pendientes explican rentabilidad real.</span>
+            </div>
+          </section>
+        </>
+      )}
     </section>
   );
 }

@@ -1,5 +1,12 @@
 import type { TrendChartOption, TrendInsight, TrendSeries } from "@/components/analytics-comparison-chart";
 import type { BusinessLineSlug } from "@/lib/analytics/business-line-operations";
+import type { GlobalFilterInput } from "@/lib/analytics/global-filters";
+import {
+  formatSemanticPercent,
+  getExecutiveBiSnapshot,
+  semanticMessages,
+  type SemanticLine,
+} from "@/lib/analytics/semantic-bi";
 
 export type CapacityMetricStatus =
   | "available"
@@ -103,6 +110,7 @@ export type CapacityOccupancyScreen = {
   branchRows: CapacityBranchRow[];
   comparisonRows?: CapacityComparisonRow[];
   executiveActions: string[];
+  noDataReason?: string;
 };
 
 const monthlyLabels = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul"];
@@ -817,4 +825,204 @@ export const capacityOccupancyScreens: Record<
 
 export function getCapacityOccupancyScreen(slug: BusinessLineSlug) {
   return capacityOccupancyScreens[slug];
+}
+
+function getCapacityStatus(line: SemanticLine): CapacityMetricStatus {
+  if (line.qualityLevel === "Insuficiente") {
+    return "critical";
+  }
+
+  if (line.capacity.pendingMessage) {
+    return "warning";
+  }
+
+  return "calculated";
+}
+
+function slugFromSemanticLine(line: SemanticLine): BusinessLineSlug {
+  if (line.key === "fisioterapia") {
+    return "fisioterapia";
+  }
+
+  if (line.key === "laboratorio") {
+    return "laboratorio";
+  }
+
+  return "imagenes";
+}
+
+function buildCapacityNoDataScreen(
+  slug: BusinessLineSlug,
+  reason: string,
+): CapacityOccupancyScreen {
+  const base = getCapacityOccupancyScreen(slug);
+
+  return {
+    ...base,
+    branchRows: [],
+    comparisonRows: undefined,
+    executiveActions: [semanticMessages.insufficientExecutiveData],
+    noDataReason: reason,
+    primaryMetrics: [
+      {
+        label: "Capacidad",
+        note: reason,
+        status: "pending-upload",
+        value: semanticMessages.pending,
+      },
+      {
+        label: "Ocupacion / utilizacion",
+        note: semanticMessages.notCalculable,
+        status: "pending-upload",
+        value: semanticMessages.pending,
+      },
+      {
+        label: "Finalizacion",
+        note: semanticMessages.notCalculable,
+        status: "pending-upload",
+        value: semanticMessages.pending,
+      },
+      {
+        label: "Calidad de datos",
+        note: semanticMessages.insufficientExecutiveData,
+        status: "critical",
+        value: "Insuficiente",
+      },
+    ],
+    subtitle: "Sin datos de capacidad",
+    utilizationRows: [],
+  };
+}
+
+export function getCapacityOccupancyScreenForContext(
+  context: GlobalFilterInput,
+  fallbackSlug: BusinessLineSlug,
+): CapacityOccupancyScreen {
+  const snapshot = getExecutiveBiSnapshot(context);
+
+  if (snapshot.noDataReason || snapshot.lines.length === 0) {
+    return buildCapacityNoDataScreen(
+      fallbackSlug,
+      snapshot.noDataReason ?? semanticMessages.noData,
+    );
+  }
+
+  const slug =
+    snapshot.lines.length === 1 ? slugFromSemanticLine(snapshot.lines[0]) : fallbackSlug;
+  const base = getCapacityOccupancyScreen(slug);
+  const primaryMetrics = snapshot.lines.flatMap((line): CapacityMetric[] => [
+    {
+      label:
+        line.key === "laboratorio"
+          ? "Utilizacion tecnica"
+          : line.key === "fisioterapia"
+            ? "Ocupacion efectiva"
+            : "Utilizacion real",
+      note: line.capacity.unitLabel,
+      status: getCapacityStatus(line),
+      value: formatSemanticPercent(line.capacity.effective),
+    },
+    {
+      label: "Capacidad planificada",
+      note: "Agenda, carga o uso programado sobre capacidad disponible.",
+      status: "calculated",
+      value: formatSemanticPercent(line.capacity.scheduled),
+    },
+    {
+      label:
+        line.key === "laboratorio"
+          ? "Procesamiento exitoso"
+          : line.key === "fisioterapia"
+            ? "Finalizacion de citas"
+            : "Estudios exitosos",
+      note: line.capacity.pendingMessage ?? "Resultado exitoso sobre actividad programada.",
+      status: getCapacityStatus(line),
+      value: formatSemanticPercent(line.capacity.finalizationRate),
+    },
+    {
+      label:
+        line.capacity.conversionGapPoints === null
+          ? "Brecha tecnica"
+          : "Brecha agenda/efectiva",
+      note:
+        line.capacity.conversionGapPoints === null
+          ? line.capacity.pendingMessage ?? semanticMessages.notCalculable
+          : "Diferencia entre capacidad planificada y efectiva.",
+      status:
+        line.capacity.conversionGapPoints === null ? "pending-upload" : "warning",
+      value:
+        line.capacity.conversionGapPoints === null
+          ? semanticMessages.notCalculable
+          : `${line.capacity.conversionGapPoints} pts`,
+    },
+  ]);
+  const utilizationRows = snapshot.lines.map((line): CapacityUtilizationRow => ({
+    available: Math.round((line.capacity.scheduled ?? 0) > 0 ? 100 : 0),
+    branch: line.branchName,
+    financialImpact: line.finance.accountsReceivable > 0
+      ? `$${Math.round(line.finance.accountsReceivable / 1000)}K`
+      : "No calculable",
+    lostCapacity:
+      line.capacity.lostUnits === null
+        ? semanticMessages.notCalculable
+        : `${Math.round(line.capacity.lostUnits).toLocaleString("en-US")} ${line.capacity.unitLabel}`,
+    mainCause:
+      line.qualityIssues[0] ??
+      (line.capacity.conversionGapPoints === null
+        ? "Capacidad tecnica pendiente"
+        : "Conversion agenda/efectiva"),
+    name: line.shortName,
+    planned: Math.round((line.capacity.scheduled ?? 0) * 100),
+    recommendation:
+      line.qualityLevel === "Insuficiente"
+        ? semanticMessages.insufficientExecutiveData
+        : "Revisar capacidad efectiva antes de ampliar recursos.",
+    successRate: Math.round((line.capacity.finalizationRate ?? 0) * 100),
+    targetRate: line.key === "laboratorio" ? 97 : line.key === "fisioterapia" ? 82 : 84,
+    unit: line.capacity.unitLabel,
+    used: Math.round((line.capacity.effective ?? 0) * 100),
+  }));
+  const branchRows = snapshot.branchRows.map((row): CapacityBranchRow => ({
+    available: "100%",
+    branch: row.branch,
+    effective: formatSemanticPercent(row.effectiveOccupancy),
+    lostCapacity: row.qualityLevel === "Insuficiente" ? "Pendiente" : "Calculada DEMO",
+    lostIncome:
+      row.revenue === null ? "Pendiente" : `$${Math.round(row.revenue / 1000)}K`,
+    mainCause: row.alert,
+    manager: row.manager,
+    planned: formatSemanticPercent(row.targetFulfillment),
+    projection:
+      row.qualityLevel === "Insuficiente"
+        ? semanticMessages.insufficientExecutiveData
+        : "Revisar contra meta y calidad.",
+    recommendation:
+      row.qualityLevel === "Insuficiente"
+        ? semanticMessages.insufficientExecutiveData
+        : "Priorizar brecha de conversion y margen.",
+    successRate: `${row.qualityScore}%`,
+    targetGap: formatSemanticPercent(row.targetFulfillment),
+    waitlist: "Pendiente de fuente",
+  }));
+
+  return {
+    ...base,
+    branchRows,
+    executiveActions: [
+      "Fisioterapia: ocupacion agendada, efectiva, brecha de conversion, finalizacion, no-show y cancelacion excluyen fechas futuras.",
+      "Laboratorio: usar utilizacion tecnica, throughput, analizadores, estaciones y SLA; no ocupacion clinica.",
+      "Imagenes: mostrar pendiente cuando RIS/PACS o capacidad por equipo no este cargada.",
+      ...base.executiveActions,
+    ],
+    primaryMetrics,
+    subtitle:
+      snapshot.lines.length === 1
+        ? snapshot.lines[0].scopeName
+        : "Capacidad consolidada filtrada",
+    title:
+      snapshot.lines.length === 1
+        ? base.title
+        : "Capacidad y ocupacion",
+    utilizationRows,
+  };
 }

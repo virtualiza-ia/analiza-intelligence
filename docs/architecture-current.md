@@ -4,7 +4,7 @@ Fecha de revision: 2026-08-07
 
 ## Resumen
 
-ANALIZA INTELLIGENCE es una aplicacion BI multipais y multiempresa construida sobre Next.js App Router. El producto ya contiene pantallas ejecutivas, dashboards operativos, modelos de jerarquia, migraciones Supabase y datos DEMO extensos. Despues de Sprint 1, autenticacion, autorizacion de rutas, permisos de invitacion y aislamiento demo/production tienen una capa server-side central. Filtros, KPI contracts, importaciones y conectores siguen para sprints posteriores.
+ANALIZA INTELLIGENCE es una aplicacion BI multipais y multiempresa construida sobre Next.js App Router. El producto ya contiene pantallas ejecutivas, dashboards operativos, modelos de jerarquia, migraciones Supabase y datos DEMO extensos. Despues de Sprint 1, autenticacion, autorizacion de rutas, permisos de invitacion y aislamiento demo/production tienen una capa server-side central. Despues de Macro Sprint 2, filtros globales, contratos KPI DEMO, finanzas reconciliadas, capacidad/ocupacion, calidad de datos e insights ejecutivos tienen una primera capa semantica compartida. Importaciones, conectores reales y lineage server-side siguen para sprints posteriores.
 
 ## Stack
 
@@ -54,24 +54,31 @@ Estado Sprint 1: existe una politica pura en `lib/security/authorization-policy.
 
 - `components/tenant-context-header.tsx` sincroniza contexto por URL, storage y eventos.
 - `components/context-selection-form.tsx` permite elegir pais, empresa, linea y sucursal.
+- `lib/analytics/global-filters.ts` centraliza la fuente unica para pais, empresa, linea, sucursal, area, gerente, profesional, servicio, pagador, canal y rango de fechas.
 - `lib/tenant/demo-context.ts` define opciones DEMO y deriva areas/sucursales.
 
-Riesgo principal: cada dashboard decide como usar el contexto. No existe un motor unico que aplique pais, empresa, area, sucursal, periodo y rol a cada consulta.
+Estado Macro Sprint 2: Resumen Ejecutivo, Finanzas, Capacidad/Ocupacion, Calidad e Insights consumen el mismo contrato de contexto. Si un filtro no tiene fuente cargada, deben mostrar `Sin datos disponibles para este filtro` en lugar de reutilizar un consolidado.
+
+Riesgo principal: la fuente semantica actual usa datasets DEMO TypeScript; falta reemplazarla por consultas server-side con lineage real.
 
 ### Dashboards y BI
 
 - `components/executive-dashboard.tsx` usa datos de `lib/analytics/demo-dashboard.ts`.
 - `components/financial-health-dashboard.tsx` usa `lib/analytics/financial-health.ts`.
+- `lib/analytics/semantic-bi.ts` calcula snapshots ejecutivos por contexto, aplica invariantes financieras, define estados de KPI bloqueado y publica quality score/quality level.
 - Otros dashboards consumen modulos en `lib/analytics`.
 
-Riesgo principal: la capa BI es mayormente TypeScript/demo data, no una capa semantica con contratos de KPI, lineage y controles de calidad.
+Estado Macro Sprint 2: los dashboards ejecutivos principales recalculan por sucursal y fechas cuando hay fuente DEMO disponible; filtros granulares sin datos cargados devuelven estado no-data. Los insights bloquean conclusiones ejecutivas cuando la calidad o confianza es insuficiente.
+
+Riesgo principal: la capa BI todavia no esta conectada a un `KpiSemanticService` server-side ni a lineage por archivo/import/conector.
 
 ### Finanzas
 
 - Los valores financieros se calculan y formatean en `lib/analytics/financial-health.ts`.
-- Existen montos hardcoded por canal, forma de pago, tendencia e insight.
+- `getFinancialHealthScreenForContext` consume el snapshot semantico para separar facturacion neta, cobros, cuentas por cobrar, costo directo y margen de contribucion.
+- Las invariantes de Sprint 2 exigen reconciliacion de canales contra facturacion neta, formas de pago contra cobros, moneda explicita y ausencia de `NaN`/`Infinity`.
 
-Riesgo principal: las cifras no reconcilian entre total, canales, pagos y periodos. Finanzas necesita contratos antes de presentarse como dato ejecutivo.
+Riesgo principal: las cifras reconciliadas son DEMO y no deben tratarse como resultados reales hasta que Sprint 3 conecte importaciones/lineage y fuentes financieras autorizadas.
 
 ### Importaciones
 
@@ -117,6 +124,15 @@ Riesgo principal: conectores estan en etapa demo/diseno. Las credenciales reales
 - Invitaciones protegidas por actor server-side y auditoria con `actor_user_id` cuando existe UUID.
 - Migracion `supabase/migrations/20260807000100_sprint1_harden_security_rbac.sql` para RLS estricto por area/sucursal y auditoria de cambios de rol/alcance/estado.
 
+## Cambios Macro Sprint 2
+
+- Fuente unica de filtros en `lib/analytics/global-filters.ts` con serializacion URL/storage/evento.
+- Primera capa semantica BI en `lib/analytics/semantic-bi.ts` para Resumen Ejecutivo, Finanzas, Capacidad/Ocupacion, Calidad e Insights.
+- Finanzas DEMO reconciliadas por facturacion neta, cobros, cuentas por cobrar, canal, forma de pago, moneda y margen de contribucion.
+- Capacidad diferencia ocupacion clinica de Fisioterapia, utilizacion tecnica de Laboratorio y metricas pendientes de Imagenes cuando faltan RIS/PACS/capacidad por equipo.
+- Calidad de datos publica niveles `Confiable`, `Revisar` e `Insuficiente`, y bloquea conclusiones ejecutivas cuando el dato no soporta una afirmacion.
+- Prueba de regresion `tests/macro-sprint2-bi-integrity.test.mjs` cubre filtros, deep links, reconciliacion financiera, ocupacion/capacidad, data quality e insights.
+
 ## Archivos clave
 
 - `app/protected/layout.tsx`
@@ -130,6 +146,8 @@ Riesgo principal: conectores estan en etapa demo/diseno. Las credenciales reales
 - `components/context-selection-form.tsx`
 - `components/executive-dashboard.tsx`
 - `components/financial-health-dashboard.tsx`
+- `components/capacity-occupancy-dashboard.tsx`
+- `components/data-quality-analia-dashboard.tsx`
 - `components/import-operations-dashboard.tsx`
 - `components/manual-monthly-entry-dashboard.tsx`
 - `components/business-module-dashboard.tsx`
@@ -138,7 +156,10 @@ Riesgo principal: conectores estan en etapa demo/diseno. Las credenciales reales
 - `lib/auth/local-session.ts`
 - `app/api/users/invite/route.ts`
 - `lib/server/user-invitations.ts`
+- `lib/analytics/global-filters.ts`
+- `lib/analytics/semantic-bi.ts`
 - `lib/analytics/*`
 - `lib/tenant/*`
+- `tests/macro-sprint2-bi-integrity.test.mjs`
 - `supabase/migrations/*`
 - `supabase/seed.sql`

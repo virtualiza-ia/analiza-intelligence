@@ -21,12 +21,12 @@ Nota Sprint 1: la migracion `supabase/migrations/20260807000100_sprint1_harden_s
 
 | ID | Riesgo | Estado | Impacto | Evidencia |
 | --- | --- | --- | --- | --- |
-| P1-BI-001 | Filtros globales no recalculan todos los KPIs | Vigente | Decisiones con metricas stale o fuera de alcance | `components/tenant-context-header.tsx`, `lib/analytics/demo-dashboard.ts` |
-| P1-BI-002 | Contexto visible puede no coincidir con pagina de seleccion | Vigente | Usuario cree estar filtrando una entidad distinta | `components/context-selection-form.tsx` |
-| P1-FIN-001 | Finanzas no reconcilian | Vigente | Venta total, canales, pagos y tendencias pueden contradecirse | `lib/analytics/financial-health.ts` |
+| P1-BI-001 | Filtros globales no recalculan todos los KPIs | Mitigado en dashboards ejecutivos principales | Decisiones con metricas stale o fuera de alcance si una pantalla queda fuera del contrato | `lib/analytics/global-filters.ts`, `lib/analytics/semantic-bi.ts`, `components/executive-dashboard.tsx`, `components/financial-health-dashboard.tsx`, `components/capacity-occupancy-dashboard.tsx` |
+| P1-BI-002 | Contexto visible puede no coincidir con pagina de seleccion | Mitigado | Usuario cree estar filtrando una entidad distinta | `components/context-selection-form.tsx`, `components/tenant-context-header.tsx`, `lib/analytics/global-filters.ts` |
+| P1-FIN-001 | Finanzas no reconcilian | Mitigado en capa DEMO Sprint 2 | Venta total, canales, pagos y tendencias pueden contradecirse si fuentes reales no pasan por invariantes | `lib/analytics/semantic-bi.ts`, `lib/analytics/financial-health.ts`, `tests/macro-sprint2-bi-integrity.test.mjs` |
 | P1-IMP-001 | Importaciones reales sin pipeline server-side | Vigente | Archivos pueden simular publicacion sin validacion durable | `components/import-operations-dashboard.tsx` |
 | P1-IMP-002 | Entradas manuales persisten localmente | Vigente | Riesgo de perdida de datos y falta de auditoria | `components/manual-monthly-entry-dashboard.tsx` |
-| P1-DQ-001 | No hay data quality gate central | Vigente | Insights pueden mostrarse con datos incompletos | `lib/analytics/*` |
+| P1-DQ-001 | No hay data quality gate central | Mitigado para insights DEMO; vigente para pipeline real | Insights pueden mostrarse con datos incompletos si fuentes reales no calculan quality score | `lib/analytics/semantic-bi.ts`, `lib/analytics/insights.ts`, `components/data-quality-analia-dashboard.tsx` |
 | P1-ORG-001 | Jerarquia no esta completamente conectada a DB/sesion/permisos | Vigente | Areas y sucursales pueden comportarse como demo UI, no como alcance real | `lib/tenant/managed-branch-records.ts`, `supabase/migrations/*` |
 
 ## P2
@@ -37,7 +37,7 @@ Nota Sprint 1: la migracion `supabase/migrations/20260807000100_sprint1_harden_s
 | P2-INT-001 | Conectores sin endpoints reales | Vigente | Integraciones no estan listas para operacion | `components/crm-connectors-dashboard.tsx`, `lib/analytics/business-control-center.ts` |
 | P2-ROUTE-001 | `/protected/apis` no existe como modulo | Vigente | Enlaces o bookmarks pueden terminar en 404 | `lib/navigation.ts`, `app/protected/[module]/page.tsx` |
 | P2-UX-002 | Error React minified #418 reportado por auditoria | No reproducido en revision estatica | Requiere reproduccion browser/runtime | Auditoria principal |
-| P2-BI-001 | Terminos de capacidad aun necesitan contrato final | Parcial | Riesgo de interpretacion operativa incorrecta | `components/capacity-occupancy-dashboard.tsx`, `lib/analytics/capacity-occupancy.ts` |
+| P2-BI-001 | Terminos de capacidad aun necesitan contrato final | Mitigado parcialmente | Riesgo de interpretacion operativa incorrecta al conectar fuentes reales | `components/capacity-occupancy-dashboard.tsx`, `lib/analytics/capacity-occupancy.ts`, `lib/analytics/semantic-bi.ts` |
 
 ## Riesgos transversales
 
@@ -47,10 +47,16 @@ Nota Sprint 1: la migracion `supabase/migrations/20260807000100_sprint1_harden_s
 - No deben mezclarse datos DEMO y produccion en la misma organizacion, query, export, insight o vista ejecutiva.
 - Todo permiso debe evaluarse server-side ademas de cualquier control visual.
 
+## Nota Macro Sprint 2
+
+- Quedan fuera de alcance, por instruccion explicita, carga XLSX/CSV completa, CRM, facturacion API, webscraping, responsive profundo, rediseno visual premium y deployment.
+- La reconciliacion financiera, filtros globales y calidad de datos estan mitigados sobre datasets DEMO versionados. El riesgo vuelve a abrirse si Sprint 3 no obliga importaciones server-side, staging, publish, rollback, audit log y lineage.
+- Las conclusiones ejecutivas ahora deben bloquearse con `Datos insuficientes para conclusion ejecutiva` cuando confianza, completitud o conciliacion no alcanzan umbral.
+
 ## Decisiones pendientes
 
 - Definir matriz oficial de roles y modulos para Gerente de Operaciones, Gerente de Area, Gerente de Sucursal y usuarios operativos.
 - Definir estructura final de ambientes y flags para DEMO, staging y production.
-- Definir contratos KPI financieros antes de corregir dashboards financieros.
+- Convertir contratos KPI DEMO de Sprint 2 en contratos server-side versionados con fuente/import/conector trazable.
 - Definir si `/protected/apis` debe existir, redirigir o eliminarse.
 - Definir conectores prioritarios y credenciales requeridas para Sprint 5.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   BarChart3,
@@ -21,7 +21,57 @@ import {
   type AnaliaQualitySuggestion,
 } from "@/lib/analytics/business-control-center";
 import { useActiveBusinessLine } from "@/hooks/use-active-business-line";
+import {
+  globalContextChangeEvent as contextChangeEvent,
+  globalContextStorageKey as storageKey,
+} from "@/lib/analytics/global-filters";
+import {
+  getExecutiveBiSnapshot,
+  getQualityLevelFromScore,
+  semanticMessages,
+  type DataQualityRuleResult,
+} from "@/lib/analytics/semantic-bi";
 import { cn } from "@/lib/utils";
+
+type StoredContext = {
+  branchId?: string;
+  branchName?: string;
+  businessLineCode?: string;
+  businessLineId?: string;
+  businessLineName?: string;
+  channelId?: string;
+  companyId?: string;
+  companyName?: string;
+  countryId?: string;
+  countryName?: string;
+  managerId?: string;
+  managerName?: string;
+  operationalAreaId?: string;
+  operationalAreaName?: string;
+  payerId?: string;
+  periodEnd?: string;
+  periodStart?: string;
+  professionalId?: string;
+  serviceId?: string;
+};
+
+function readStoredContext() {
+  const rawContext =
+    window.localStorage.getItem(storageKey) ??
+    window.sessionStorage.getItem(storageKey);
+
+  if (!rawContext) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawContext) as StoredContext;
+  } catch {
+    window.localStorage.removeItem(storageKey);
+    window.sessionStorage.removeItem(storageKey);
+    return null;
+  }
+}
 
 function priorityClass(priority: AnaliaQualitySuggestion["priority"]) {
   if (priority === "Alta") {
@@ -43,6 +93,40 @@ function ProgressBar({ value }: { value: number }) {
         style={{ width: `${Math.max(6, Math.min(value, 100))}%` }}
       />
     </div>
+  );
+}
+
+function qualityRuleClass(rule: DataQualityRuleResult) {
+  if (rule.severity === "critical" || !rule.passed) {
+    return "border-red-200 bg-red-50 text-red-900";
+  }
+
+  if (rule.severity === "warning") {
+    return "border-amber-200 bg-amber-50 text-amber-900";
+  }
+
+  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+}
+
+function QualityRuleGrid({ rules }: { rules: DataQualityRuleResult[] }) {
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <div className="mb-4 flex items-center gap-2 text-sm font-medium">
+        <ShieldCheck className="size-4 text-primary" />
+        Reglas de calidad del filtro activo
+      </div>
+      <div className="grid gap-3 md:grid-cols-5">
+        {rules.map((rule) => (
+          <article
+            className={cn("rounded-md border p-3 text-sm", qualityRuleClass(rule))}
+            key={rule.dimension}
+          >
+            <div className="font-semibold">{rule.label}</div>
+            <p className="mt-2 text-xs leading-5">{rule.message}</p>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -95,6 +179,7 @@ const automaticQualityAlerts = [
 
 export function DataQualityAnaliaDashboard() {
   const activeBusinessLine = useActiveBusinessLine();
+  const [context, setContext] = useState<StoredContext | null>(null);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(() => new Set());
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, string>>({});
   const visibleSuggestions = useMemo(
@@ -114,10 +199,103 @@ export function DataQualityAnaliaDashboard() {
   const appliedCount = visibleSuggestions.filter((suggestion) =>
     appliedIds.has(suggestion.id),
   ).length;
-  const qualityScore = useMemo(
-    () => Math.min(94, 72 + appliedCount * 5),
-    [appliedCount],
+  const qualitySnapshot = useMemo(
+    () =>
+      getExecutiveBiSnapshot({
+        branchId: context?.branchId,
+        branchName: context?.branchName,
+        businessLineCode: context?.businessLineCode,
+        businessLineId: context?.businessLineId,
+        businessLineName: context?.businessLineName,
+        channelId: context?.channelId,
+        companyId: context?.companyId,
+        companyName: context?.companyName,
+        countryId: context?.countryId,
+        countryName: context?.countryName,
+        managerId: context?.managerId,
+        managerName: context?.managerName,
+        operationalAreaId: context?.operationalAreaId,
+        operationalAreaName: context?.operationalAreaName,
+        payerId: context?.payerId,
+        periodEnd: context?.periodEnd,
+        periodStart: context?.periodStart,
+        professionalId: context?.professionalId,
+        serviceId: context?.serviceId,
+      }),
+    [context],
   );
+  const baseQualityScore =
+    qualitySnapshot.lines.length > 0
+      ? Math.round(
+          qualitySnapshot.lines.reduce(
+            (sum, line) => sum + line.qualityScore,
+            0,
+          ) / qualitySnapshot.lines.length,
+        )
+      : 0;
+  const qualityScore = useMemo(
+    () => Math.min(94, baseQualityScore + appliedCount * 2),
+    [appliedCount, baseQualityScore],
+  );
+  const qualityLevel = getQualityLevelFromScore(qualityScore);
+  const qualityRules = useMemo(() => {
+    if (qualitySnapshot.lines.length === 0) {
+      return [
+        {
+          dimension: "completeness",
+          label: "Completitud",
+          message: qualitySnapshot.noDataReason ?? semanticMessages.noData,
+          passed: false,
+          severity: "critical",
+        },
+        {
+          dimension: "validity",
+          label: "Validez",
+          message: semanticMessages.notCalculable,
+          passed: false,
+          severity: "critical",
+        },
+        {
+          dimension: "consistency",
+          label: "Consistencia",
+          message: semanticMessages.insufficientExecutiveData,
+          passed: false,
+          severity: "critical",
+        },
+        {
+          dimension: "uniqueness",
+          label: "Unicidad",
+          message: "Duplicados no evaluables sin fuente cargada.",
+          passed: false,
+          severity: "warning",
+        },
+        {
+          dimension: "timeliness",
+          label: "Oportunidad",
+          message: "Periodo sin fuente disponible.",
+          passed: false,
+          severity: "warning",
+        },
+      ] satisfies DataQualityRuleResult[];
+    }
+
+    return qualitySnapshot.lines.flatMap((line) => line.qualityRules);
+  }, [qualitySnapshot]);
+
+  useEffect(() => {
+    function refreshContext() {
+      setContext(readStoredContext());
+    }
+
+    refreshContext();
+    window.addEventListener("storage", refreshContext);
+    window.addEventListener(contextChangeEvent, refreshContext);
+
+    return () => {
+      window.removeEventListener("storage", refreshContext);
+      window.removeEventListener(contextChangeEvent, refreshContext);
+    };
+  }, []);
 
   function applySuggestion(id: string) {
     setAppliedIds((current) => {
@@ -168,10 +346,25 @@ export function DataQualityAnaliaDashboard() {
             Score de confiabilidad DEMO
           </div>
           <div className="text-3xl font-semibold">{qualityScore}%</div>
+          <Badge
+            className={cn(
+              "mt-2 w-fit",
+              qualityLevel === "Confiable" &&
+                "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
+              qualityLevel === "Revisar" &&
+                "bg-amber-100 text-amber-800 hover:bg-amber-100",
+              qualityLevel === "Insuficiente" &&
+                "bg-red-100 text-red-800 hover:bg-red-100",
+            )}
+          >
+            {qualityLevel}
+          </Badge>
           <ProgressBar value={qualityScore} />
           <p className="mt-2 leading-6 text-muted-foreground">
-            Sube solo cuando aplicas reglas de validacion o mejoras de lectura.
-            No convierte datos DEMO en datos reales.
+            Pais {qualitySnapshot.context.countryName}, empresa{" "}
+            {qualitySnapshot.context.companyName}, sucursal{" "}
+            {qualitySnapshot.context.branchName}. No convierte datos DEMO en
+            datos reales.
           </p>
         </aside>
       </div>
@@ -204,6 +397,8 @@ export function DataQualityAnaliaDashboard() {
           );
         })}
       </section>
+
+      <QualityRuleGrid rules={qualityRules} />
 
       <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="rounded-md border bg-card p-4">

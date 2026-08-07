@@ -2,6 +2,15 @@ import {
   elSalvadorBranchResultTemplates,
   elSalvadorTemplateSummary,
 } from "@/lib/analytics/el-salvador-result-templates";
+import type { GlobalFilterInput } from "@/lib/analytics/global-filters";
+import {
+  formatSemanticPercent,
+  getExecutiveBiSnapshot,
+  semanticMessages,
+  semanticStatusFromLine,
+  type ExecutiveBranchRow,
+  type ExecutiveManagerRow,
+} from "@/lib/analytics/semantic-bi";
 
 export type ExecutiveKpi = {
   label: string;
@@ -56,6 +65,8 @@ export type BusinessLineDashboard = {
   alert: string;
   monthlyRevenue: BarPoint[];
   occupancyByBranch: BarPoint[];
+  qualityLevel?: string;
+  qualityScore?: number;
 };
 
 export type InsightPreview = {
@@ -64,6 +75,56 @@ export type InsightPreview = {
   affectedIndicator: string;
   recommendation: string;
 };
+
+type SemanticDashboardLine = ReturnType<typeof getExecutiveBiSnapshot>["lines"][number];
+
+function mapSemanticLineToDashboard(line: SemanticDashboardLine): BusinessLineDashboard {
+  return {
+    accountsReceivable: line.finance.accountsReceivable,
+    alert:
+      line.qualityLevel === "Insuficiente"
+        ? semanticMessages.insufficientExecutiveData
+        : line.qualityIssues[0] ?? "Lectura DEMO disponible.",
+    averageTicket: Math.round(line.finance.averageTicket ?? 0),
+    cancelledAppointments: line.operations.cancelledAppointments,
+    collectedRevenue: line.finance.collections,
+    companyName: line.companyName,
+    completedAppointments: line.operations.completedAppointments,
+    effectiveOccupancy: Math.round((line.capacity.effective ?? 0) * 100),
+    executiveInterpretation:
+      line.qualityLevel === "Insuficiente"
+        ? semanticMessages.insufficientExecutiveData
+        : `${line.shortName} muestra ${formatSemanticPercent(line.finance.targetFulfillment)} de meta y ${formatSemanticPercent(line.finance.contributionMarginRate)} de margen de contribucion con calidad ${line.qualityLevel}.`,
+    executiveStatus: semanticStatusFromLine(line),
+    financialHealth: line.qualityScore,
+    fixedCosts: 0,
+    fixedExpenses: 0,
+    key: line.key,
+    marginDeltaPoints: Math.round((line.finance.yoyVariance ?? 0) * 100),
+    marginRate: line.finance.contributionMarginRate ?? 0,
+    monthlyRevenue: line.monthlyRevenue,
+    noShows: line.operations.noShows,
+    occupancyByBranch: line.occupancyByBranch,
+    operatingHealth: Math.round(
+      (line.capacity.finalizationRate ?? line.capacity.effective ?? 0) * 100,
+    ),
+    patientCount: line.operations.patientCount,
+    qualityLevel: line.qualityLevel,
+    qualityScore: line.qualityScore,
+    rescheduledAppointments: line.operations.rescheduledAppointments,
+    revenue: line.finance.netBilling,
+    revenueGrowthRate: Math.round((line.finance.yoyVariance ?? 0) * 100),
+    revenueTarget: line.finance.target,
+    scheduledAppointments: line.operations.scheduledAppointments,
+    scheduledOccupancy: Math.round((line.capacity.scheduled ?? 0) * 100),
+    scopeName: line.scopeName,
+    serviceVolume: line.operations.serviceVolume,
+    shortName: line.shortName,
+    sourceNote: line.sourceNote,
+    variableCosts: line.finance.directCost,
+    variableExpenses: line.finance.directCost,
+  };
+}
 
 const laboratoryRevenue = elSalvadorTemplateSummary.totalActualRevenue;
 const laboratoryTarget = elSalvadorTemplateSummary.totalRevenueTarget;
@@ -221,94 +282,93 @@ export const dashboardBusinessLines: BusinessLineDashboard[] = [
   },
 ];
 
-function buildLaboratoryBranchLine(
-  branchId: string,
-): BusinessLineDashboard | null {
-  const branch = elSalvadorBranchResultTemplates.find(
-    (item) => item.id === branchId,
-  );
-
-  if (!branch) {
-    return null;
-  }
-
-  const revenueK = Math.round(branch.actualRevenue / 1000);
-
-  return {
-    key: "laboratorio",
-    companyName: "Analiza Laboratorio",
-    shortName: branch.city,
-    scopeName: branch.branchName,
-    revenue: branch.actualRevenue,
-    revenueGrowthRate: Math.round((branch.revenueCompletionRate - 1) * 100),
-    collectedRevenue: Math.round(branch.actualRevenue * 0.91),
-    accountsReceivable: Math.round(branch.actualRevenue * 0.09),
-    revenueTarget: branch.revenueTarget,
-    financialHealth: branch.dataQualityScore,
-    operatingHealth: Math.round(branch.revenueCompletionRate * 80),
-    fixedExpenses: Math.round(branch.actualRevenue * 0.18),
-    variableExpenses: branch.costOfSale,
-    fixedCosts: Math.round(branch.actualRevenue * 0.11),
-    variableCosts: branch.costOfSale,
-    marginRate: branch.marginRate,
-    marginDeltaPoints: branch.marginRate >= 0.35 ? 1 : -4,
-    scheduledAppointments: branch.rowCounts.salesRows,
-    completedAppointments: Math.round(branch.rowCounts.salesRows * 0.9),
-    noShows: Math.round(branch.rowCounts.salesRows * 0.04),
-    cancelledAppointments: Math.round(branch.rowCounts.salesRows * 0.03),
-    rescheduledAppointments: Math.round(branch.rowCounts.salesRows * 0.03),
-    effectiveOccupancy: branch.dataQualityScore,
-    scheduledOccupancy: Math.min(branch.dataQualityScore + 7, 100),
-    serviceVolume: branch.rowCounts.customerRows,
-    patientCount: branch.rowCounts.customerRows,
-    averageTicket: Math.round(branch.actualRevenue / Math.max(branch.rowCounts.customerRows, 1)),
-    executiveStatus:
-      branch.dataQualityScore >= 85
-        ? "verde"
-        : branch.dataQualityScore >= 75
-          ? "amarillo"
-          : "rojo",
-    executiveInterpretation:
-      branch.validationFlags[0] ??
-      "Sucursal con plantilla cargada; revisar meta, margen y calidad antes de presentar al CEO.",
-    sourceNote: branch.fileName,
-    alert: branch.validationFlags[0] ?? "Plantilla de resultados cargada.",
-    monthlyRevenue: [
-      { label: "Ene", value: Math.round(revenueK * 0.72) },
-      { label: "Feb", value: Math.round(revenueK * 0.78) },
-      { label: "Mar", value: Math.round(revenueK * 0.88) },
-      { label: "Abr", value: Math.round(revenueK * 0.84) },
-      { label: "May", value: Math.round(revenueK * 0.92) },
-      { label: "Jun", value: revenueK },
-    ],
-    occupancyByBranch: [{ label: branch.city, value: branch.dataQualityScore }],
-  };
-}
-
 export function getBusinessLinesForDashboard({
   branchId,
+  branchName,
+  businessLineCode,
+  businessLineId,
+  businessLineName,
+  channelId,
+  companyId,
   companyName,
-}: {
-  branchId?: string;
-  companyName?: string;
-}) {
-  if (branchId) {
-    const branchLine = buildLaboratoryBranchLine(branchId);
+  countryId,
+  countryName,
+  managerId,
+  managerName,
+  operationalAreaId,
+  operationalAreaName,
+  payerId,
+  periodEnd,
+  periodStart,
+  professionalId,
+  serviceId,
+}: GlobalFilterInput) {
+  return getExecutiveBiSnapshot({
+    branchId,
+    branchName,
+    businessLineCode,
+    businessLineId,
+    businessLineName,
+    channelId,
+    companyId,
+    companyName,
+    countryId,
+    countryName,
+    managerId,
+    managerName,
+    operationalAreaId,
+    operationalAreaName,
+    payerId,
+    periodEnd,
+    periodStart,
+    professionalId,
+    serviceId,
+  }).lines.map(mapSemanticLineToDashboard);
+}
 
-    if (branchLine) {
-      return [branchLine];
-    }
-  }
+export function getExecutiveKpisForDashboard(context: GlobalFilterInput) {
+  return getExecutiveBiSnapshot(context).kpis.map((kpi): ExecutiveKpi => ({
+    change: kpi.status === "blocked" ? "Bloqueado" : "Filtrado",
+    definition: kpi.note,
+    formula: "Contrato semantico Sprint 2",
+    label: kpi.label,
+    source: "Capa BI semantica DEMO",
+    tone:
+      kpi.status === "blocked"
+        ? "negative"
+        : kpi.status === "pending"
+          ? "warning"
+          : "positive",
+    updatedAt: "Contexto activo",
+    value: kpi.value,
+  }));
+}
 
-  if (!companyName || companyName === "Vista consolidada") {
-    return dashboardBusinessLines;
-  }
+export function getExecutiveBranchRowsForDashboard(
+  context: GlobalFilterInput,
+): ExecutiveBranchRow[] {
+  return getExecutiveBiSnapshot(context).branchRows;
+}
 
-  const normalizedCompanyName = companyName.toLowerCase();
+export function getExecutiveManagerRowsForDashboard(
+  context: GlobalFilterInput,
+): ExecutiveManagerRow[] {
+  return getExecutiveBiSnapshot(context).managerRows;
+}
 
-  return dashboardBusinessLines.filter((line) =>
-    normalizedCompanyName.includes(line.shortName.toLowerCase()),
-  );
+export function getNoDataReasonForDashboard(context: GlobalFilterInput) {
+  return getExecutiveBiSnapshot(context).noDataReason;
+}
+
+export function getInsightPreviewsForDashboard(
+  context: GlobalFilterInput,
+): InsightPreview[] {
+  return getExecutiveBiSnapshot(context).insights.map((insight) => ({
+    affectedIndicator: insight.affectedIndicator,
+    priority: insight.priority,
+    recommendation: insight.recommendation,
+    title: insight.title,
+  }));
 }
 
 export function getRevenueShareData(lines: BusinessLineDashboard[]): BarPoint[] {
