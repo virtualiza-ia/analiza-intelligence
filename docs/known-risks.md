@@ -10,8 +10,8 @@ Este registro resume riesgos vigentes segun la auditoria principal y la revision
 | --- | --- | --- | --- | --- |
 | P0-SEC-001 | RBAC server-side incompleto en rutas protegidas | Resuelto en aplicacion | Usuarios podrian acceder por URL directa a modulos no permitidos | `lib/server/authorization.ts`, `lib/security/authorization-policy.ts`, `app/protected/[module]/page.tsx`, `app/forbidden/page.tsx` |
 | P0-SEC-002 | Autorizacion sensible delegada a cliente | Resuelto para invitaciones | Invitaciones o acciones privilegiadas podrian ejecutarse con actor/scope manipulados | `app/api/users/invite/route.ts`, `lib/server/user-invitations.ts` |
-| P0-SEC-003 | Selector `Rol DEMO` disponible en shell protegido | Mitigado | Riesgo de confundir demos con permisos reales o filtrar comportamiento a ambientes no demo | `lib/security/environment.ts`, `app/api/auth/demo-role/route.ts`, `components/app-sidebar.tsx` |
-| P0-SEC-004 | Separacion demo/staging/production insuficiente | Mitigado parcialmente | Riesgo de mezclar datos DEMO con datos reales | `lib/security/environment.ts`, `lib/auth/demo-admin.ts`, `components/business-module-dashboard.tsx` |
+| P0-SEC-003 | Selector `Rol DEMO` disponible en shell protegido | Mitigado con sesion server-side | Riesgo de confundir demos con permisos reales o filtrar comportamiento a ambientes no demo | `lib/security/environment.ts`, `app/api/auth/demo-role/route.ts`, `app/api/auth/demo-session/route.ts`, `components/app-sidebar.tsx` |
+| P0-SEC-004 | Separacion demo/staging/production insuficiente | Mitigado localmente | Riesgo de mezclar datos DEMO con datos reales | `lib/security/environment.ts`, `lib/auth/demo-admin.ts`, `components/business-module-dashboard.tsx`, `.env.local` |
 | P0-SEC-005 | Credenciales demo expuestas en DOM | No confirmado; mitigado por busqueda y gating | Si reaparece en runtime, compromete acceso demo/admin | `components/login-form.tsx`, `lib/auth/demo-admin.ts` |
 | P0-DATA-001 | DEMO y estructuras reales conviven en runtime | Parcial | Ejecutivos podrian leer datos demo como si fueran reales | `lib/analytics/*`, `lib/tenant/*` |
 
@@ -28,6 +28,7 @@ Nota Sprint 1: la migracion `supabase/migrations/20260807000100_sprint1_harden_s
 | P1-IMP-002 | Entradas manuales persisten localmente | Parcial | El formulario mensual historico sigue local; carga masiva ya tiene pipeline server-side | `components/manual-monthly-entry-dashboard.tsx`, `components/import-operations-dashboard.tsx` |
 | P1-DQ-001 | No hay data quality gate central | Mitigado para insights DEMO e importaciones Sprint 3 | Insights o imports reales pueden fallar si fuentes externas no pasan quality score | `lib/analytics/semantic-bi.ts`, `lib/data-ingestion/platform.ts`, `lib/analytics/insights.ts`, `components/data-quality-analia-dashboard.tsx` |
 | P1-ORG-001 | Jerarquia no esta completamente conectada a DB/sesion/permisos | Vigente | Areas y sucursales pueden comportarse como demo UI, no como alcance real | `lib/tenant/managed-branch-records.ts`, `supabase/migrations/*` |
+| P1-UX-LOGIN-001 | Acceso visual local bloqueado despues de Security/RBAC | Resuelto para DEMO local | La direccion no podia revisar la plataforma localmente | `app/login/page.tsx`, `components/login-form.tsx`, `app/api/auth/demo-session/route.ts` |
 
 ## P2
 
@@ -66,6 +67,13 @@ Nota Sprint 1: la migracion `supabase/migrations/20260807000100_sprint1_harden_s
 - En auditoria local, `next dev` con Turbopack fallo por parsing CSS generado; se cambia el script a `next dev --webpack`, alineado con `npm run build`.
 - Smoke local 2026-08-07: rutas principales respondieron 200 con cookie demo local; no se detecto password prellenado en HTML protegido ni React #418 en la respuesta.
 - No se declara Production Ready mientras sigan abiertos blockers manuales externos: migracion RLS remota, migracion ingestion remota, rotacion de credenciales demo historicas si existieron, verificacion DOM en deployment y credenciales reales de conectores.
+
+## Nota Executive Quality Review
+
+- Se agrega acceso DEMO local por perfil desde `/login`, con sesion creada server-side en `/api/auth/demo-session`.
+- El mecanismo solo funciona cuando el servidor permite runtime demo local; staging/preview/production deben mantenerlo bloqueado.
+- Se corrigen titulos SVG en dashboards para evitar warnings de React durante la revision visual.
+- Se agregan revisiones especializadas en `docs/reviews/*` y plan consolidado en `docs/reviews/EXECUTIVE_FINAL_ACTION_PLAN.md`.
 
 ## Decisiones pendientes
 

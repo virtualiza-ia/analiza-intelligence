@@ -26,10 +26,10 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a Executive Ready demo y
 
 ## Arquitectura detectada
 
-- `app/protected/layout.tsx` valida acceso general a area protegida, pero no aplica permisos por ruta/modulo.
-- `app/protected/[module]/page.tsx` renderiza modulos protegidos desde `lib/navigation.ts`; las restricciones `allowedRoles` viven en navegacion/UI y no se aplican server-side en el render dinamico.
-- `proxy.ts` y `lib/supabase/proxy.ts` refrescan/verifican sesion y redirigen usuarios no autenticados, pero no hacen RBAC granular.
-- `components/app-sidebar.tsx` filtra menu por rol en cliente y conserva selector `Rol DEMO` cuando `allowDemoRoleSwitch` esta activo.
+- `app/protected/layout.tsx` valida acceso general a area protegida.
+- `app/protected/[module]/page.tsx` renderiza modulos protegidos desde `lib/navigation.ts` y aplica `requireProtectedPath` server-side antes de renderizar.
+- `proxy.ts` y `lib/supabase/proxy.ts` refrescan/verifican sesion, dejan pasar endpoints publicos de autenticacion controlados y redirigen usuarios no autenticados.
+- `components/app-sidebar.tsx` filtra menu por rol en cliente y conserva selector `Rol DEMO` solo cuando el actor server-side autoriza demo role switch.
 - El contexto global se guarda en URL, `localStorage`, `sessionStorage` y eventos de navegador desde `components/tenant-context-header.tsx`, con contrato central en `lib/analytics/global-filters.ts`.
 - Los dashboards principales consumen una primera capa semantica en `lib/analytics/semantic-bi.ts` para aplicar pais, empresa, linea, sucursal, filtros granulares, periodo, no-data y calidad de datos sobre datasets DEMO.
 - Las importaciones masivas ya tienen pipeline server-side en `/api/imports/*`; el formulario mensual historico sigue como fallback manual.
@@ -48,7 +48,7 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a Executive Ready demo y
 ## Hallazgos P0 no confirmados o parcialmente resueltos
 
 - BUG-001 de la auditoria, credenciales demo visibles en DOM, no se confirma en el codigo fuente actual. `components/login-form.tsx` no incluye password hardcoded ni prellenado; `ANALIZA_DEMO_ADMIN_PASSWORD` se lee server-side. Persiste riesgo por usuario demo y token default si el ambiente esta mal configurado.
-- Proteccion de sesion general existe para `/protected`, pero no equivale a autorizacion por alcance pais/empresa/area/sucursal.
+- Proteccion de sesion y autorizacion por modulo existen para `/protected`; el alcance pais/empresa/area/sucursal se valida en acciones server-side cubiertas y debe extenderse a todo nuevo endpoint.
 
 ## Hallazgos P1 despues de Macro Sprint 2
 
@@ -120,6 +120,7 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a Executive Ready demo y
 - `/protected/imagenes`: existe como modulo de imagenes; la inconsistencia exacta de auditoria debe revalidarse en UI.
 - `/protected/apis`: resuelta localmente como alias de Conectores; verificar en deployment.
 - Operational areas: existen derivadas en frontend y migraciones, pero falta confirmar poblacion real en DB y enforcement completo.
+- Acceso local para revision ejecutiva: la auditoria inicial no contemplaba el endurecimiento posterior de login. El codigo actual incluye `/login` y `/api/auth/demo-session` para crear sesion DEMO server-side solamente en runtime demo local; preview/staging/production quedan bloqueados.
 
 ## Dependencias entre sprints
 

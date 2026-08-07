@@ -35,8 +35,9 @@ Estado Sprint 1: el modulo dinamico ya no depende solo del sidebar. `lib/securit
 - `proxy.ts` llama `updateSession` para refrescar/verificar sesion.
 - `lib/supabase/proxy.ts` maneja redireccion de usuarios no autenticados.
 - `lib/auth/demo-admin.ts` habilita acceso demo admin solo cuando `lib/security/environment.ts` permite runtime demo.
+- `app/api/auth/demo-session/route.ts` crea sesiones DEMO server-side por perfil autorizado y escribe cookies HttpOnly.
 - `lib/auth/local-session.ts` firma sesiones locales con HMAC y cookies httpOnly.
-- `components/login-form.tsx` intenta demo admin, login local y Supabase.
+- `components/login-form.tsx` muestra el selector "Entorno DEMO local" solo cuando el servidor lo habilita; tambien conserva login local y fallback Supabase.
 - `lib/server/authorization.ts` resuelve el actor actual desde sesion local, sesion demo o claims Supabase.
 
 Estado Sprint 1: las rutas protegidas y APIs sensibles derivan actor server-side. Sesiones locales requieren secreto configurado fuera de demo.
@@ -81,7 +82,7 @@ Riesgo principal: la capa BI todavia no esta conectada a un `KpiSemanticService`
 - `getFinancialHealthScreenForContext` consume el snapshot semantico para separar facturacion neta, cobros, cuentas por cobrar, costo directo y margen de contribucion.
 - Las invariantes de Sprint 2 exigen reconciliacion de canales contra facturacion neta, formas de pago contra cobros, moneda explicita y ausencia de `NaN`/`Infinity`.
 
-Riesgo principal: las cifras reconciliadas son DEMO y no deben tratarse como resultados reales hasta que Sprint 3 conecte importaciones/lineage y fuentes financieras autorizadas.
+Riesgo principal: las cifras reconciliadas son DEMO y no deben tratarse como resultados reales hasta conectar importaciones publicadas persistidas y fuentes financieras autorizadas.
 
 ### Importaciones
 
@@ -171,6 +172,15 @@ Riesgo principal: falta Playwright/Lighthouse formal y verificacion DOM/Console 
 - Documentos nuevos: `docs/production-readiness-checklist.md` y `docs/executive-demo-script.md`.
 - `docs/design-system.md` actualizado con tokens y convenciones de UX premium.
 - Prueba de regresion `tests/macro-sprint4-executive-readiness.test.mjs`.
+
+## Cambios Executive Quality Review
+
+- `/login` queda disponible como entrada ejecutiva local.
+- El acceso DEMO por perfil se crea en servidor con `/api/auth/demo-session` y se bloquea fuera de runtime demo local; Vercel preview/staging y production no lo habilitan.
+- El actor DEMO usa scope especifico por rol mediante `lib/auth/demo-scope.ts`.
+- El proxy permite endpoints publicos de autenticacion controlados sin abrir rutas protegidas.
+- Dashboards SVG usan cadenas unicas en `title` para reducir warnings de consola en la demo.
+- Revisiones finales documentadas en `docs/reviews/*`.
 
 ## Archivos clave
 
