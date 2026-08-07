@@ -1,121 +1,123 @@
 # Data Ingestion
 
-See also [Import operations playbook](import-operations-playbook.md) for the
-business-line upload catalog, connector fallback model, versioning rules and
-publication controls used by the Importaciones screen.
+Fecha de revision: 2026-08-07
 
-See also [Template download library](template-download-library.md) for the
-Plantillas screen, package downloads by business line and last-upload workbook
-contract.
+## Estado Macro Sprint 3
 
-## Import Assistant
+Sprint 3 agrega una plataforma server-side para entrada de datos con flujo:
 
-The import center uses this flow:
+1. seleccion de pais, empresa, linea, sucursal, dataset y periodo;
+2. carga `.csv`, `.xlsx` o `.xls` compatible;
+3. deteccion de tipo real por firma/contenido;
+4. lectura de headers;
+5. mapping por aliases de plantilla;
+6. validacion server-side;
+7. staging;
+8. preview;
+9. quality gate;
+10. publish;
+11. lineage;
+12. rollback;
+13. audit log.
 
-1. Select country.
-2. Select company.
-3. Select branch.
-4. Select data type.
-5. Select date range.
-6. Download template.
-7. Upload file.
-8. Detect headers.
-9. Map columns.
-10. Validate.
-11. Preview.
-12. Show errors.
-13. Show warnings.
-14. Confirm import.
-15. Process.
-16. Show result.
-17. Register audit.
+La implementacion runtime vive en `lib/data-ingestion/*` y las rutas API bajo `/api/imports/*`. La migracion `supabase/migrations/20260807000200_sprint3_ingestion_connectors.sql` deja el modelo fisico RAW/STAGING/PUBLISHED listo para Supabase/Postgres.
 
-## Supported Formats
+## Separacion RAW / STAGING / PUBLISHED
 
-- CSV
-- XLSX
-- XLS
+RAW:
+- `ingestion_raw_files`
+- checksum SHA-256
+- nombre original y sanitizado
+- content type
+- tamanio
+- source/import/upload actor
+- inmutable
 
-PDF files may be stored as documentary backup, but must not generate KPIs automatically unless an approved parser exists.
+STAGING:
+- `ingestion_staging_rows`
+- fila original
+- fila mapeada
+- errores
+- warnings
+- codigos de validacion
+- hash por fila
 
-## Validations
+PUBLISHED:
+- `ingestion_published_rows`
+- solo filas validas aprobadas
+- `active=true`
+- rollback marca filas como inactivas, no borra RAW
 
-- data types
-- required fields
-- dates
-- amounts
-- duplicates
-- identifiers
-- country
-- company
-- branch
-- manager
-- service
-- professional
-- appointment status
-- date range
-- source template version
-- cross-column consistency
+## Plantillas Versionadas
 
-No error may import silently.
+`lib/data-ingestion/templates.ts` define plantillas `2026-08-sprint3` para:
 
-Phase 3 stores unknown normalized appointment statuses as `unknown` so they can be surfaced in data quality instead of being hidden in KPI calculations.
+- Fisioterapia
+- Laboratorio
+- Imagenes
+- Facturacion
+- Cobros
+- Costos directos
+- Capacidad
+- Citas
+- Metas
+- Profesionales
+- Servicios
+- Gerentes
+- Sucursales
+- CRM
 
-## Error Handling
+Cada campo declara definicion, obligatoriedad, tipo, aliases, ejemplo DEMO y catalogo valido cuando aplica.
 
-Users can download an error report, correct mapping, retry, cancel, view history, and request reversal when no later dependency exists.
+## Validaciones
 
-## Templates
+El cliente puede ayudar a seleccionar archivo, pero la decision ocurre en servidor:
 
-Initial downloadable templates:
+- extension permitida por plantilla
+- tamanio maximo
+- MIME/firma real
+- columnas obligatorias
+- fechas `YYYY-MM-DD`
+- periodos `YYYY-MM`
+- numeros, decimales y porcentajes
+- moneda explicita
+- catalogos de pais/empresa/linea/sucursal/estado
+- formulas peligrosas
+- duplicados por llave natural
+- idempotencia por pais/empresa/sucursal/dataset/periodo/checksum/source
+- alcance por actor, rol y sucursal
 
-- appointments
-- capacity and schedules
-- branch result template
-- fisioterapia
-- laboratorio
-- imagenes
-- invoicing
-- payments
-- fixed expenses
-- variable expenses
-- direct costs
-- fixed costs
-- variable costs
-- targets
-- goal suggestions and CEO approvals
-- professionals
-- services
-- branches
-- managers
-- payroll and bonuses
-- CRM and referrers
+Estados:
+- `VALIDATED`
+- `WARNING`
+- `BLOCKED`
+- `PUBLISHED`
+- `ROLLED_BACK`
 
-Each template includes instructions, column definitions, required fields, expected format, DEMO examples, valid catalogs, frequent errors, and template version.
+## Lineage
 
-Templates are the root data source when a real API, CRM connector, billing connector, or endpoint is not available. Every KPI must be traceable to an approved connector run or to a specific template, file version, row, uploader, and approval event.
+Cada fila publicada conserva:
 
-Bulk document uploads and connectors must publish into the same staging and
-analytics contracts. Switching from a manual template to a connector should not
-change KPI definitions; it should only change the source type and lineage.
+- source
+- connector
+- file
+- import
+- row original
+- mapping version
+- transformaciones
+- validaciones
+- usuario
+- fecha
+- version de plantilla
 
-## El Salvador Branch Result Template
+El endpoint `/api/imports/[importId]/lineage` responde a la pregunta: “de donde salio este dato”.
 
-The current El Salvador branch result workbook is recognized as a branch-level source for:
+## Blockers Manuales
 
-- branch and manager metadata from `Evaluacion`
-- monthly target, actual sales, projected sales, completion percentage, net sales, cost of sale, margin percentage, and absolute margin
-- YTD financial history
-- order and sales detail from `llenado de venta drsv`
-- customer/order operational detail from `Llenado clientes DRSV` and `Llenado Dias y Horas`
-- doctor, specialty, visitador, and location data from the medical sheets
+Permanecen como release blockers:
 
-Sensitive customer fields such as customer name and phone must be blocked from executive dashboards. The import should store or process them only under controlled, role-protected workflows when needed for validation.
-
-Current validation rules for these files:
-
-- reject or warn on duplicate file uploads
-- warn when file period, workbook period, and sales period disagree
-- warn when YTD or projection formulas return errors such as `#DIV/0!`
-- warn when large sheets require backend row-count verification
-- require branch code, manager, area manager, target, actual sales, and cost of sale
+- aplicar migracion RLS remota;
+- rotar credenciales demo historicas si existen;
+- verificar DOM en deployment;
+- configurar credenciales reales de conectores en variables server-side;
+- activar repositorio persistente DB en ambientes con Supabase/Postgres antes de operacion real.

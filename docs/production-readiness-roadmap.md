@@ -2,7 +2,7 @@
 
 Fecha de revision: 2026-08-07  
 Fuente principal: `docs/audits/ANALIZA_INTELLIGENCE_AUDIT.md`  
-Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Sprint 1 fue cerrado y Macro Sprint 2 aborda integridad BI, finanzas, filtros, ocupacion/capacidad, calidad e insights sin iniciar Sprint 3.
+Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Sprint 1 y Macro Sprint 2 fueron cerrados. Macro Sprint 3 aborda importaciones, staging, lineage, conectores y fuentes sin iniciar Sprint 4.
 
 ## Estado actual del repo
 
@@ -13,6 +13,7 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Spri
 - Sprint 0 quedo cerrado con commit independiente.
 - Sprint 1 implementa controles P0 de seguridad y RBAC sin iniciar Sprint 2.
 - Macro Sprint 2 crea una fuente unica de filtros y una capa semantica DEMO para overview ejecutivo, finanzas, capacidad/ocupacion, calidad e insights.
+- Macro Sprint 3 crea plataforma server-side de importaciones, plantillas versionadas, staging, publish, rollback, lineage, audit log y framework de conectores.
 
 ## Stack detectado
 
@@ -30,7 +31,8 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Spri
 - `components/app-sidebar.tsx` filtra menu por rol en cliente y conserva selector `Rol DEMO` cuando `allowDemoRoleSwitch` esta activo.
 - El contexto global se guarda en URL, `localStorage`, `sessionStorage` y eventos de navegador desde `components/tenant-context-header.tsx`, con contrato central en `lib/analytics/global-filters.ts`.
 - Los dashboards principales consumen una primera capa semantica en `lib/analytics/semantic-bi.ts` para aplicar pais, empresa, linea, sucursal, filtros granulares, periodo, no-data y calidad de datos sobre datasets DEMO.
-- Las importaciones reales aun no tienen pipeline server-side completo; los flujos actuales simulan validacion/publicacion DEMO en cliente.
+- Las importaciones masivas ya tienen pipeline server-side en `/api/imports/*`; el formulario mensual historico sigue como fallback manual.
+- Conectores ya tienen framework comun y endpoints `/api/connectors/*`; los reales quedan deshabilitados hasta configurar credenciales server-only.
 - Las migraciones Supabase incluyen RLS, jerarquia y contexto semantico, pero la aplicacion no depende de forma consistente de esas politicas para autorizacion de rutas/API.
 
 ## Hallazgos P0 despues de Sprint 1
@@ -52,15 +54,15 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Spri
 - Filtros globales: mitigado en overview, finanzas, capacidad/ocupacion, calidad e insights mediante `lib/analytics/global-filters.ts`; queda pendiente aplicar el contrato a exportaciones y pantallas fuera de la macrofase.
 - BI: existe primera capa semantica DEMO con formulas, granularidad, filtros y bloqueo; queda pendiente convertirla en servicio server-side con lineage real.
 - Finanzas: las metricas DEMO reconciliadas separan facturacion neta, cobros, cuentas por cobrar, costo directo y margen de contribucion. Queda pendiente conectar facturacion/importaciones reales.
-- Importaciones: existen tabs, seleccion de archivo y estados DEMO, pero la lectura, validacion, staging, publicacion y auditoria reales deben ocurrir server-side.
+- Importaciones: Sprint 3 mitiga lectura, validacion, staging, publish, rollback, audit log, lineage e idempotencia para carga masiva.
 - Campos requeridos: hay validacion funcional en algunos formularios, pero falta consistencia en required/aria-required y contratos de datos.
 - Jerarquia organizacional: hay modelos, migraciones y datos DEMO administrados, pero falta demostrar persistencia real y enforcement integral de operaciones por area/sucursal.
-- Calidad de datos: mitigado para insights DEMO con niveles Confiable/Revisar/Insuficiente; queda pendiente hacerlo parte del pipeline de importacion y fuentes reales.
+- Calidad de datos: mitigado para insights DEMO e importaciones Sprint 3; queda pendiente conectarlo a dashboards sobre datos reales publicados.
 
 ## Hallazgos P2 vigentes
 
 - Responsive: varios dashboards usan tablas con anchos minimos grandes y pueden generar overflow en mobile.
-- Integraciones: conectores CRM/ERP/documentos son principalmente UI/demo; no existen rutas API concretas para los endpoints esperados.
+- Integraciones: existe framework y endpoints de conectores; faltan credenciales reales y pruebas contra sistemas externos.
 - Ruta `/protected/apis`: sigue sin modulo equivalente en `lib/navigation.ts` y debe resolverse como redireccion, alias o eliminacion de enlaces.
 - Error React minified #418: no se confirma desde codigo estatico; requiere reproduccion visual/runtime.
 - Capacidad: fisioterapia, laboratorio e imagenes ya tienen semantica separada en capa DEMO; falta validarla contra fuentes operativas reales y capacidad por equipo.
@@ -84,6 +86,8 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Spri
 - `components/manual-monthly-entry-dashboard.tsx`
 - `components/business-module-dashboard.tsx`
 - `components/crm-connectors-dashboard.tsx`
+- `app/api/imports/*`
+- `app/api/connectors/*`
 - `lib/auth/demo-admin.ts`
 - `lib/auth/local-session.ts`
 - `app/api/users/invite/route.ts`
@@ -94,17 +98,19 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Spri
 - `lib/analytics/financial-health.ts`
 - `lib/analytics/capacity-occupancy.ts`
 - `lib/analytics/insights.ts`
+- `lib/data-ingestion/*`
 - `lib/tenant/delegation-policy.ts`
 - `lib/tenant/demo-context.ts`
 - `lib/tenant/managed-branch-records.ts`
 - `tests/macro-sprint2-bi-integrity.test.mjs`
+- `tests/macro-sprint3-ingestion.test.mjs`
 - `supabase/migrations/*`
 - `supabase/seed.sql`
 
 ## Discrepancias entre auditoria y codigo actual
 
 - Credenciales DEMO expuestas: no confirmado en fuente actual. El login ya no muestra password demo prellenado; revisar runtime y variables sigue siendo obligatorio.
-- Tabs de importaciones: mejorado. Ahora existen tabs funcionales y seleccion de archivo; el riesgo vigente es que la validacion/publicacion real sigue sin servidor.
+- Tabs de importaciones: mitigado. Carga masiva usa API server-side para upload, validacion, preview, publish, rollback y lineage.
 - Filtro de fecha: mitigado en capa semantica DEMO y dashboards principales; sigue pendiente para exportaciones y datasets reales.
 - Filtro de sucursal: mitigado cuando existe fuente DEMO cargada; sucursales sin fuente muestran no-data y no usan consolidado regional.
 - Contexto: mitigado entre URL/header/pagina de seleccion mediante contrato unico.
@@ -119,7 +125,7 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Spri
 - Sprint 0 desbloquea todos los demas porque define ambientes, baseline, validacion y politica de datos DEMO.
 - Sprint 1 debe ocurrir antes de exponer rutas, importaciones, invitaciones o conectores a usuarios reales.
 - Sprint 2 depende de contratos KPI y de contexto global confiable; Macro Sprint 2 entrega la primera version DEMO para finanzas y dashboards ejecutivos.
-- Sprint 3 depende de reglas de calidad/lineage del Sprint 2 y debe convertir la capa DEMO en datos confiables para BI mediante importaciones server-side.
+- Sprint 3 depende de reglas de calidad/lineage del Sprint 2 y entrega importaciones server-side, conectores y lineage.
 - Sprint 4 depende de RBAC del Sprint 1 para que la jerarquia no sea solo UI.
 - Sprint 5 depende de ambiente seguro, secretos server-only e importaciones auditables.
 - Sprint 6 depende de contratos de datos estables para no redisenar UX sobre metricas inconsistentes.
@@ -193,9 +199,19 @@ Alcance:
 - Validacion de extension, tamano, columnas, tipos, formulas peligrosas y duplicados.
 - Staging, preview, publish, rollback y audit log.
 - Data quality scoring y lineage por archivo/import.
+- Framework de conectores con adapters DEMO, conectores reales deshabilitados sin credenciales y fallback manual.
+- Plantillas versionadas para las fuentes operativas y financieras raiz.
 
 Criterios de salida:
 - Ningun dato importado llega a BI sin validacion y trazabilidad.
+- Carga duplicada se bloquea por idempotencia.
+- Gerente de sucursal no puede cargar otra sucursal.
+- Rollback preserva RAW y revierte filas publicadas.
+
+Estado Macro Sprint 3:
+- Implementado con `lib/data-ingestion/*`, `/api/imports/*`, `/api/connectors/*`, migracion nueva y `tests/macro-sprint3-ingestion.test.mjs`.
+- Pendiente de credenciales: LIS/API Laboratorio, RIS/PACS Imagenes, portal Fisioterapia y CRM/facturacion reales.
+- No incluye redisenio visual premium, performance tuning profundo, produccion real, despliegue final, IA generativa ni forecasting.
 
 ### Sprint 4 - Jerarquia organizacional
 

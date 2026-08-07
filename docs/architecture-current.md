@@ -4,7 +4,7 @@ Fecha de revision: 2026-08-07
 
 ## Resumen
 
-ANALIZA INTELLIGENCE es una aplicacion BI multipais y multiempresa construida sobre Next.js App Router. El producto ya contiene pantallas ejecutivas, dashboards operativos, modelos de jerarquia, migraciones Supabase y datos DEMO extensos. Despues de Sprint 1, autenticacion, autorizacion de rutas, permisos de invitacion y aislamiento demo/production tienen una capa server-side central. Despues de Macro Sprint 2, filtros globales, contratos KPI DEMO, finanzas reconciliadas, capacidad/ocupacion, calidad de datos e insights ejecutivos tienen una primera capa semantica compartida. Importaciones, conectores reales y lineage server-side siguen para sprints posteriores.
+ANALIZA INTELLIGENCE es una aplicacion BI multipais y multiempresa construida sobre Next.js App Router. El producto ya contiene pantallas ejecutivas, dashboards operativos, modelos de jerarquia, migraciones Supabase y datos DEMO extensos. Despues de Sprint 1, autenticacion, autorizacion de rutas, permisos de invitacion y aislamiento demo/production tienen una capa server-side central. Despues de Macro Sprint 2, filtros globales, contratos KPI DEMO, finanzas reconciliadas, capacidad/ocupacion, calidad de datos e insights ejecutivos tienen una primera capa semantica compartida. Macro Sprint 3 agrega importaciones server-side, staging, publish, rollback, lineage, auditoria, plantillas versionadas y framework de conectores.
 
 ## Stack
 
@@ -82,11 +82,15 @@ Riesgo principal: las cifras reconciliadas son DEMO y no deben tratarse como res
 
 ### Importaciones
 
-- `components/import-operations-dashboard.tsx` muestra carga masiva, validacion y publicacion DEMO.
+- `components/import-operations-dashboard.tsx` ejecuta carga masiva contra `/api/imports/upload`, publica con `/api/imports/[importId]/publish`, revierte con `/api/imports/[importId]/rollback` y consulta lineage.
 - `components/manual-monthly-entry-dashboard.tsx` captura entradas mensuales y guarda historial local.
-- No se detecto pipeline server-side completo de importacion para CSV/XLSX.
+- `lib/data-ingestion/templates.ts` define plantillas versionadas para datasets operativos y financieros.
+- `lib/data-ingestion/file-parser.ts` soporta CSV, XLSX basico y XLS compatible tabular/HTML.
+- `lib/data-ingestion/platform.ts` separa RAW, STAGING y PUBLISHED, aplica idempotencia, quality gates, audit log y rollback.
+- `app/api/imports/*` expone validacion, plantillas, publish, rollback y lineage con actor server-side.
+- La migracion `supabase/migrations/20260807000200_sprint3_ingestion_connectors.sql` agrega tablas fisicas para ingestion.
 
-Riesgo principal: la UI ya simula el flujo, pero produccion necesita validacion server-side, staging, publish, rollback, audit log y lineage.
+Riesgo principal: antes de operacion real debe aplicarse la migracion remota y conectar el repositorio persistente DB en ambiente autorizado.
 
 ### Jerarquia organizacional
 
@@ -98,11 +102,12 @@ Riesgo principal: el modelo existe, pero falta cerrar el ciclo real entre DB, se
 
 ### Conectores e integraciones
 
-- `components/crm-connectors-dashboard.tsx` presenta UI de conectores y credenciales DEMO.
+- `components/crm-connectors-dashboard.tsx` presenta Fuentes y Conectores con estado, test connection y sync.
+- `lib/data-ingestion/connectors.ts` define el contrato `DataConnector`, adapters DEMO y conectores reales deshabilitados si faltan credenciales.
 - `lib/analytics/business-control-center.ts` lista endpoints esperados.
-- No se detectaron rutas API reales bajo `/api/connectors`.
+- `app/api/connectors/*` expone status, test y sync.
 
-Riesgo principal: conectores estan en etapa demo/diseno. Las credenciales reales deben ser server-only y los conectores deben fallar cerrado.
+Riesgo principal: los conectores reales de Fisioterapia, Laboratorio e Imagenes quedan pendientes de credenciales y validacion contra sistemas externos. Fallan cerrado y mantienen fallback manual.
 
 ## Arquitectura objetivo recomendada
 
@@ -133,6 +138,16 @@ Riesgo principal: conectores estan en etapa demo/diseno. Las credenciales reales
 - Calidad de datos publica niveles `Confiable`, `Revisar` e `Insuficiente`, y bloquea conclusiones ejecutivas cuando el dato no soporta una afirmacion.
 - Prueba de regresion `tests/macro-sprint2-bi-integrity.test.mjs` cubre filtros, deep links, reconciliacion financiera, ocupacion/capacidad, data quality e insights.
 
+## Cambios Macro Sprint 3
+
+- Plataforma de importacion en `lib/data-ingestion/platform.ts` con RAW/STAGING/PUBLISHED, idempotencia, quality gate, audit log, lineage y rollback.
+- Parser server-side en `lib/data-ingestion/file-parser.ts` para CSV, XLSX y XLS compatible.
+- Plantillas versionadas en `lib/data-ingestion/templates.ts` para Fisioterapia, Laboratorio, Imagenes, Facturacion, Cobros, Costos, Capacidad, Citas, Metas, Profesionales, Servicios, Gerentes, Sucursales y CRM.
+- Framework `DataConnector` en `lib/data-ingestion/connectors.ts` con adapters DEMO y conectores reales preparados para credenciales server-only.
+- APIs `/api/imports/*` y `/api/connectors/*` protegidas por actor server-side.
+- Migracion `supabase/migrations/20260807000200_sprint3_ingestion_connectors.sql`.
+- Prueba de regresion `tests/macro-sprint3-ingestion.test.mjs` cubre importacion, staging, publish, rollback, lineage, duplicados, conectores y scope de sucursal.
+
 ## Archivos clave
 
 - `app/protected/layout.tsx`
@@ -158,8 +173,12 @@ Riesgo principal: conectores estan en etapa demo/diseno. Las credenciales reales
 - `lib/server/user-invitations.ts`
 - `lib/analytics/global-filters.ts`
 - `lib/analytics/semantic-bi.ts`
+- `lib/data-ingestion/*`
 - `lib/analytics/*`
 - `lib/tenant/*`
 - `tests/macro-sprint2-bi-integrity.test.mjs`
+- `tests/macro-sprint3-ingestion.test.mjs`
+- `app/api/imports/*`
+- `app/api/connectors/*`
 - `supabase/migrations/*`
 - `supabase/seed.sql`

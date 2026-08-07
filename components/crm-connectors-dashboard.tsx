@@ -1,36 +1,63 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   CheckCircle2,
   ClipboardList,
   Copy,
   DatabaseZap,
-  KeyRound,
   LockKeyhole,
   PlugZap,
+  RefreshCcw,
   ShieldCheck,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  buildDemoApiKey,
-  crmConnectorPlans,
-  maskDemoApiKey,
-  type BusinessControlLine,
-} from "@/lib/analytics/business-control-center";
+import { crmConnectorPlans } from "@/lib/analytics/business-control-center";
 import { useActiveBusinessLine } from "@/hooks/use-active-business-line";
+
+type ConnectorStatusRow = {
+  connectorId: string;
+  coverage: number;
+  datasetType: string;
+  errors: string[];
+  freshness: "fresh" | "stale" | "unknown";
+  frequency: string;
+  lastDataReceivedAt: string | null;
+  lastSyncAt: string | null;
+  name: string;
+  nextSyncAt: string | null;
+  owner: string;
+  processedRecords: number;
+  rejectedRecords: number;
+  retries: number;
+  sourceType: string;
+  status: "Conectado" | "Sin configurar" | "Error" | "Pausado" | "Pendiente";
+};
+
+function sourceStatusClass(status: ConnectorStatusRow["status"]) {
+  if (status === "Conectado") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+
+  if (status === "Error") {
+    return "border-red-200 bg-red-50 text-red-800";
+  }
+
+  if (status === "Sin configurar" || status === "Pendiente") {
+    return "border-amber-200 bg-amber-50 text-amber-900";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
 
 export function CrmConnectorsDashboard() {
   const activeBusinessLine = useActiveBusinessLine();
   const [baseUrl, setBaseUrl] = useState("https://crm.analiza.local");
-  const [demoKeys, setDemoKeys] = useState<Record<BusinessControlLine, string>>({
-    Fisioterapia: maskDemoApiKey("az_fis_demo", "F3P8"),
-    Imagenes: maskDemoApiKey("az_img_demo", "I9M4"),
-    Laboratorio: maskDemoApiKey("az_lab_demo", "L7A2"),
-  });
+  const [connectorStatuses, setConnectorStatuses] = useState<ConnectorStatusRow[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const visiblePlans = useMemo(
     () =>
@@ -42,17 +69,26 @@ export function CrmConnectorsDashboard() {
     [activeBusinessLine.isConsolidated, activeBusinessLine.line],
   );
 
-  function generateDemoKey(line: BusinessControlLine, keyPrefix: string) {
-    const key = buildDemoApiKey(keyPrefix);
+  useEffect(() => {
+    let isMounted = true;
 
-    setDemoKeys((current) => ({
-      ...current,
-      [line]: key,
-    }));
-    setNotice(
-      "Llave DEMO generada para validar el flujo. En produccion la llave real debe generarse en servidor y guardarse en secreto.",
-    );
-  }
+    fetch("/api/connectors/status")
+      .then((response) => response.json())
+      .then((payload: { connectors?: ConnectorStatusRow[] }) => {
+        if (isMounted) {
+          setConnectorStatuses(payload.connectors ?? []);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setNotice("No se pudo consultar estado de conectores.");
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   async function copyEndpoint(path: string) {
     const endpoint = `${baseUrl}${path}`;
@@ -65,6 +101,33 @@ export function CrmConnectorsDashboard() {
     }
   }
 
+  async function testConnector(connectorId: string) {
+    const response = await fetch(`/api/connectors/${connectorId}/test`, {
+      method: "POST",
+    });
+    const payload = (await response.json()) as { message?: string; error?: string };
+
+    setNotice(payload.message ?? payload.error ?? "Prueba de conexion finalizada.");
+  }
+
+  async function syncConnector(connectorId: string) {
+    const response = await fetch(`/api/connectors/${connectorId}/sync`, {
+      body: JSON.stringify({ period: "2026-07", publish: false }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const payload = (await response.json()) as {
+      error?: string;
+      processedRecords?: number;
+      status?: string;
+    };
+
+    setNotice(
+      payload.error ??
+        `Sync ${payload.status ?? "finalizado"} con ${payload.processedRecords ?? 0} registros.`,
+    );
+  }
+
   return (
     <section className="flex w-full min-w-0 flex-col gap-6 px-4 py-6 lg:px-6">
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
@@ -74,6 +137,7 @@ export function CrmConnectorsDashboard() {
               Entorno DEMO
             </Badge>
             <Badge variant="outline">Credenciales reales solo en servidor</Badge>
+            <Badge variant="outline">Fuentes y Conectores</Badge>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-md border bg-card">
@@ -125,6 +189,99 @@ export function CrmConnectorsDashboard() {
           </div>
         </div>
 
+        <div className="rounded-md border bg-card p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold tracking-normal">
+                Fuentes y Conectores
+              </h2>
+              <p className="text-sm leading-6 text-muted-foreground">
+                Estado operativo: conectado, sin configurar, error, pausado o
+                pendiente. Las credenciales reales se leen solo desde variables
+                de servidor.
+              </p>
+            </div>
+            <RefreshCcw className="size-5 text-primary" />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead className="text-xs text-muted-foreground">
+                <tr className="border-b">
+                  <th className="py-2 pr-4 font-medium">Fuente</th>
+                  <th className="py-2 pr-4 font-medium">Estado</th>
+                  <th className="py-2 pr-4 font-medium">Sync</th>
+                  <th className="py-2 pr-4 font-medium">Registros</th>
+                  <th className="py-2 pr-4 font-medium">Cobertura</th>
+                  <th className="py-2 pr-4 font-medium">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {connectorStatuses.map((connector) => (
+                  <tr className="border-b last:border-b-0" key={connector.connectorId}>
+                    <td className="py-3 pr-4">
+                      <div className="font-medium">{connector.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {connector.sourceType} · {connector.datasetType} · {connector.owner}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <Badge className={sourceStatusClass(connector.status)}>
+                        {connector.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3 pr-4 text-xs text-muted-foreground">
+                      <div>Ultimo: {connector.lastSyncAt ?? "pendiente"}</div>
+                      <div>Proximo: {connector.nextSyncAt ?? "pendiente"}</div>
+                    </td>
+                    <td className="py-3 pr-4">
+                      {connector.processedRecords} procesados /{" "}
+                      {connector.rejectedRecords} rechazados
+                    </td>
+                    <td className="py-3 pr-4">{connector.coverage}%</td>
+                    <td className="py-3 pr-4">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          onClick={() => testConnector(connector.connectorId)}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          <ShieldCheck className="size-4" />
+                          Probar
+                        </Button>
+                        <Button
+                          onClick={() => syncConnector(connector.connectorId)}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          <RefreshCcw className="size-4" />
+                          Sync
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {connectorStatuses.some((connector) => connector.errors.length > 0) ? (
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+              <div className="mb-1 flex items-center gap-2 font-medium">
+                <AlertTriangle className="size-4" />
+                Credenciales o errores pendientes
+              </div>
+              {connectorStatuses
+                .filter((connector) => connector.errors.length > 0)
+                .map((connector) => (
+                  <div key={connector.connectorId}>
+                    {connector.name}: {connector.errors.join(" ")}
+                  </div>
+                ))}
+            </div>
+          ) : null}
+        </div>
+
         {visiblePlans.map((selectedPlan) => (
           <div className="rounded-md border bg-card p-4" key={selectedPlan.line}>
           <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
@@ -143,21 +300,14 @@ export function CrmConnectorsDashboard() {
 
             <div className="rounded-md border bg-background p-3">
               <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <KeyRound className="size-4 text-primary" />
-                API key DEMO
+                <LockKeyhole className="size-4 text-primary" />
+                Credencial server-side
               </div>
-              <div className="break-all rounded-md bg-muted px-3 py-2 font-mono text-xs">
-                {demoKeys[selectedPlan.line]}
-              </div>
-              <Button
-                className="mt-3 w-full"
-                onClick={() =>
-                  generateDemoKey(selectedPlan.line, selectedPlan.keyPrefix)
-                }
-                type="button"
-              >
-                Generar llave DEMO
-              </Button>
+              <p className="text-xs leading-5 text-muted-foreground">
+                No se generan ni muestran llaves reales en el navegador. La
+                integracion usa variables de servidor y fallback manual cuando
+                faltan credenciales.
+              </p>
             </div>
           </div>
 

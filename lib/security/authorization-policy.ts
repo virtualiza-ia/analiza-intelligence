@@ -26,6 +26,11 @@ export type AuthorizationActor = {
 export type AuthorizationAction =
   | "branches.assign_area"
   | "branches.create"
+  | "connectors.manage"
+  | "connectors.run"
+  | "imports.publish"
+  | "imports.rollback"
+  | "imports.upload"
   | "operational_areas.create"
   | "record.read"
   | "route.access"
@@ -44,6 +49,19 @@ export type AuthorizationTarget = {
 };
 
 const protectedBasePaths = new Set(["/protected", "/protected/context"]);
+const importMutationRoles: RoleKey[] = [
+  "super_admin",
+  "webmaster_admin",
+  "gerente_operaciones",
+  "gerente_area",
+  "gerente_sucursal",
+  "usuario_operativo",
+];
+const connectorMutationRoles: RoleKey[] = [
+  "super_admin",
+  "webmaster_admin",
+  "gerente_operaciones",
+];
 
 function normalizePathname(pathname: string) {
   const [pathOnly = "/"] = pathname.split("?");
@@ -110,6 +128,26 @@ export function canPerformAction(
     return target.scope
       ? canAccessRecord(toDelegationActor(actor), target.scope)
       : false;
+  }
+
+  if (
+    action === "imports.upload" ||
+    action === "imports.publish" ||
+    action === "imports.rollback"
+  ) {
+    return Boolean(
+      target.scope &&
+        importMutationRoles.includes(actor.roleKey) &&
+        canAccessRecord(toDelegationActor(actor), target.scope),
+    );
+  }
+
+  if (action === "connectors.manage" || action === "connectors.run") {
+    return Boolean(
+      target.scope &&
+        connectorMutationRoles.includes(actor.roleKey) &&
+        canAccessRecord(toDelegationActor(actor), target.scope),
+    );
   }
 
   if (action === "users.invite") {

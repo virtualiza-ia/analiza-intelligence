@@ -62,9 +62,12 @@ for (const requiredConnectorsText of [
   "useActiveBusinessLine",
   "visiblePlans",
   "Filtro superior activo",
-  "Generar llave DEMO",
+  "Fuentes y Conectores",
+  "Probar",
+  "Sync",
   "Credenciales reales solo en servidor",
   "No se debe pegar una llave real",
+  "No se generan ni muestran llaves reales",
   "Copiar endpoint",
   "Fallback sin conector",
 ]) {

@@ -1,18 +1,10 @@
 # Connectors
 
-## Connector Types
+Fecha de revision: 2026-08-07
 
-- REST API
-- GraphQL API
-- database
-- webhook
-- SFTP file
-- manual upload
-- authorized scraping
-- billing system
-- CRM
+## Estado Macro Sprint 3
 
-## TypeScript Contract
+Sprint 3 introduce el framework comun `DataConnector`:
 
 ```ts
 interface DataConnector {
@@ -23,49 +15,87 @@ interface DataConnector {
 }
 ```
 
-Concrete interfaces will be added in the connector phase.
+Tipos soportados:
 
-## Required Metadata
+- REST API
+- GraphQL
+- database
+- webhook
+- SFTP
+- manual file
+- authorized scraping
 
-Each connector records:
+## Catalogo Inicial
 
-- name
-- type
-- country
-- company
-- optional branch
-- status
-- last sync
-- next sync
-- frequency
-- server-side credential status
-- synced fields
-- mappings
-- run logs
-- errors
+`lib/data-ingestion/connectors.ts` define:
+
+- Facturacion DEMO
+- Cobros DEMO
+- CRM DEMO
+- Fisioterapia scraping autorizado
+- Laboratorio LIS/API
+- Imagenes RIS/PACS
+
+Los conectores reales quedan deshabilitados si faltan credenciales. El fallback manual sigue usando las mismas plantillas y quality gates.
+
+## Variables Requeridas
+
+Fisioterapia scraping autorizado:
+- `PHYSIO_PORTAL_BASE_URL`
+- `PHYSIO_AUTHORIZED_SESSION_SECRET`
+
+Laboratorio LIS/API:
+- `LAB_LIS_BASE_URL`
+- `LAB_LIS_CLIENT_ID`
+- `LAB_LIS_CLIENT_SECRET`
+
+Imagenes RIS/PACS:
+- `IMAGING_RIS_BASE_URL`
+- `IMAGING_RIS_CLIENT_SECRET`
+
+Ninguna credencial real debe escribirse en cliente, documentacion, logs o screenshots.
+
+## Estados
+
+Cada fuente muestra:
+
+- Conectado
+- Sin configurar
+- Error
+- Pausado
+- Pendiente
+
+Y conserva:
+
+- ultimo sync
+- proxima ejecucion
+- ultimo dato recibido
+- registros procesados
+- registros rechazados
+- errores
 - retries
-- record count
-- latest source data date
-- responsible person
+- cobertura
+- freshness
+- responsable
 
-## Demo Adapters
+## Scraping Autorizado
 
-Create DEMO adapters for:
+La arquitectura de Fisioterapia permite fixtures HTML para pruebas y deja el conector real preparado. Reglas:
 
-- invoicing
-- CRM
-- fisioterapia
-- laboratorio
-- imagenes
-- appointments
-- costs
-- targets
-- payroll and bonuses
+- no evadir CAPTCHA;
+- no evadir MFA;
+- no saltar autenticacion;
+- usar sesion autorizada;
+- detectar cambios HTML;
+- registrar ultima extraccion;
+- soportar paginacion e incremental sync antes de activacion real;
+- deduplicar y reintentar con logs;
+- fallar cerrado si la estructura cambia.
 
-Real connectors remain disabled until credentials and authorization are configured.
+## Endpoints
 
-When a real connector is not possible, the matching approved template remains the source of truth. The connector page must show whether a KPI is fed by API, endpoint, CRM, billing system, SFTP, or manual template.
+- `GET /api/connectors/status`
+- `POST /api/connectors/[connectorId]/test`
+- `POST /api/connectors/[connectorId]/sync`
 
-## Authorized Scraping
-
-Scraping connectors must not evade authentication, CAPTCHA, MFA, rate limits, or technical protections. They must use an authorized session, support configurable selectors/adapters, detect HTML structure changes, record extraction date/time, keep raw data separate, prevent duplicates, support manual execution, prepare scheduled execution, and register audit logs.
+Todos derivan actor en servidor y deben respetar pais, empresa, area, sucursal y rol.

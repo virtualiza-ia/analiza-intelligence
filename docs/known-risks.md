@@ -24,9 +24,9 @@ Nota Sprint 1: la migracion `supabase/migrations/20260807000100_sprint1_harden_s
 | P1-BI-001 | Filtros globales no recalculan todos los KPIs | Mitigado en dashboards ejecutivos principales | Decisiones con metricas stale o fuera de alcance si una pantalla queda fuera del contrato | `lib/analytics/global-filters.ts`, `lib/analytics/semantic-bi.ts`, `components/executive-dashboard.tsx`, `components/financial-health-dashboard.tsx`, `components/capacity-occupancy-dashboard.tsx` |
 | P1-BI-002 | Contexto visible puede no coincidir con pagina de seleccion | Mitigado | Usuario cree estar filtrando una entidad distinta | `components/context-selection-form.tsx`, `components/tenant-context-header.tsx`, `lib/analytics/global-filters.ts` |
 | P1-FIN-001 | Finanzas no reconcilian | Mitigado en capa DEMO Sprint 2 | Venta total, canales, pagos y tendencias pueden contradecirse si fuentes reales no pasan por invariantes | `lib/analytics/semantic-bi.ts`, `lib/analytics/financial-health.ts`, `tests/macro-sprint2-bi-integrity.test.mjs` |
-| P1-IMP-001 | Importaciones reales sin pipeline server-side | Vigente | Archivos pueden simular publicacion sin validacion durable | `components/import-operations-dashboard.tsx` |
-| P1-IMP-002 | Entradas manuales persisten localmente | Vigente | Riesgo de perdida de datos y falta de auditoria | `components/manual-monthly-entry-dashboard.tsx` |
-| P1-DQ-001 | No hay data quality gate central | Mitigado para insights DEMO; vigente para pipeline real | Insights pueden mostrarse con datos incompletos si fuentes reales no calculan quality score | `lib/analytics/semantic-bi.ts`, `lib/analytics/insights.ts`, `components/data-quality-analia-dashboard.tsx` |
+| P1-IMP-001 | Importaciones reales sin pipeline server-side | Mitigado en Sprint 3 | Archivos pueden simular publicacion sin validacion durable si se evita API server-side | `lib/data-ingestion/platform.ts`, `app/api/imports/upload/route.ts`, `tests/macro-sprint3-ingestion.test.mjs` |
+| P1-IMP-002 | Entradas manuales persisten localmente | Parcial | El formulario mensual historico sigue local; carga masiva ya tiene pipeline server-side | `components/manual-monthly-entry-dashboard.tsx`, `components/import-operations-dashboard.tsx` |
+| P1-DQ-001 | No hay data quality gate central | Mitigado para insights DEMO e importaciones Sprint 3 | Insights o imports reales pueden fallar si fuentes externas no pasan quality score | `lib/analytics/semantic-bi.ts`, `lib/data-ingestion/platform.ts`, `lib/analytics/insights.ts`, `components/data-quality-analia-dashboard.tsx` |
 | P1-ORG-001 | Jerarquia no esta completamente conectada a DB/sesion/permisos | Vigente | Areas y sucursales pueden comportarse como demo UI, no como alcance real | `lib/tenant/managed-branch-records.ts`, `supabase/migrations/*` |
 
 ## P2
@@ -34,7 +34,7 @@ Nota Sprint 1: la migracion `supabase/migrations/20260807000100_sprint1_harden_s
 | ID | Riesgo | Estado | Impacto | Evidencia |
 | --- | --- | --- | --- | --- |
 | P2-UX-001 | Overflow responsive en dashboards densos | Vigente | Mobile/tablet puede ser dificil de usar | `components/*dashboard*.tsx` |
-| P2-INT-001 | Conectores sin endpoints reales | Vigente | Integraciones no estan listas para operacion | `components/crm-connectors-dashboard.tsx`, `lib/analytics/business-control-center.ts` |
+| P2-INT-001 | Conectores sin endpoints reales | Mitigado parcialmente | Integraciones externas siguen pendientes de credenciales y prueba contra sistemas reales | `lib/data-ingestion/connectors.ts`, `app/api/connectors/status/route.ts`, `components/crm-connectors-dashboard.tsx` |
 | P2-ROUTE-001 | `/protected/apis` no existe como modulo | Vigente | Enlaces o bookmarks pueden terminar en 404 | `lib/navigation.ts`, `app/protected/[module]/page.tsx` |
 | P2-UX-002 | Error React minified #418 reportado por auditoria | No reproducido en revision estatica | Requiere reproduccion browser/runtime | Auditoria principal |
 | P2-BI-001 | Terminos de capacidad aun necesitan contrato final | Mitigado parcialmente | Riesgo de interpretacion operativa incorrecta al conectar fuentes reales | `components/capacity-occupancy-dashboard.tsx`, `lib/analytics/capacity-occupancy.ts`, `lib/analytics/semantic-bi.ts` |
@@ -53,10 +53,17 @@ Nota Sprint 1: la migracion `supabase/migrations/20260807000100_sprint1_harden_s
 - La reconciliacion financiera, filtros globales y calidad de datos estan mitigados sobre datasets DEMO versionados. El riesgo vuelve a abrirse si Sprint 3 no obliga importaciones server-side, staging, publish, rollback, audit log y lineage.
 - Las conclusiones ejecutivas ahora deben bloquearse con `Datos insuficientes para conclusion ejecutiva` cuando confianza, completitud o conciliacion no alcanzan umbral.
 
+## Nota Macro Sprint 3
+
+- Sprint 3 agrega carga CSV, XLSX y XLS compatible con validacion server-side, staging, publish, rollback, idempotencia, audit log y lineage.
+- La migracion `supabase/migrations/20260807000200_sprint3_ingestion_connectors.sql` queda pendiente de aplicacion remota autorizada.
+- Los conectores reales de Fisioterapia, Laboratorio e Imagenes fallan cerrado si faltan credenciales; los adapters DEMO existen para validar pipeline sin bloquear el sprint.
+- Persisten como blockers manuales: migracion RLS remota, rotacion de credenciales demo historicas y verificacion DOM en deployment.
+
 ## Decisiones pendientes
 
 - Definir matriz oficial de roles y modulos para Gerente de Operaciones, Gerente de Area, Gerente de Sucursal y usuarios operativos.
 - Definir estructura final de ambientes y flags para DEMO, staging y production.
-- Convertir contratos KPI DEMO de Sprint 2 en contratos server-side versionados con fuente/import/conector trazable.
+- Conectar dashboards ejecutivos a published rows reales cuando la DB remota tenga imports aprobados.
 - Definir si `/protected/apis` debe existir, redirigir o eliminarse.
-- Definir conectores prioritarios y credenciales requeridas para Sprint 5.
+- Obtener credenciales oficiales para LIS, RIS/PACS, CRM y facturacion antes de activar conectores reales.

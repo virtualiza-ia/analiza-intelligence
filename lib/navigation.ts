@@ -101,7 +101,7 @@ const dataReadRoles: RoleKey[] = [
   "viewer",
 ];
 
-const connectorAdminRoles: RoleKey[] = adminRoles;
+const connectorAdminRoles: RoleKey[] = [...adminRoles, "gerente_operaciones"];
 
 const delegatedUserAdminRoles: RoleKey[] = [
   ...adminRoles,
@@ -117,6 +117,13 @@ const branchFocusedRoles: RoleKey[] = [
   "gerente_sucursal",
 ];
 const adminDataRoles: RoleKey[] = [...adminRoles, "gerente_operaciones"];
+const importMutationRoles: RoleKey[] = [
+  ...adminRoles,
+  "gerente_operaciones",
+  "gerente_area",
+  "gerente_sucursal",
+  "usuario_operativo",
+];
 const deepDiagnosticRoles: RoleKey[] = [];
 
 export const navigationItems: NavigationItem[] = [
@@ -216,7 +223,7 @@ export const navigationItems: NavigationItem[] = [
     href: "/protected/importaciones",
     icon: Import,
     group: "datos",
-    allowedRoles: adminDataRoles,
+    allowedRoles: importMutationRoles,
   },
   {
     title: "Formulario mensual",

@@ -44,6 +44,7 @@ import {
   type ImportBusinessLine,
   type ImportFrequency,
 } from "@/lib/analytics/import-operations";
+import type { IngestionDatasetType } from "@/lib/data-ingestion/templates";
 import { cn } from "@/lib/utils";
 
 const storageKey = "analiza:selected-context";
@@ -53,15 +54,84 @@ const allStatuses = "Todos los estados" as const;
 const allFrequencies = "Todas las frecuencias" as const;
 
 type StoredContext = {
+  countryId?: string;
   countryName?: string;
+  companyId?: string;
   companyName?: string;
   businessLineId?: string;
   businessLineName?: string;
+  branchId?: string;
   branchName?: string;
+  operationalAreaId?: string;
   period?: string;
   periodStart?: string;
   periodEnd?: string;
   isDemo?: boolean;
+};
+
+type ServerImportIssue = {
+  code: string;
+  column?: string;
+  message: string;
+  rowNumber?: number;
+  severity: "error" | "warning";
+};
+
+type ServerImportPreviewRow = {
+  errors: ServerImportIssue[];
+  mapped: Record<string, string | number | null>;
+  rowNumber: number;
+  warnings: ServerImportIssue[];
+};
+
+type ServerImportRecord = {
+  id: string;
+  datasetType: IngestionDatasetType;
+  duplicateOf: string | null;
+  period: string;
+  qualityScore: number;
+  rowCount: number;
+  status:
+    | "RAW_RECEIVED"
+    | "VALIDATED"
+    | "WARNING"
+    | "BLOCKED"
+    | "PUBLISHED"
+    | "ROLLED_BACK";
+};
+
+type ServerImportResult = {
+  duplicateOf: string | null;
+  importRecord: ServerImportRecord;
+  issues: ServerImportIssue[];
+  previewRows: ServerImportPreviewRow[];
+  qualityScore: number;
+  raw: {
+    checksum: string;
+    fileSize: number;
+    sanitizedFileName: string;
+  };
+  stagingRows: number;
+};
+
+type LineageResult = {
+  audit: Array<{
+    action: string;
+    at: string;
+    details: string;
+    status: string;
+  }>;
+  publishedRows: Array<{
+    active: boolean;
+    rowNumber: number;
+  }>;
+  raw: {
+    checksum: string;
+    fileName: string;
+    immutable: true;
+    receivedAt: string;
+    sanitizedFileName: string;
+  } | null;
 };
 
 type ImportLineFilter = ImportBusinessLine | typeof allLines;
@@ -86,6 +156,23 @@ const frequencyOrder: ImportFrequency[] = [
   "Al cierre",
   "Bajo demanda",
 ];
+
+const datasetTypeByDocumentId: Record<string, IngestionDatasetType> = {
+  "core-calendar-capacity": "capacity",
+  "core-financial-results": "billing",
+  "core-goals": "targets",
+  "core-master-catalogs": "branches",
+  "core-service-prices-costs": "services",
+  "fisio-appointments-sessions": "physiotherapy",
+  "fisio-branch-results": "physiotherapy",
+  "fisio-professional-payroll": "professionals",
+  "img-appointments-studies": "imaging",
+  "img-branch-results": "imaging",
+  "lab-branch-results": "laboratory",
+  "lab-orders-tests": "laboratory",
+  "lab-reactives-inventory": "direct_costs",
+  "lab-referrers": "crm",
+};
 
 const lineColors: Record<ImportBusinessLine, string> = {
   Consolidado: "bg-slate-700",
@@ -449,20 +536,28 @@ function DocumentRow({
 
 function DocumentDetail({
   importDocument,
+  lineage,
+  latestResult,
   onDownload,
   onFileChange,
+  onLineage,
   onReplace,
   onValidate,
   onPublish,
+  onRollback,
   selectedFileName,
   status,
 }: {
   importDocument: BulkImportDocument;
+  lineage: LineageResult | null;
+  latestResult: ServerImportResult | null;
   onDownload: () => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onLineage: () => void;
   onReplace: () => void;
   onValidate: () => void;
   onPublish: () => void;
+  onRollback: () => void;
   selectedFileName: string;
   status: BulkImportStatus;
 }) {
@@ -529,20 +624,113 @@ function DocumentDetail({
             <CheckCircle2 className="size-4" />
             Confirmar publicacion
           </Button>
+          <Button onClick={onRollback} type="button" variant="outline">
+            <Archive className="size-4" />
+            Rollback
+          </Button>
           <Button onClick={onReplace} type="button" variant="outline">
             <RefreshCcw className="size-4" />
             Reemplazar version
           </Button>
-          <Button type="button" variant="outline">
+          <Button onClick={onLineage} type="button" variant="outline">
             <History className="size-4" />
             Ver trazabilidad
           </Button>
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
-          Archivo seleccionado: {selectedFileName || "ninguno"}. Esta pantalla
-          simula el flujo DEMO; la lectura real debe ocurrir en servidor.
+          Archivo seleccionado: {selectedFileName || "ninguno"}. La validacion
+          ocurre en servidor antes de publicar.
         </p>
       </div>
+
+      {latestResult ? (
+        <div className="grid gap-3 rounded-md border bg-muted/30 p-3 text-xs leading-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={statusClass(status)}>
+              {latestResult.importRecord.status}
+            </Badge>
+            <Badge variant="outline">
+              Calidad {latestResult.qualityScore}%
+            </Badge>
+            <Badge variant="outline">
+              {latestResult.stagingRows} filas staging
+            </Badge>
+          </div>
+          <div>
+            <strong>Import ID:</strong> {latestResult.importRecord.id}
+          </div>
+          <div>
+            <strong>RAW:</strong> {latestResult.raw.sanitizedFileName} ·{" "}
+            {latestResult.raw.fileSize} bytes · checksum{" "}
+            {latestResult.raw.checksum.slice(0, 12)}
+          </div>
+          {latestResult.duplicateOf ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
+              Carga duplicada bloqueada contra {latestResult.duplicateOf}.
+            </div>
+          ) : null}
+          {latestResult.issues.length > 0 ? (
+            <div className="grid gap-1">
+              <strong>Errores y warnings</strong>
+              {latestResult.issues.slice(0, 6).map((item) => (
+                <span key={`${item.code}-${item.rowNumber ?? "header"}-${item.column ?? "row"}`}>
+                  {item.severity.toUpperCase()} {item.rowNumber ? `fila ${item.rowNumber}` : "archivo"}:{" "}
+                  {item.message}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span>Sin errores bloqueantes en preview.</span>
+          )}
+          {latestResult.previewRows.length > 0 ? (
+            <div className="overflow-x-auto rounded-md border bg-background">
+              <table className="w-full min-w-[520px] text-left">
+                <thead className="text-muted-foreground">
+                  <tr className="border-b">
+                    <th className="px-2 py-1 font-medium">Fila</th>
+                    <th className="px-2 py-1 font-medium">Datos</th>
+                    <th className="px-2 py-1 font-medium">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {latestResult.previewRows.map((row) => (
+                    <tr className="border-b last:border-b-0" key={row.rowNumber}>
+                      <td className="px-2 py-2">{row.rowNumber}</td>
+                      <td className="px-2 py-2">
+                        {Object.entries(row.mapped)
+                          .slice(0, 4)
+                          .map(([key, value]) => `${key}: ${value ?? "pendiente"}`)
+                          .join(" · ")}
+                      </td>
+                      <td className="px-2 py-2">
+                        {row.errors.length > 0
+                          ? "BLOCKED"
+                          : row.warnings.length > 0
+                            ? "WARNING"
+                            : "VALIDATED"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {lineage ? (
+        <div className="grid gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs leading-5 text-blue-900">
+          <strong>Lineage del ultimo import</strong>
+          <span>RAW inmutable: {lineage.raw?.immutable ? "si" : "pendiente"}</span>
+          <span>Eventos auditados: {lineage.audit.length}</span>
+          <span>Filas publicadas activas: {lineage.publishedRows.filter((row) => row.active).length}</span>
+          {lineage.audit.slice(-3).map((event) => (
+            <span key={`${event.at}-${event.action}`}>
+              {event.action} · {event.status} · {event.details}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       <div className="grid gap-3">
         <InfoList
@@ -603,10 +791,14 @@ function InfoList({
 
 function BulkUploadPanel({
   documents,
+  lineage,
+  latestResult,
   onDownload,
   onFileChange,
+  onLineage,
   onPublish,
   onReplace,
+  onRollback,
   onSelectDocument,
   onValidate,
   selectedDocument,
@@ -614,13 +806,17 @@ function BulkUploadPanel({
   statusOverrides,
 }: {
   documents: BulkImportDocument[];
+  lineage: LineageResult | null;
+  latestResult: ServerImportResult | null;
   onDownload: (importDocument: BulkImportDocument) => void;
   onFileChange: (
     importDocument: BulkImportDocument,
     event: ChangeEvent<HTMLInputElement>,
   ) => void;
+  onLineage: (importDocument: BulkImportDocument) => void;
   onPublish: (importDocument: BulkImportDocument) => void;
   onReplace: (importDocument: BulkImportDocument) => void;
+  onRollback: (importDocument: BulkImportDocument) => void;
   onSelectDocument: (importDocument: BulkImportDocument) => void;
   onValidate: (importDocument: BulkImportDocument) => void;
   selectedDocument: BulkImportDocument;
@@ -643,10 +839,14 @@ function BulkUploadPanel({
 
       <DocumentDetail
         importDocument={selectedDocument}
+        lineage={lineage}
+        latestResult={latestResult}
         onDownload={() => onDownload(selectedDocument)}
         onFileChange={(event) => onFileChange(selectedDocument, event)}
+        onLineage={() => onLineage(selectedDocument)}
         onPublish={() => onPublish(selectedDocument)}
         onReplace={() => onReplace(selectedDocument)}
+        onRollback={() => onRollback(selectedDocument)}
         onValidate={() => onValidate(selectedDocument)}
         selectedFileName={selectedFileName}
         status={getDisplayStatus(selectedDocument, statusOverrides)}
@@ -888,6 +1088,14 @@ export function ImportOperationsDashboard() {
   const [selectedFileByDocument, setSelectedFileByDocument] = useState<
     Record<string, string>
   >({});
+  const [selectedFileObjectByDocument, setSelectedFileObjectByDocument] =
+    useState<Record<string, File>>({});
+  const [serverResultByDocument, setServerResultByDocument] = useState<
+    Record<string, ServerImportResult>
+  >({});
+  const [lineageByDocument, setLineageByDocument] = useState<
+    Record<string, LineageResult>
+  >({});
   const [statusOverrides, setStatusOverrides] = useState<
     Record<string, BulkImportStatus>
   >({});
@@ -963,6 +1171,8 @@ export function ImportOperationsDashboard() {
   const visibleDocuments =
     filteredDocuments.length > 0 ? filteredDocuments : documentsForLine;
   const selectedFileName = selectedFileByDocument[selectedDocument.id] ?? "";
+  const latestServerResult = serverResultByDocument[selectedDocument.id] ?? null;
+  const selectedLineage = lineageByDocument[selectedDocument.id] ?? null;
   const baseSummary = buildImportCoverageSummary(selectedLine);
   const currentSummary = {
     ...baseSummary,
@@ -1009,6 +1219,10 @@ export function ImportOperationsDashboard() {
       ...currentValue,
       [importDocument.id]: fileName,
     }));
+    setSelectedFileObjectByDocument((currentValue) => ({
+      ...currentValue,
+      [importDocument.id]: event.target.files?.[0] as File,
+    }));
     setStatusOverrides((currentValue) => ({
       ...currentValue,
       [importDocument.id]: "Listo para cargar",
@@ -1030,20 +1244,119 @@ export function ImportOperationsDashboard() {
     setNotice(message);
   }
 
-  function validateDocument(importDocument: BulkImportDocument) {
-    setDocumentStatus(
-      importDocument,
-      "Validado",
-      `${importDocument.name} paso a Validado DEMO. En produccion aqui se ejecutan reglas de servidor.`,
-    );
+  function buildUploadFormData(importDocument: BulkImportDocument) {
+    const file = selectedFileObjectByDocument[importDocument.id];
+    const datasetType = datasetTypeByDocumentId[importDocument.id] ?? "billing";
+    const formData = new FormData();
+
+    if (!file) {
+      return null;
+    }
+
+    formData.set("file", file);
+    formData.set("dataset_type", datasetType);
+    formData.set("period", context?.periodStart?.slice(0, 7) ?? "2026-07");
+    formData.set("source_id", importDocument.id);
+    formData.set("country_id", context?.countryId ?? "");
+    formData.set("country_name", context?.countryName ?? "El Salvador");
+    formData.set("company_id", context?.companyId ?? "");
+    formData.set("company_name", context?.companyName ?? "");
+    formData.set("business_line_id", context?.businessLineId ?? "");
+    formData.set("business_line_name", context?.businessLineName ?? selectedLine);
+    formData.set("branch_id", context?.branchId ?? "");
+    formData.set("branch_name", context?.branchName ?? "");
+    formData.set("operational_area_id", context?.operationalAreaId ?? "");
+
+    return formData;
   }
 
-  function publishDocument(importDocument: BulkImportDocument) {
-    setDocumentStatus(
-      importDocument,
-      "Importado",
-      `${importDocument.name} quedo Importado DEMO y listo para alimentar dashboards publicados.`,
-    );
+  async function validateDocument(importDocument: BulkImportDocument) {
+    const formData = buildUploadFormData(importDocument);
+
+    if (!formData) {
+      setNotice("Selecciona un archivo XLSX, XLS o CSV antes de validar.");
+      return;
+    }
+
+    setNotice("Validando en servidor: RAW, mapping, staging, calidad e idempotencia.");
+
+    try {
+      const response = await fetch("/api/imports/upload", {
+        body: formData,
+        method: "POST",
+      });
+      const payload = (await response.json()) as ServerImportResult & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Validacion rechazada.");
+      }
+
+      setServerResultByDocument((currentValue) => ({
+        ...currentValue,
+        [importDocument.id]: payload,
+      }));
+      setDocumentStatus(
+        importDocument,
+        payload.importRecord.status === "BLOCKED" ? "Con errores" : "Validado",
+        `${importDocument.name}: ${payload.importRecord.status} con calidad ${payload.qualityScore}%. Preview server-side listo.`,
+      );
+    } catch (error) {
+      setDocumentStatus(
+        importDocument,
+        "Con errores",
+        error instanceof Error
+          ? error.message
+          : "No se pudo validar en servidor.",
+      );
+    }
+  }
+
+  async function publishDocument(importDocument: BulkImportDocument) {
+    const serverResult = serverResultByDocument[importDocument.id];
+
+    if (!serverResult) {
+      setNotice("Valida el archivo antes de publicar.");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/imports/${serverResult.importRecord.id}/publish`,
+        { method: "POST" },
+      );
+      const payload = (await response.json()) as {
+        error?: string;
+        importRecord?: ServerImportRecord;
+        publishedRows?: number;
+      };
+
+      if (!response.ok || !payload.importRecord) {
+        throw new Error(payload.error ?? "Publicacion rechazada.");
+      }
+
+      const nextImportRecord = payload.importRecord;
+
+      setServerResultByDocument((currentValue) => ({
+        ...currentValue,
+        [importDocument.id]: {
+          ...serverResult,
+          importRecord: nextImportRecord,
+        },
+      }));
+      setDocumentStatus(
+        importDocument,
+        "Importado",
+        `${importDocument.name}: ${payload.publishedRows ?? 0} filas publicadas con auditoria y lineage.`,
+      );
+    } catch (error) {
+      setDocumentStatus(
+        importDocument,
+        "Con errores",
+        error instanceof Error ? error.message : "No se pudo publicar.",
+      );
+    }
   }
 
   function replaceDocument(importDocument: BulkImportDocument) {
@@ -1052,6 +1365,83 @@ export function ImportOperationsDashboard() {
       "Reemplazado",
       `${importDocument.name} quedo marcado como version reemplazada DEMO con auditoria pendiente.`,
     );
+  }
+
+  async function rollbackDocument(importDocument: BulkImportDocument) {
+    const serverResult = serverResultByDocument[importDocument.id];
+
+    if (!serverResult) {
+      setNotice("No hay import publicado para revertir.");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/imports/${serverResult.importRecord.id}/rollback`,
+        {
+          body: JSON.stringify({
+            reason: "Rollback solicitado desde centro de importaciones.",
+          }),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+        },
+      );
+      const payload = (await response.json()) as {
+        error?: string;
+        importRecord?: ServerImportRecord;
+      };
+
+      if (!response.ok || !payload.importRecord) {
+        throw new Error(payload.error ?? "Rollback rechazado.");
+      }
+
+      const nextImportRecord = payload.importRecord;
+
+      setServerResultByDocument((currentValue) => ({
+        ...currentValue,
+        [importDocument.id]: {
+          ...serverResult,
+          importRecord: nextImportRecord,
+        },
+      }));
+      setDocumentStatus(
+        importDocument,
+        "Archivado",
+        `${importDocument.name}: rollback ejecutado, RAW preservado y analytics revertido.`,
+      );
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "No se pudo hacer rollback.");
+    }
+  }
+
+  async function fetchLineage(importDocument: BulkImportDocument) {
+    const serverResult = serverResultByDocument[importDocument.id];
+
+    if (!serverResult) {
+      setNotice("Valida o publica primero para consultar lineage.");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/imports/${serverResult.importRecord.id}/lineage`,
+      );
+      const payload = (await response.json()) as LineageResult & { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Lineage no disponible.");
+      }
+
+      setLineageByDocument((currentValue) => ({
+        ...currentValue,
+        [importDocument.id]: payload,
+      }));
+      setNotice(
+        `${importDocument.name}: lineage consultado con ${payload.audit.length} eventos.`,
+      );
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "No se pudo consultar lineage.");
+    }
   }
 
   function useFallbackDocument(documentId: string) {
@@ -1158,10 +1548,14 @@ export function ImportOperationsDashboard() {
                 </div>
                 <BulkUploadPanel
                   documents={visibleDocuments}
+                  lineage={selectedLineage}
+                  latestResult={latestServerResult}
                   onDownload={downloadTemplate}
                   onFileChange={handleFileChange}
+                  onLineage={fetchLineage}
                   onPublish={publishDocument}
                   onReplace={replaceDocument}
+                  onRollback={rollbackDocument}
                   onSelectDocument={(importDocument) =>
                     setSelectedDocumentId(importDocument.id)
                   }
