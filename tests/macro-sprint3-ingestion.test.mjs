@@ -403,6 +403,21 @@ for (const routeFile of [
   assert.ok(source.includes("requireProtectedAccess"));
 }
 
+const connectorSyncRoute = readFileSync(
+  "app/api/connectors/[connectorId]/sync/route.ts",
+  "utf8",
+);
+assert.ok(
+  connectorSyncRoute.includes("connectors.run"),
+  "Connector sync route must enforce connector run authorization.",
+);
+
+const lineageRoute = readFileSync("app/api/imports/[importId]/lineage/route.ts", "utf8");
+assert.ok(
+  lineageRoute.includes("route.access") && lineageRoute.includes("record.read"),
+  "Import lineage route must enforce route and record-scope authorization.",
+);
+
 const migration = readFileSync(
   "supabase/migrations/20260807000200_sprint3_ingestion_connectors.sql",
   "utf8",

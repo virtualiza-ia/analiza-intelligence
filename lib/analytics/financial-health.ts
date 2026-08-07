@@ -1084,7 +1084,7 @@ export function getFinancialHealthScreenForContext(
       },
       {
         description:
-          "Validaciones que evitan NaN, Infinity, ceros silenciosos, mezclas de moneda y periodos incomparables.",
+          "Validaciones que evitan valores no calculables, ceros silenciosos, mezclas de moneda y periodos incomparables.",
         metrics: invariantMetrics,
         title: "Invariantes financieros",
       },

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getImportLineage } from "@/lib/data-ingestion/platform";
 import { requireProtectedAccess } from "@/lib/server/authorization";
+import { canPerformAction } from "@/lib/security/authorization-policy";
 
 type ImportRouteContext = {
   params: Promise<{
@@ -10,12 +11,24 @@ type ImportRouteContext = {
 };
 
 export async function GET(_request: Request, context: ImportRouteContext) {
-  await requireProtectedAccess();
+  const actor = await requireProtectedAccess();
   const { importId } = await context.params;
   const lineage = getImportLineage(importId);
 
   if (!lineage) {
     return NextResponse.json({ error: "Import no encontrado." }, { status: 404 });
+  }
+
+  if (
+    !canPerformAction(actor, "route.access", { pathname: "/protected/importaciones" }) ||
+    !canPerformAction(actor, "record.read", {
+      scope: lineage.importRecord.scope,
+    })
+  ) {
+    return NextResponse.json(
+      { error: "Actor no autorizado para consultar este lineage." },
+      { status: 403 },
+    );
   }
 
   return NextResponse.json({

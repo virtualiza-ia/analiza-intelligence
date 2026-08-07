@@ -580,7 +580,7 @@ function buildFinancialInvariants(finance: Omit<SemanticFinance, "invariants">) 
     },
     {
       id: "no-nan-infinity",
-      label: "Sin NaN o Infinity",
+      label: "Sin valores no calculables",
       passed: finiteValues.every((value) => Number.isFinite(value)),
       message: "Las divisiones sin denominador devuelven pendiente, no cero silencioso.",
     },

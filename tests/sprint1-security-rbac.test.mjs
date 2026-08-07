@@ -204,6 +204,22 @@ assert.equal(
   "Operations manager must not create super admins.",
 );
 
+assert.equal(
+  canPerformAction(viewer, "connectors.run", {
+    scope: { companyId, countryId, organizationId },
+  }),
+  false,
+  "Viewer must not execute connector sync actions.",
+);
+
+assert.equal(
+  canPerformAction(operationsManager, "connectors.run", {
+    scope: { companyId, countryId, organizationId },
+  }),
+  true,
+  "Operations manager must execute connector sync actions in scope.",
+);
+
 const sourceChecks = [
   "app/protected/[module]/page.tsx",
   "app/protected/overview/page.tsx",

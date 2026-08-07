@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getDataConnector } from "@/lib/data-ingestion/connectors";
 import { buildImportScope } from "@/lib/data-ingestion/platform";
 import { requireProtectedAccess } from "@/lib/server/authorization";
+import { canPerformAction } from "@/lib/security/authorization-policy";
 
 type ConnectorRouteContext = {
   params: Promise<{
@@ -53,6 +54,13 @@ export async function POST(request: Request, context: ConnectorRouteContext) {
     organizationId:
       stringValue(body.organization_id) ?? actor.scope.organizationId,
   });
+
+  if (!canPerformAction(actor, "connectors.run", { scope })) {
+    return NextResponse.json(
+      { error: "Actor no autorizado para ejecutar este conector." },
+      { status: 403 },
+    );
+  }
 
   try {
     return NextResponse.json(
