@@ -104,7 +104,7 @@ export default async function ModulePage({ params }: ModulePageProps) {
     );
   }
 
-  if (module === "conectores") {
+  if (module === "conectores" || module === "apis") {
     return <CrmConnectorsDashboard />;
   }
 

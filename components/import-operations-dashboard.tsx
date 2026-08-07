@@ -534,6 +534,80 @@ function DocumentRow({
   );
 }
 
+function ImportPipelineStepper({
+  hasLineage,
+  latestResult,
+  status,
+}: {
+  hasLineage: boolean;
+  latestResult: ServerImportResult | null;
+  status: BulkImportStatus;
+}) {
+  const importIsValidated =
+    latestResult !== null && latestResult.importRecord.status !== "BLOCKED";
+  const steps = [
+    {
+      complete: Boolean(latestResult?.raw),
+      label: "Upload",
+      note: "Archivo recibido y RAW inmutable.",
+    },
+    {
+      complete: Boolean(latestResult),
+      label: "Mapping",
+      note: "Columnas alineadas con plantilla versionada.",
+    },
+    {
+      complete: importIsValidated,
+      label: "Validacion",
+      note: "Reglas server-side, errores y warnings.",
+    },
+    {
+      complete: Boolean(latestResult?.previewRows.length),
+      label: "Preview",
+      note: "Muestra segura antes de publicar.",
+    },
+    {
+      complete: status === "Importado",
+      label: "Publish",
+      note: "Filas pasan a PUBLISHED.",
+    },
+    {
+      complete: hasLineage,
+      label: "Lineage",
+      note: "Auditoria y origen consultables.",
+    },
+  ];
+
+  return (
+    <div className="grid gap-3 rounded-md border bg-muted/30 p-3">
+      <div className="text-sm font-medium">Pipeline de importacion</div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {steps.map((step, index) => (
+          <div
+            className="flex items-start gap-3 rounded-md border bg-background p-3"
+            key={step.label}
+          >
+            <span
+              className={cn(
+                "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                step.complete
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-slate-100 text-slate-600",
+              )}
+            >
+              {index + 1}
+            </span>
+            <div className="grid gap-1 text-xs leading-5">
+              <span className="font-medium text-foreground">{step.label}</span>
+              <span className="text-muted-foreground">{step.note}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DocumentDetail({
   importDocument,
   lineage,
@@ -595,6 +669,12 @@ function DocumentDetail({
         <span>Formatos: {importDocument.acceptedFormats.join(", ")}</span>
         <span>Plantilla: {importDocument.sourceTemplate}</span>
       </div>
+
+      <ImportPipelineStepper
+        hasLineage={Boolean(lineage)}
+        latestResult={latestResult}
+        status={status}
+      />
 
       <div className="grid gap-2">
         <div className="text-sm font-medium">Acciones de carga</div>
@@ -992,7 +1072,48 @@ function BatchHistorySection() {
         <History className="size-4 text-primary" />
         Historial reciente DEMO
       </div>
-      <div className="overflow-x-auto">
+      <div className="grid gap-3 md:hidden">
+        {importBatchRuns.map((batchRun) => (
+          <article
+            className="grid gap-3 rounded-md border bg-background p-3 text-sm"
+            key={`${batchRun.id}-mobile`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-medium">{batchRun.documentName}</div>
+                <div className="text-xs text-muted-foreground">
+                  {batchRun.businessLine} · {batchRun.period}
+                </div>
+              </div>
+              <Badge className={statusClass(batchRun.status)}>
+                {batchRun.status}
+              </Badge>
+            </div>
+            <dl className="grid gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between gap-3">
+                <dt>Responsable</dt>
+                <dd>{batchRun.owner}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Calidad</dt>
+                <dd>{batchRun.qualityScore}%</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Publica en</dt>
+                <dd>
+                  {batchRun.publishedModules.length > 0
+                    ? batchRun.publishedModules.join(", ")
+                    : "No publicado"}
+                </dd>
+              </div>
+            </dl>
+            <p className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+              {batchRun.traceability}
+            </p>
+          </article>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[920px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">

@@ -405,6 +405,158 @@ function WeightModel({
   );
 }
 
+function findDimensionScore(record: ManagerBonusRecord, pattern: RegExp) {
+  return record.dimensions.find((dimension) => pattern.test(dimension.label))?.score;
+}
+
+function ExecutiveManagerPerformanceTable({
+  records,
+}: {
+  records: ManagerBonusRecord[];
+}) {
+  if (records.length === 0) {
+    return (
+      <section className="rounded-md border bg-card p-6 text-sm leading-6 text-muted-foreground">
+        No hay gerentes para estos filtros. Ajusta estado, tipo de meta o
+        alcance del contexto superior.
+      </section>
+    );
+  }
+
+  const rows = records.map((record) => ({
+    ...record,
+    productivity:
+      findDimensionScore(record, /productividad|operacion|produccion/i) ??
+      record.score,
+  }));
+
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <div className="mb-4 grid gap-1">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <GitBranch className="size-4 text-primary" />
+          Rendimiento ejecutivo de gerentes
+        </div>
+        <p className="text-xs leading-5 text-muted-foreground">
+          Respeta jerarquia Gerente Operaciones {"->"} Gerente Area {"->"}{" "}
+          Gerente Sucursal. No rankea solo por ingresos absolutos; separa
+          componentes para evitar un score opaco.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:hidden">
+        {rows.map((record) => (
+          <article
+            className="grid gap-3 rounded-md border bg-background p-3 text-sm"
+            key={`${record.id}-executive-mobile`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-medium">{record.manager}</div>
+                <div className="text-xs text-muted-foreground">
+                  {record.region} · {record.branch}
+                </div>
+              </div>
+              <Badge className={statusClass(record.status)}>
+                {record.status}
+              </Badge>
+            </div>
+            <dl className="grid gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between gap-3">
+                <dt>Ingresos vs meta</dt>
+                <dd>
+                  {formatCurrency(record.netSales)} /{" "}
+                  {formatRate(record.targetCompletionRate)}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Ocupacion efectiva</dt>
+                <dd>{formatRate(record.occupancyRate)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Finalizacion/SLA</dt>
+                <dd>{formatRate(record.slaRate)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>No-show</dt>
+                <dd>No calculable sin agenda por gerente</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Productividad</dt>
+                <dd>{record.productivity}/100</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Margen</dt>
+                <dd>{formatRate(record.marginRate)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Calidad</dt>
+                <dd>{record.dataQuality}/100</dd>
+              </div>
+            </dl>
+            <p className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+              {record.blockingConditions[0]?.reason ?? record.principalGap}
+            </p>
+          </article>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[1180px] text-left text-sm">
+          <thead className="text-xs text-muted-foreground">
+            <tr className="border-b">
+              <th className="py-2 pr-4 font-medium">Gerente</th>
+              <th className="py-2 pr-4 font-medium">Area</th>
+              <th className="py-2 pr-4 font-medium">Sucursal</th>
+              <th className="py-2 pr-4 font-medium">Ingresos vs meta</th>
+              <th className="py-2 pr-4 font-medium">Ocupacion efectiva</th>
+              <th className="py-2 pr-4 font-medium">Finalizacion/SLA</th>
+              <th className="py-2 pr-4 font-medium">No-show</th>
+              <th className="py-2 pr-4 font-medium">Productividad</th>
+              <th className="py-2 pr-4 font-medium">Margen</th>
+              <th className="py-2 pr-4 font-medium">Calidad</th>
+              <th className="py-2 pr-4 font-medium">Alertas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((record) => (
+              <tr className="border-b last:border-b-0" key={`${record.id}-executive`}>
+                <td className="py-3 pr-4 font-medium">{record.manager}</td>
+                <td className="py-3 pr-4">{record.region}</td>
+                <td className="py-3 pr-4">{record.branch}</td>
+                <td className="py-3 pr-4">
+                  <div>{formatCurrency(record.netSales)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatRate(record.targetCompletionRate)}
+                  </div>
+                </td>
+                <td className="py-3 pr-4">{formatRate(record.occupancyRate)}</td>
+                <td className="py-3 pr-4">{formatRate(record.slaRate)}</td>
+                <td className="py-3 pr-4 text-muted-foreground">
+                  No calculable sin agenda por gerente
+                </td>
+                <td className="py-3 pr-4">{record.productivity}/100</td>
+                <td className="py-3 pr-4">{formatRate(record.marginRate)}</td>
+                <td className="py-3 pr-4">
+                  {record.dataQuality}/100
+                  {record.dataQuality < 72 ? (
+                    <div className="text-xs text-amber-700">
+                      Score ejecutivo no concluyente
+                    </div>
+                  ) : null}
+                </td>
+                <td className="max-w-[280px] py-3 pr-4 text-muted-foreground">
+                  {record.blockingConditions[0]?.reason ?? record.principalGap}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function ManagerRankingTable({
   onSelect,
   records,
@@ -1580,6 +1732,7 @@ export function ManagerBonusDashboard() {
             description: "KPIs, pesos e insights antes del ranking.",
             children: (
               <>
+                <ExecutiveManagerPerformanceTable records={filteredRecords} />
                 <GroupedMetrics metrics={screen.metrics} />
                 <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
                   <WeightModel weights={screen.weights} />

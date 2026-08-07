@@ -1173,6 +1173,44 @@ export function LaboratoryPresentationDashboard() {
         records={contextRecords}
       />
 
+      <section className="grid gap-3 rounded-md border bg-card p-4">
+        <div className="grid gap-1">
+          <h2 className="text-lg font-semibold tracking-normal">
+            Lectura tecnica de Laboratorio
+          </h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Ordenes, pruebas, throughput, utilizacion, TAT, rechazo, reproceso,
+            ingreso/prueba, costo/prueba y margen se muestran separados para no
+            usar la semantica clinica de citas.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            ["Ordenes", selectedRecord?.orders.toLocaleString("en-US") ?? "Sin datos"],
+            ["Pruebas", "Pendiente LIS/API"],
+            ["Throughput", selectedRecord ? `${selectedRecord.peakHoursLabel}` : "Sin datos"],
+            ["Utilizacion", "Pendiente capacidad tecnica"],
+            ["TAT", "Pendiente LIS/API"],
+            ["Rechazo", "Pendiente control de muestra"],
+            ["Reproceso", "Pendiente control de muestra"],
+            [
+              "Ingreso/prueba",
+              selectedRecord ? formatCurrency(selectedRecord.ticketAverage) : "Sin datos",
+            ],
+            ["Costo/prueba", "Pendiente costo por prueba"],
+            [
+              "Margen",
+              selectedRecord ? formatRate(selectedRecord.marginRate) : "Sin datos",
+            ],
+          ].map(([label, value]) => (
+            <article className="rounded-md border bg-background p-3" key={label}>
+              <div className="text-xs text-muted-foreground">{label}</div>
+              <div className="mt-1 text-base font-semibold">{value}</div>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <ReadableTabs
         tabs={[
           {

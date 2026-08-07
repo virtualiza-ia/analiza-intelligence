@@ -148,9 +148,10 @@ export function CrmConnectorsDashboard() {
                 Conectores CRM por linea de negocio
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                Genera llaves DEMO, endpoints e instrucciones para conectar el
-                CRM de cada linea. Si el CRM no tiene API disponible, las
-                plantillas siguen alimentando el sistema.
+                Supervisa endpoints, credenciales server-side y respaldo manual
+                para conectar el CRM de cada linea. Si una API no esta
+                configurada, las plantillas siguen alimentando el sistema con
+                trazabilidad.
               </p>
             </div>
           </div>
@@ -203,7 +204,7 @@ export function CrmConnectorsDashboard() {
             </div>
             <RefreshCcw className="size-5 text-primary" />
           </div>
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b">
@@ -264,6 +265,70 @@ export function CrmConnectorsDashboard() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="mt-4 grid gap-3 md:hidden">
+            {connectorStatuses.map((connector) => (
+              <article
+                className="grid gap-3 rounded-md border bg-background p-3 text-sm"
+                key={`${connector.connectorId}-mobile`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium">{connector.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {connector.sourceType} · {connector.datasetType}
+                    </div>
+                  </div>
+                  <Badge className={sourceStatusClass(connector.status)}>
+                    {connector.status}
+                  </Badge>
+                </div>
+                <dl className="grid gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt>Ultimo sync</dt>
+                    <dd>{connector.lastSyncAt ?? "pendiente"}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt>Proximo sync</dt>
+                    <dd>{connector.nextSyncAt ?? "pendiente"}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt>Registros</dt>
+                    <dd>
+                      {connector.processedRecords} / {connector.rejectedRecords}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt>Freshness</dt>
+                    <dd>{connector.freshness}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt>Cobertura</dt>
+                    <dd>{connector.coverage}%</dd>
+                  </div>
+                </dl>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => testConnector(connector.connectorId)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <ShieldCheck className="size-4" />
+                    Probar
+                  </Button>
+                  <Button
+                    onClick={() => syncConnector(connector.connectorId)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <RefreshCcw className="size-4" />
+                    Sync
+                  </Button>
+                </div>
+              </article>
+            ))}
           </div>
           {connectorStatuses.some((connector) => connector.errors.length > 0) ? (
             <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">

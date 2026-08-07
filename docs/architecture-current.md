@@ -4,7 +4,7 @@ Fecha de revision: 2026-08-07
 
 ## Resumen
 
-ANALIZA INTELLIGENCE es una aplicacion BI multipais y multiempresa construida sobre Next.js App Router. El producto ya contiene pantallas ejecutivas, dashboards operativos, modelos de jerarquia, migraciones Supabase y datos DEMO extensos. Despues de Sprint 1, autenticacion, autorizacion de rutas, permisos de invitacion y aislamiento demo/production tienen una capa server-side central. Despues de Macro Sprint 2, filtros globales, contratos KPI DEMO, finanzas reconciliadas, capacidad/ocupacion, calidad de datos e insights ejecutivos tienen una primera capa semantica compartida. Macro Sprint 3 agrega importaciones server-side, staging, publish, rollback, lineage, auditoria, plantillas versionadas y framework de conectores.
+ANALIZA INTELLIGENCE es una aplicacion BI multipais y multiempresa construida sobre Next.js App Router. El producto ya contiene pantallas ejecutivas, dashboards operativos, modelos de jerarquia, migraciones Supabase y datos DEMO extensos. Despues de Sprint 1, autenticacion, autorizacion de rutas, permisos de invitacion y aislamiento demo/production tienen una capa server-side central. Despues de Macro Sprint 2, filtros globales, contratos KPI DEMO, finanzas reconciliadas, capacidad/ocupacion, calidad de datos e insights ejecutivos tienen una primera capa semantica compartida. Macro Sprint 3 agrega importaciones server-side, staging, publish, rollback, lineage, auditoria, plantillas versionadas y framework de conectores. Macro Sprint 4 consolida la experiencia ejecutiva, responsive, rutas ambiguas, estados profesionales y documentacion de readiness sin desplegar a produccion.
 
 ## Stack
 
@@ -24,6 +24,7 @@ ANALIZA INTELLIGENCE es una aplicacion BI multipais y multiempresa construida so
 - `app/protected/layout.tsx` actua como compuerta de acceso general via `requireProtectedAccess`.
 - `app/protected/overview/page.tsx` renderiza el dashboard ejecutivo despues de `requireProtectedPath`.
 - `app/protected/[module]/page.tsx` resuelve modulos dinamicos desde `lib/navigation.ts` y aplica `requireProtectedPath` antes de renderizar.
+- `/protected/apis` queda registrado como alias explicito de integraciones/conectores para evitar 404 ambiguo.
 - `components/app-sidebar.tsx` controla navegacion visible por rol en cliente.
 - `app/forbidden/page.tsx` presenta denegacion profesional cuando el servidor bloquea una ruta.
 
@@ -70,7 +71,9 @@ Riesgo principal: la fuente semantica actual usa datasets DEMO TypeScript; falta
 
 Estado Macro Sprint 2: los dashboards ejecutivos principales recalculan por sucursal y fechas cuando hay fuente DEMO disponible; filtros granulares sin datos cargados devuelven estado no-data. Los insights bloquean conclusiones ejecutivas cuando la calidad o confianza es insuficiente.
 
-Riesgo principal: la capa BI todavia no esta conectada a un `KpiSemanticService` server-side ni a lineage por archivo/import/conector.
+Estado Macro Sprint 4: `/protected/overview` funciona como Executive Command Center con header de pais, empresa, sucursal, periodo, ultima actualizacion y calidad; tarjetas principales de negocio; seccion “Requiere su atencion”; y tablas ejecutivas con cards mobile.
+
+Riesgo principal: la capa BI todavia no esta conectada a un `KpiSemanticService` server-side persistente ni a published rows reales por archivo/import/conector.
 
 ### Finanzas
 
@@ -107,7 +110,17 @@ Riesgo principal: el modelo existe, pero falta cerrar el ciclo real entre DB, se
 - `lib/analytics/business-control-center.ts` lista endpoints esperados.
 - `app/api/connectors/*` expone status, test y sync.
 
-Riesgo principal: los conectores reales de Fisioterapia, Laboratorio e Imagenes quedan pendientes de credenciales y validacion contra sistemas externos. Fallan cerrado y mantienen fallback manual.
+Riesgo principal: los conectores reales de Fisioterapia, Laboratorio e Imagenes quedan pendientes de credenciales y validacion contra sistemas externos. Fallan cerrado y mantienen fallback manual; credenciales reales de conectores siguen como blocker manual.
+
+### UX, responsive y QA
+
+- `docs/design-system.md` define el sistema visual ejecutivo: fondo claro, navy, azul electrico, tarjetas blancas, sombras discretas, estados semanticos y convenciones de tablas/cards.
+- `components/executive-dashboard.tsx`, `components/manager-bonus-dashboard.tsx`, `components/import-operations-dashboard.tsx` y `components/crm-connectors-dashboard.tsx` tienen lectura mobile con cards para tablas criticas.
+- Las vistas de Fisioterapia, Laboratorio e Imagenes muestran semantica separada por unidad y marcan fuentes pendientes en lugar de inventar KPIs.
+- `package.json` usa `next dev --webpack` para alinear dev local con el build que ya compila; Turbopack local produjo error CSS en auditoria Sprint 4.
+- Smoke local 2026-08-07: rutas principales respondieron 200 con cookie demo local; no se detecto password prellenado en HTML ni React #418 en la respuesta.
+
+Riesgo principal: falta Playwright/Lighthouse formal y verificacion DOM/Console en deployment real. No se declara Production Ready mientras sigan abiertos blockers manuales externos: migraciones remotas, verificacion DOM y credenciales reales de conectores.
 
 ## Arquitectura objetivo recomendada
 
@@ -148,6 +161,17 @@ Riesgo principal: los conectores reales de Fisioterapia, Laboratorio e Imagenes 
 - Migracion `supabase/migrations/20260807000200_sprint3_ingestion_connectors.sql`.
 - Prueba de regresion `tests/macro-sprint3-ingestion.test.mjs` cubre importacion, staging, publish, rollback, lineage, duplicados, conectores y scope de sucursal.
 
+## Cambios Macro Sprint 4
+
+- Executive Command Center en `/protected/overview` con tarjetas ejecutivas, calidad de dato visible y “Requiere su atencion”.
+- Tablas criticas transformadas a cards en mobile para overview, gerentes, importaciones y conectores.
+- Ruta `/protected/apis` resuelta como alias de conectores.
+- Vista ejecutiva de gerentes expone jerarquia, area, sucursal, ingresos vs meta, ocupacion, finalizacion/SLA, no-show no calculable cuando falta fuente, productividad, margen, calidad y alertas.
+- Vistas por unidad agregan lectura semantica especifica: Fisioterapia clinica, Laboratorio tecnico e Imagenes tecnico-operativa.
+- Documentos nuevos: `docs/production-readiness-checklist.md` y `docs/executive-demo-script.md`.
+- `docs/design-system.md` actualizado con tokens y convenciones de UX premium.
+- Prueba de regresion `tests/macro-sprint4-executive-readiness.test.mjs`.
+
 ## Archivos clave
 
 - `app/protected/layout.tsx`
@@ -167,6 +191,9 @@ Riesgo principal: los conectores reales de Fisioterapia, Laboratorio e Imagenes 
 - `components/manual-monthly-entry-dashboard.tsx`
 - `components/business-module-dashboard.tsx`
 - `components/crm-connectors-dashboard.tsx`
+- `docs/design-system.md`
+- `docs/production-readiness-checklist.md`
+- `docs/executive-demo-script.md`
 - `lib/auth/demo-admin.ts`
 - `lib/auth/local-session.ts`
 - `app/api/users/invite/route.ts`

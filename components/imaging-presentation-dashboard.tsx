@@ -1370,6 +1370,47 @@ export function ImagingPresentationDashboard() {
         records={contextRecords}
       />
 
+      <section className="grid gap-3 rounded-md border bg-card p-4">
+        <div className="grid gap-1">
+          <h2 className="text-lg font-semibold tracking-normal">
+            Lectura tecnica de Imagenes
+          </h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Estudios, modalidad, utilizacion de equipo, tiempos, informes
+            pendientes, downtime, ingresos, margen y productividad se tratan
+            como operacion tecnica; los campos sin RIS/PACS quedan pendientes.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            ["Estudios", selectedRecord?.studies.toLocaleString("en-US") ?? "Sin datos"],
+            ["Modalidad", selectedRecord?.topModality ?? "Sin datos"],
+            ["Utilizacion equipo", selectedRecord?.capacityStatus ?? "Pendiente"],
+            ["Tiempos", selectedRecord?.reportsStatus ?? "Pendiente RIS/PACS"],
+            ["Informes pendientes", selectedRecord?.reportsStatus ?? "Pendiente RIS/PACS"],
+            ["Downtime", selectedRecord?.capacityStatus ?? "Pendiente equipos"],
+            [
+              "Ingresos",
+              selectedRecord ? formatCurrency(selectedRecord.revenue) : "Sin datos",
+            ],
+            [
+              "Margen",
+              selectedRecord?.financeConciliationStatus ?? "Pendiente conciliacion",
+            ],
+            [
+              "Productividad",
+              selectedRecord?.staffingStatus ?? "Pendiente horas y turnos",
+            ],
+            ["Calidad", selectedRecord ? `${selectedRecord.dataQualityScore}%` : "Sin datos"],
+          ].map(([label, value]) => (
+            <article className="rounded-md border bg-background p-3" key={label}>
+              <div className="text-xs text-muted-foreground">{label}</div>
+              <div className="mt-1 text-base font-semibold">{value}</div>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <ReadableTabs
         tabs={[
           {

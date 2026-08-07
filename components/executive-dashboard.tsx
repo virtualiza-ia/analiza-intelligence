@@ -17,7 +17,6 @@ import {
   demoDashboardMeta,
   getAppointmentStatusByLine,
   getExecutiveBranchRowsForDashboard,
-  getExecutiveKpisForDashboard,
   getExecutiveManagerRowsForDashboard,
   getInsightPreviewsForDashboard,
   getBusinessLinesForDashboard,
@@ -30,7 +29,6 @@ import {
   type BusinessLineDashboard,
   type BusinessLineKey,
   type BusinessLineStatus,
-  type ExecutiveKpi,
 } from "@/lib/analytics/demo-dashboard";
 import {
   formatSemanticCurrency,
@@ -70,6 +68,28 @@ type StoredContext = {
   periodStart?: string;
   periodEnd?: string;
   isDemo: boolean;
+};
+
+type ExecutiveState = BusinessLineStatus | "neutral";
+
+type CommandCenterMetric = {
+  label: string;
+  value: string;
+  target?: string;
+  variation?: string;
+  state: ExecutiveState;
+  formula: string;
+  source: string;
+  detail: string;
+};
+
+type AttentionItem = {
+  category: "CRITICO" | "ATENCION" | "OPORTUNIDAD" | "POSITIVO";
+  lineName: string;
+  title: string;
+  impact: string;
+  action: string;
+  state: ExecutiveState;
 };
 
 function readStoredContext() {
@@ -116,6 +136,296 @@ function formatSignedPercent(value: number) {
 
 function formatSignedPoints(value: number) {
   return `${value > 0 ? "+" : ""}${value} pts`;
+}
+
+function formatQualityLevel(score: number) {
+  if (score >= 85) {
+    return "Confiable";
+  }
+
+  if (score >= 70) {
+    return "Revisar";
+  }
+
+  return "Insuficiente";
+}
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(1, value));
+}
+
+function getWeightedRate(
+  lines: BusinessLineDashboard[],
+  valueSelector: (line: BusinessLineDashboard) => number,
+  weightSelector: (line: BusinessLineDashboard) => number,
+) {
+  const totalWeight = lines.reduce((sum, line) => sum + weightSelector(line), 0);
+
+  if (totalWeight <= 0) {
+    return 0;
+  }
+
+  return (
+    lines.reduce(
+      (sum, line) => sum + valueSelector(line) * weightSelector(line),
+      0,
+    ) / totalWeight
+  );
+}
+
+function getMetricState(value: number, warningFloor: number, successFloor: number) {
+  if (value >= successFloor) {
+    return "verde";
+  }
+
+  if (value >= warningFloor) {
+    return "amarillo";
+  }
+
+  return "rojo";
+}
+
+function getInverseMetricState(value: number, warningCeiling: number, successCeiling: number) {
+  if (value <= successCeiling) {
+    return "verde";
+  }
+
+  if (value <= warningCeiling) {
+    return "amarillo";
+  }
+
+  return "rojo";
+}
+
+function buildCommandCenterMetrics(lines: BusinessLineDashboard[]) {
+  const totals = lines.reduce(
+    (summary, line) => ({
+      accountsReceivable: summary.accountsReceivable + line.accountsReceivable,
+      cancelledAppointments:
+        summary.cancelledAppointments + line.cancelledAppointments,
+      completedAppointments:
+        summary.completedAppointments + line.completedAppointments,
+      directCost: summary.directCost + line.variableCosts,
+      noShows: summary.noShows + line.noShows,
+      patientCount: summary.patientCount + line.patientCount,
+      revenue: summary.revenue + line.revenue,
+      revenueTarget: summary.revenueTarget + line.revenueTarget,
+      scheduledAppointments:
+        summary.scheduledAppointments + line.scheduledAppointments,
+    }),
+    {
+      accountsReceivable: 0,
+      cancelledAppointments: 0,
+      completedAppointments: 0,
+      directCost: 0,
+      noShows: 0,
+      patientCount: 0,
+      revenue: 0,
+      revenueTarget: 0,
+      scheduledAppointments: 0,
+    },
+  );
+  const targetFulfillment = clampPercent(totals.revenue / Math.max(totals.revenueTarget, 1));
+  const contributionMarginRate = clampPercent(
+    (totals.revenue - totals.directCost) / Math.max(totals.revenue, 1),
+  );
+  const scheduledOccupancy = clampPercent(
+    getWeightedRate(
+      lines,
+      (line) => line.scheduledOccupancy / 100,
+      (line) => line.scheduledAppointments,
+    ),
+  );
+  const effectiveOccupancy = clampPercent(
+    getWeightedRate(
+      lines,
+      (line) => line.effectiveOccupancy / 100,
+      (line) => line.scheduledAppointments,
+    ),
+  );
+  const noShowRate = clampPercent(
+    totals.noShows / Math.max(totals.scheduledAppointments, 1),
+  );
+  const capacityAvailable =
+    scheduledOccupancy > 0
+      ? Math.max(
+          Math.round(totals.scheduledAppointments / scheduledOccupancy) -
+            totals.scheduledAppointments,
+          0,
+        )
+      : 0;
+  const yoyVariance = getWeightedRate(
+    lines,
+    (line) => line.revenueGrowthRate,
+    (line) => line.revenue,
+  );
+
+  return [
+    {
+      detail: "Facturacion neta validada para el alcance filtrado.",
+      formula: "sum(net_billing)",
+      label: "Ingresos",
+      source: "Capa BI semantica DEMO",
+      state: getMetricState(targetFulfillment, 0.85, 0.95),
+      target: `Meta ${formatCurrency(totals.revenueTarget)}`,
+      value: formatCurrency(totals.revenue),
+      variation: formatSignedPercent(Math.round(yoyVariance)),
+    },
+    {
+      detail: "Mide avance contra meta aprobada del periodo.",
+      formula: "net_billing / revenue_target",
+      label: "Cumplimiento meta",
+      source: "Metas DEMO versionadas",
+      state: getMetricState(targetFulfillment, 0.85, 0.95),
+      target: "Meta 100%",
+      value: formatPercent(targetFulfillment),
+      variation: `${formatCurrency(Math.max(totals.revenueTarget - totals.revenue, 0))} brecha`,
+    },
+    {
+      detail: "No equivale a utilidad neta; excluye gastos incompletos.",
+      formula: "(net_billing - direct_costs) / net_billing",
+      label: "Margen de contribucion",
+      source: "Finanzas DEMO reconciliadas",
+      state: getMetricState(contributionMarginRate, 0.25, 0.35),
+      target: "Meta por unidad pendiente",
+      value: formatPercent(contributionMarginRate),
+      variation: `${formatCurrency(totals.revenue - totals.directCost)} margen`,
+    },
+    {
+      detail: "Personas atendidas o clientes anonimizados por fuente.",
+      formula: "count(distinct anonymous_patient_or_customer_id)",
+      label: "Pacientes/clientes atendidos",
+      source: "Servicios DEMO",
+      state: "neutral",
+      value: totals.patientCount.toLocaleString("en-US"),
+      variation: "Identificador anonimizado",
+    },
+    {
+      detail: "Capacidad comprometida por agenda o plan tecnico.",
+      formula: "scheduled_capacity / available_capacity",
+      label: "Ocupacion agendada",
+      source: "Capacidad DEMO",
+      state: getMetricState(scheduledOccupancy, 0.7, 0.82),
+      value: formatPercent(scheduledOccupancy),
+      variation: "Agenda / capacidad",
+    },
+    {
+      detail: "Capacidad realmente atendida o procesada.",
+      formula: "completed_capacity / available_capacity",
+      label: "Ocupacion efectiva",
+      source: "Capacidad DEMO",
+      state: getMetricState(effectiveOccupancy, 0.62, 0.75),
+      value: formatPercent(effectiveOccupancy),
+      variation: `${formatSignedPoints(Math.round((effectiveOccupancy - scheduledOccupancy) * 100))} vs agendada`,
+    },
+    {
+      detail: "Citas, ordenes o estudios completados sin mezclar unidades clinicas.",
+      formula: "sum(completed_operational_units)",
+      label: "Citas completadas",
+      source: "Operacion DEMO",
+      state: "neutral",
+      value: totals.completedAppointments.toLocaleString("en-US"),
+      variation: `${totals.scheduledAppointments.toLocaleString("en-US")} agendadas`,
+    },
+    {
+      detail: "No-show aplica solo donde existe agenda formal.",
+      formula: "no_show / scheduled_appointments",
+      label: "No-show",
+      source: "Citas DEMO",
+      state: getInverseMetricState(noShowRate, 0.08, 0.04),
+      value: totals.noShows.toLocaleString("en-US"),
+      variation: formatPercent(noShowRate),
+    },
+    {
+      detail: "Unidades disponibles derivadas de agenda y capacidad cargada.",
+      formula: "available_capacity - scheduled_capacity",
+      label: "Capacidad disponible",
+      source: "Capacidad DEMO",
+      state: capacityAvailable > 0 ? "amarillo" : "neutral",
+      value: capacityAvailable.toLocaleString("en-US"),
+      variation: "Unidades de capacidad",
+    },
+    {
+      detail: "Facturacion neta menos cobros conciliados.",
+      formula: "net_billing - collections",
+      label: "Cuentas por cobrar",
+      source: "Cobros DEMO",
+      state:
+        totals.accountsReceivable / Math.max(totals.revenue, 1) > 0.12
+          ? "amarillo"
+          : "verde",
+      value: formatCurrency(totals.accountsReceivable),
+      variation: `${formatPercent(totals.accountsReceivable / Math.max(totals.revenue, 1))} de ingresos`,
+    },
+  ] satisfies CommandCenterMetric[];
+}
+
+function buildAttentionItems(lines: BusinessLineDashboard[]) {
+  if (lines.length === 0) {
+    return [];
+  }
+
+  const byTargetGap = [...lines].sort(
+    (left, right) =>
+      left.revenue / Math.max(left.revenueTarget, 1) -
+      right.revenue / Math.max(right.revenueTarget, 1),
+  );
+  const byMargin = [...lines].sort((left, right) => left.marginRate - right.marginRate);
+  const byOccupancyGap = [...lines].sort(
+    (left, right) =>
+      right.scheduledOccupancy -
+      right.effectiveOccupancy -
+      (left.scheduledOccupancy - left.effectiveOccupancy),
+  );
+  const positiveLine =
+    lines.find((line) => line.executiveStatus === "verde") ??
+    [...lines].sort((left, right) => right.financialHealth - left.financialHealth)[0];
+  const targetRisk = byTargetGap[0];
+  const marginRisk = byMargin[0];
+  const occupancyOpportunity = byOccupancyGap[0];
+
+  return [
+    {
+      action: "Revisar costos directos, mix de servicios y registros incompletos antes de presentar conclusion.",
+      category: "CRITICO",
+      impact: `Brecha a meta ${formatCurrency(Math.max(targetRisk.revenueTarget - targetRisk.revenue, 0))}`,
+      lineName: targetRisk.shortName,
+      state: "rojo",
+      title: `${formatPercent(targetRisk.revenue / Math.max(targetRisk.revenueTarget, 1))} de meta`,
+    },
+    {
+      action: "Validar fuente de costos y confirmar si la variacion pertenece al mismo periodo.",
+      category: "ATENCION",
+      impact: `Margen ${formatPercent(marginRisk.marginRate)} (${formatSignedPoints(marginRisk.marginDeltaPoints)})`,
+      lineName: marginRisk.shortName,
+      state: "amarillo",
+      title: "Margen bajo o presionado",
+    },
+    {
+      action: "Llenar horas ociosas con confirmacion, referidores y agenda priorizada por sucursal.",
+      category: "OPORTUNIDAD",
+      impact: `Brecha agenda/efectiva ${Math.max(
+        occupancyOpportunity.scheduledOccupancy -
+          occupancyOpportunity.effectiveOccupancy,
+        0,
+      )} pts`,
+      lineName: occupancyOpportunity.shortName,
+      state: "neutral",
+      title: "Capacidad disponible accionable",
+    },
+    {
+      action: "Replicar practicas de agenda, seguimiento y control de calidad en sucursales comparables.",
+      category: "POSITIVO",
+      impact: `Calidad ${positiveLine.qualityScore ?? positiveLine.financialHealth}%`,
+      lineName: positiveLine.shortName,
+      state: "verde",
+      title: "Unidad con senal saludable",
+    },
+  ] satisfies AttentionItem[];
 }
 
 function statusLabel(status: BusinessLineStatus) {
@@ -223,34 +533,111 @@ function NoDataState({ reason }: { reason: string }) {
   );
 }
 
-function ExecutiveKpiGrid({ kpis }: { kpis: ExecutiveKpi[] }) {
+function stateClass(state: ExecutiveState) {
+  if (state === "verde") {
+    return "bg-emerald-100 text-emerald-800 hover:bg-emerald-100";
+  }
+
+  if (state === "amarillo") {
+    return "bg-amber-100 text-amber-800 hover:bg-amber-100";
+  }
+
+  if (state === "rojo") {
+    return "bg-red-100 text-red-800 hover:bg-red-100";
+  }
+
+  return "bg-slate-100 text-slate-800 hover:bg-slate-100";
+}
+
+function stateLabel(state: ExecutiveState) {
+  if (state === "verde") {
+    return "Logrado";
+  }
+
+  if (state === "amarillo") {
+    return "Atencion";
+  }
+
+  if (state === "rojo") {
+    return "Riesgo";
+  }
+
+  return "Informativo";
+}
+
+function ExecutiveKpiGrid({ metrics }: { metrics: CommandCenterMetric[] }) {
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      {kpis.map((kpi) => (
-        <article className="grid min-h-32 gap-3 rounded-md border bg-card p-4" key={kpi.label}>
+    <section
+      aria-label="Tarjetas principales del Executive Command Center"
+      className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+    >
+      {metrics.map((metric) => (
+        <article
+          className="grid min-h-40 gap-3 rounded-md border bg-card p-4"
+          key={metric.label}
+          title={`${metric.formula}. Fuente: ${metric.source}`}
+        >
           <div className="flex items-start justify-between gap-2">
             <div className="text-sm font-medium text-muted-foreground">
-              {kpi.label}
+              {metric.label}
             </div>
-            <Badge
-              className={cn(
-                kpi.tone === "positive" &&
-                  "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
-                kpi.tone === "warning" &&
-                  "bg-amber-100 text-amber-800 hover:bg-amber-100",
-                kpi.tone === "negative" &&
-                  "bg-red-100 text-red-800 hover:bg-red-100",
-                kpi.tone === "neutral" &&
-                  "bg-slate-100 text-slate-800 hover:bg-slate-100",
-              )}
-            >
-              {kpi.change}
+            <Badge className={stateClass(metric.state)}>
+              {stateLabel(metric.state)}
             </Badge>
           </div>
-          <div className="text-2xl font-semibold tracking-normal">{kpi.value}</div>
-          <p className="text-xs leading-5 text-muted-foreground">{kpi.definition}</p>
+          <div className="text-2xl font-semibold tracking-normal">
+            {metric.value}
+          </div>
+          <div className="grid gap-1 text-xs leading-5 text-muted-foreground">
+            {metric.target ? <span>Meta: {metric.target}</span> : null}
+            {metric.variation ? <span>Tendencia: {metric.variation}</span> : null}
+            <span>{metric.detail}</span>
+            <span className="font-medium text-foreground">
+              Formula: {metric.formula}
+            </span>
+          </div>
         </article>
       ))}
+    </section>
+  );
+}
+
+function AttentionCards({ items }: { items: AttentionItem[] }) {
+  return (
+    <section className="grid gap-4 rounded-md border bg-card p-4">
+      <div className="grid gap-1">
+        <h2 className="text-lg font-semibold tracking-normal">
+          Requiere su atencion
+        </h2>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Priorizado por meta, margen, capacidad y calidad; no por ingresos
+          absolutos.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {items.map((item) => (
+          <article
+            className="grid min-h-44 gap-3 rounded-md border bg-background p-4"
+            key={`${item.category}-${item.lineName}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <Badge className={stateClass(item.state)}>{item.category}</Badge>
+              <span className="text-xs font-medium text-muted-foreground">
+                {item.lineName}
+              </span>
+            </div>
+            <div>
+              <h3 className="text-base font-semibold">{item.title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Impacto: {item.impact}
+              </p>
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Accion: {item.action}
+            </p>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
@@ -266,7 +653,51 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
           Ordenada por riesgo de calidad y cumplimiento, no por ingreso absoluto.
         </p>
       </div>
-      <div className="overflow-x-auto">
+      <div className="grid gap-3 md:hidden">
+        {rows.map((row) => (
+          <article
+            className="grid gap-3 rounded-md border bg-background p-3 text-sm"
+            key={`${row.company}-${row.branch}-mobile`}
+          >
+            <div>
+              <div className="font-medium">{row.branch}</div>
+              <div className="text-xs text-muted-foreground">
+                {row.company} · {row.manager}
+              </div>
+            </div>
+            <dl className="grid gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between gap-3">
+                <dt>Ingresos</dt>
+                <dd className="font-medium text-foreground">
+                  {formatSemanticCurrency(row.revenue)}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Meta</dt>
+                <dd>{formatSemanticPercent(row.targetFulfillment)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Margen</dt>
+                <dd>{formatSemanticPercent(row.contributionMarginRate)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Ocupacion</dt>
+                <dd>{formatSemanticPercent(row.effectiveOccupancy)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Calidad</dt>
+                <dd>
+                  {row.qualityLevel} {row.qualityScore}%
+                </dd>
+              </div>
+            </dl>
+            <p className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+              {row.alert}
+            </p>
+          </article>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
@@ -319,7 +750,45 @@ function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
           Compara responsabilidad, calidad, meta, margen y ocupacion efectiva.
         </p>
       </div>
-      <div className="overflow-x-auto">
+      <div className="grid gap-3 md:hidden">
+        {rows.map((row) => (
+          <article
+            className="grid gap-3 rounded-md border bg-background p-3 text-sm"
+            key={`${row.manager}-mobile`}
+          >
+            <div>
+              <div className="font-medium">{row.manager}</div>
+              <div className="text-xs text-muted-foreground">
+                {row.branches}
+              </div>
+            </div>
+            <dl className="grid gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between gap-3">
+                <dt>Meta promedio</dt>
+                <dd>{formatSemanticPercent(row.targetFulfillment)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Margen</dt>
+                <dd>{formatSemanticPercent(row.contributionMarginRate)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Ocupacion</dt>
+                <dd>{formatSemanticPercent(row.effectiveOccupancy)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Calidad</dt>
+                <dd>
+                  {row.qualityLevel} {row.qualityScore}%
+                </dd>
+              </div>
+            </dl>
+            <p className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+              {row.action}
+            </p>
+          </article>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[920px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
@@ -380,7 +849,54 @@ function ExecutiveStatusTable({ lines }: { lines: BusinessLineDashboard[] }) {
         </p>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="grid gap-3 md:hidden">
+        {orderedLines.map((line) => (
+          <article
+            className="grid gap-3 rounded-md border bg-background p-3 text-sm"
+            key={`${line.key}-mobile`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-medium">{line.shortName}</div>
+                <div className="text-xs text-muted-foreground">
+                  {line.scopeName}
+                </div>
+              </div>
+              <Badge className={statusClass(line.executiveStatus)}>
+                {statusLabel(line.executiveStatus)}
+              </Badge>
+            </div>
+            <dl className="grid gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between gap-3">
+                <dt>Ingresos</dt>
+                <dd className="font-medium text-foreground">
+                  {formatCompactCurrency(line.revenue)}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Crecimiento</dt>
+                <dd>{formatSignedPercent(line.revenueGrowthRate)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Margen</dt>
+                <dd>{formatPercent(line.marginRate)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Ocupacion</dt>
+                <dd>{line.effectiveOccupancy}%</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt>Pacientes</dt>
+                <dd>{line.patientCount.toLocaleString("en-US")}</dd>
+              </div>
+            </dl>
+            <p className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+              {line.executiveInterpretation}
+            </p>
+          </article>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[860px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
@@ -736,10 +1252,6 @@ export function ExecutiveDashboard() {
     () => getBusinessLinesForDashboard(dashboardContext),
     [dashboardContext],
   );
-  const kpis = useMemo(
-    () => getExecutiveKpisForDashboard(dashboardContext),
-    [dashboardContext],
-  );
   const branchRows = useMemo(
     () => getExecutiveBranchRowsForDashboard(dashboardContext),
     [dashboardContext],
@@ -757,8 +1269,25 @@ export function ExecutiveDashboard() {
     [dashboardContext],
   );
 
+  const commandMetrics = useMemo(
+    () => buildCommandCenterMetrics(lines),
+    [lines],
+  );
+  const attentionItems = useMemo(() => buildAttentionItems(lines), [lines]);
   const revenueShare = useMemo(() => getRevenueShareData(lines), [lines]);
   const targetVsActual = useMemo(() => getTargetVsActualByLine(lines), [lines]);
+  const averageQualityScore = useMemo(() => {
+    if (lines.length === 0) {
+      return 0;
+    }
+
+    return Math.round(
+      lines.reduce(
+        (sum, line) => sum + (line.qualityScore ?? line.financialHealth),
+        0,
+      ) / lines.length,
+    );
+  }, [lines]);
   const selectedOperationalLine = useMemo(
     () =>
       lines.find((line) => line.key === selectedOperationalLineKey) ??
@@ -807,13 +1336,12 @@ export function ExecutiveDashboard() {
         <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-end">
           <div className="grid gap-2">
             <h1 className="text-3xl font-semibold tracking-normal">
-              Resumen ejecutivo
+              Executive Command Center
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Vista ejecutiva DEMO para CEO, gerente de operaciones y gerentes
-              de sucursal. El primer bloque esta separado por linea de negocio;
-              no usa una suma general porque eso puede ocultar la realidad de
-              cada empresa.
+              Resumen ejecutivo DEMO para entender en menos de 30 segundos como
+              va el negocio, donde falta meta, donde hay capacidad ociosa y que
+              dato no es suficientemente confiable.
             </p>
           </div>
           <div className="rounded-md border bg-card p-4 text-sm">
@@ -830,17 +1358,21 @@ export function ExecutiveDashboard() {
               <span>{context?.branchName ?? "Sucursal pendiente"}</span>
               <span>Periodo: {selectedPeriod}</span>
               <span>Ultima actualizacion: {demoDashboardMeta.lastUpdated}</span>
+              <span>
+                Calidad del dato: {formatQualityLevel(averageQualityScore)}{" "}
+                {averageQualityScore}%
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      <ExecutiveKpiGrid kpis={kpis} />
-
       {noDataReason ? (
         <NoDataState reason={noDataReason} />
       ) : (
         <>
+          <ExecutiveKpiGrid metrics={commandMetrics} />
+          <AttentionCards items={attentionItems} />
           <ExecutiveStatusTable lines={lines} />
           <BusinessLineSummary lines={lines} />
           <FinancialHealthByLine lines={lines} />

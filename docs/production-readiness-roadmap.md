@@ -2,7 +2,7 @@
 
 Fecha de revision: 2026-08-07  
 Fuente principal: `docs/audits/ANALIZA_INTELLIGENCE_AUDIT.md`  
-Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Sprint 1 y Macro Sprint 2 fueron cerrados. Macro Sprint 3 aborda importaciones, staging, lineage, conectores y fuentes sin iniciar Sprint 4.
+Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a Executive Ready demo y preparar ruta hacia PRODUCTION READY. Sprint 1, Macro Sprint 2 y Macro Sprint 3 fueron cerrados. Macro Sprint 4 consolida UX premium, Executive Command Center, responsive, QA local y documentos de readiness sin desplegar a produccion.
 
 ## Estado actual del repo
 
@@ -14,6 +14,7 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Spri
 - Sprint 1 implementa controles P0 de seguridad y RBAC sin iniciar Sprint 2.
 - Macro Sprint 2 crea una fuente unica de filtros y una capa semantica DEMO para overview ejecutivo, finanzas, capacidad/ocupacion, calidad e insights.
 - Macro Sprint 3 crea plataforma server-side de importaciones, plantillas versionadas, staging, publish, rollback, lineage, audit log y framework de conectores.
+- Macro Sprint 4 convierte `/protected/overview` en Executive Command Center, cierra ruta `/protected/apis`, mejora gerentes, importaciones, conectores y responsive de tablas criticas, y documenta checklist/guion ejecutivo.
 
 ## Stack detectado
 
@@ -63,8 +64,8 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Spri
 
 - Responsive: varios dashboards usan tablas con anchos minimos grandes y pueden generar overflow en mobile.
 - Integraciones: existe framework y endpoints de conectores; faltan credenciales reales y pruebas contra sistemas externos.
-- Ruta `/protected/apis`: sigue sin modulo equivalente en `lib/navigation.ts` y debe resolverse como redireccion, alias o eliminacion de enlaces.
-- Error React minified #418: no se confirma desde codigo estatico; requiere reproduccion visual/runtime.
+- Ruta `/protected/apis`: resuelta localmente como alias explicito de integraciones/conectores.
+- Error React minified #418: no se confirma en smoke local Sprint 4; requiere verificacion DOM/Console en deployment.
 - Capacidad: fisioterapia, laboratorio e imagenes ya tienen semantica separada en capa DEMO; falta validarla contra fuentes operativas reales y capacidad por equipo.
 
 ## Archivos criticos afectados por los hallazgos
@@ -117,7 +118,7 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Spri
 - Finanzas: mitigado en datos DEMO reconciliados; sigue pendiente con fuentes reales de facturacion/cobros.
 - Capacidad: parcialmente resuelto. Laboratorio ya no reutiliza ocupacion clinica; Imagenes conserva metricas pendientes cuando faltan RIS/PACS/capacidad por equipo.
 - `/protected/imagenes`: existe como modulo de imagenes; la inconsistencia exacta de auditoria debe revalidarse en UI.
-- `/protected/apis`: sigue siendo 404/ausente.
+- `/protected/apis`: resuelta localmente como alias de Conectores; verificar en deployment.
 - Operational areas: existen derivadas en frontend y migraciones, pero falta confirmar poblacion real en DB y enforcement completo.
 
 ## Dependencias entre sprints
@@ -126,11 +127,10 @@ Estado objetivo: mover ANALIZA INTELLIGENCE de CRITICAL a PRODUCTION READY. Spri
 - Sprint 1 debe ocurrir antes de exponer rutas, importaciones, invitaciones o conectores a usuarios reales.
 - Sprint 2 depende de contratos KPI y de contexto global confiable; Macro Sprint 2 entrega la primera version DEMO para finanzas y dashboards ejecutivos.
 - Sprint 3 depende de reglas de calidad/lineage del Sprint 2 y entrega importaciones server-side, conectores y lineage.
-- Sprint 4 depende de RBAC del Sprint 1 para que la jerarquia no sea solo UI.
-- Sprint 5 depende de ambiente seguro, secretos server-only e importaciones auditables.
-- Sprint 6 depende de contratos de datos estables para no redisenar UX sobre metricas inconsistentes.
-- Sprint 7 depende de cierre P0/P1 y evidencia de lint, typecheck, tests y build.
-- Sprint 8 solo debe ejecutarse con datos DEMO aislados o datos reales autorizados y validados.
+- Macro Sprint 4 depende de RBAC del Sprint 1, contratos BI del Sprint 2 e ingestion/conectores del Sprint 3.
+- La jerarquia organizacional real DB sigue dependiendo de migraciones remotas, poblacion de areas y asignaciones.
+- Integraciones reales dependen de credenciales server-side y pruebas contra sistemas externos.
+- Production readiness final depende de cierre de blockers manuales y evidencia en deployment autorizado.
 
 ## Roadmap
 
@@ -213,18 +213,39 @@ Estado Macro Sprint 3:
 - Pendiente de credenciales: LIS/API Laboratorio, RIS/PACS Imagenes, portal Fisioterapia y CRM/facturacion reales.
 - No incluye redisenio visual premium, performance tuning profundo, produccion real, despliegue final, IA generativa ni forecasting.
 
-### Sprint 4 - Jerarquia organizacional
+### Macro Sprint 4 - UX premium, Executive Command Center, Performance, QA y Production Readiness
 
-Objetivo: operar la jerarquia real Gerente de Operaciones -> Area -> Sucursal -> Operativo.
+Objetivo: convertir la experiencia demo ejecutiva en una plataforma coherente, rapida, responsive y presentable ante Direccion sin abrir nuevas funcionalidades grandes.
 
 Alcance:
-- CRUD server-side para areas, sucursales y asignaciones.
-- Politicas por pais/empresa/area/sucursal.
-- Pruebas de creacion y administracion delegada.
+- Executive Command Center en `/protected/overview`.
+- Tarjetas principales con valor, meta cuando aplica, tendencia, estado, formula y fuente.
+- Seccion “Requiere su atencion” priorizada por impacto, margen, capacidad y calidad.
+- Vista ejecutiva de gerentes con jerarquia y componentes separados.
+- Semantica especifica para Fisioterapia, Laboratorio e Imagenes.
+- UX de importaciones y conectores sobre la logica Sprint 3.
+- Responsive desktop/laptop/tablet/mobile para pantallas criticas.
+- Ruta `/protected/apis` resuelta.
+- Documentacion: design system, checklist readiness y guion ejecutivo.
 
 Criterios de salida:
-- Gerente de Area administra solo sus sucursales.
-- Gerente de Sucursal administra solo su sucursal.
+- Rutas principales responden en smoke local.
+- No hay 404 ambiguo en `/protected/apis`.
+- No se detecta password prellenado en HTML protegido del smoke local.
+- Lint, typecheck, tests, build y `git diff --check` pasan.
+
+Estado Macro Sprint 4:
+- Implementado localmente. No despliega produccion ni declara Production Ready por blockers manuales externos, incluyendo migraciones remotas, verificacion DOM y credenciales reales de conectores.
+
+### Backlog posterior - Jerarquia organizacional real
+
+Objetivo: operar la jerarquia real Gerente de Operaciones -> Area -> Sucursal -> Operativo con DB remota y asignaciones persistentes.
+
+Alcance pendiente:
+- CRUD server-side para areas, sucursales y asignaciones.
+- Poblacion real de `operational_areas` y `manager_assignments`.
+- Politicas por pais/empresa/area/sucursal en entorno remoto.
+- Pruebas de creacion y administracion delegada.
 
 ### Sprint 5 - Integraciones
 

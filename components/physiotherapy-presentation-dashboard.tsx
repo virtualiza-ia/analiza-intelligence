@@ -2524,6 +2524,41 @@ export function PhysiotherapyPresentationDashboard() {
         <KpiTile kpi={{ label: "Cierre oficial", note: "Bloqueado por conciliacion.", value: canClosePhysioPresentation() ? "Permitido" : "Bloqueado" }} />
       </section>
 
+      <section className="grid gap-3 rounded-md border bg-card p-4">
+        <div className="grid gap-1">
+          <h2 className="text-lg font-semibold tracking-normal">
+            Lectura clinica de Fisioterapia
+          </h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Horas disponibles, horas agendadas, horas atendidas, ocupacion,
+            sesiones, no-show, cancelacion, productividad, ingreso/hora y
+            utilizacion por fisioterapeuta no se mezclan con ordenes o cobros.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            ["Horas disponibles", "Pendiente fuente horaria"],
+            ["Horas agendadas", "Pendiente agenda"],
+            ["Horas atendidas", "Pendiente agenda"],
+            [
+              "Ocupacion",
+              `${Math.round((physioReferenceRecord.sessions / Math.max(physioReferenceRecord.capacityByProfessionals, 1)) * 100)}%`,
+            ],
+            ["Sesiones", physioReferenceRecord.sessions.toLocaleString("en-US")],
+            ["No-show", "Pendiente estado agenda"],
+            ["Cancelacion", physioReferenceRecord.reportedCancellations.toLocaleString("en-US")],
+            ["Productividad", "Pendiente horas por profesional"],
+            ["Ingreso/hora", "No calculable sin horas atendidas"],
+            ["Utilizacion por fisioterapeuta", "Pendiente normalizacion"],
+          ].map(([label, value]) => (
+            <article className="rounded-md border bg-background p-3" key={label}>
+              <div className="text-xs text-muted-foreground">{label}</div>
+              <div className="mt-1 text-base font-semibold">{value}</div>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <nav className="flex gap-2 overflow-x-auto rounded-md border bg-card p-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;

@@ -67,3 +67,70 @@ Do not invent the logo. Provide configurable slots for:
 - company logo
 - favicon
 - corporate colors
+
+## Macro Sprint 4 Executive System
+
+Fecha de revision: 2026-08-07
+
+El look and feel objetivo es ejecutivo, claro y sobrio:
+
+- Fondo claro `hsl(210 24% 98%)`.
+- Navy como base de navegacion y jerarquia.
+- Azul electrico solo para acentos activos, focus y acciones primarias.
+- Tarjetas blancas con sombra discreta y borde suave.
+- Radio base de 8px o menos para superficies operativas.
+- Rojo solo para riesgo, error o bloqueo.
+- Ambar para atencion, dato incompleto o credenciales pendientes.
+- Verde para objetivo logrado o fuente confiable.
+- Espaciado generoso entre secciones y compacto dentro de tablas/paneles.
+
+### Spacing
+
+- Page shell: `px-4 py-6`, `lg:px-6`.
+- Secciones: `gap-6` entre bloques principales.
+- Tarjetas KPI: `p-4`, `gap-3`, altura minima estable.
+- Tablas: padding vertical `py-2` en header, `py-3` en filas.
+- Mobile: apilar cards y evitar depender de scroll horizontal para KPIs principales.
+
+### Typography
+
+- H1: `text-3xl font-semibold tracking-normal`.
+- Section title: `text-lg font-semibold tracking-normal`.
+- Card title: `text-sm font-medium`.
+- Supporting copy: `text-sm leading-6 text-muted-foreground`.
+- Microcopy/source: `text-xs leading-5 text-muted-foreground`.
+- No escalar fuente con viewport ni usar letter-spacing negativo.
+
+### Semantic States
+
+- `Logrado`: verde, KPI o fuente en rango saludable.
+- `Atencion`: ambar, requiere revision o dato incompleto.
+- `Riesgo`: rojo, bloqueo, margen/meta critica o error.
+- `Informativo`: slate, lectura sin meta aprobada.
+- `Sin datos`: explicar si es cero real, fuente faltante o filtro sin dataset.
+- `Sin permiso`: usar `/forbidden`, no esconder solo por UI.
+- `Sin configurar`: integracion pendiente de credenciales server-side.
+- `Dato vencido`: mostrar ultima actualizacion y freshness.
+
+### Charts
+
+- Usar visualizaciones 2D simples.
+- Mostrar periodo, unidad, comparacion y tooltip/title cuando aplique.
+- No usar 3D, gradientes decorativos ni colores sin significado.
+- Usar colores de linea de negocio solo para identidad; estados mantienen verde/ambar/rojo.
+
+### Cards, Tables And Filters
+
+- Cards: items repetidos, modales o herramientas acotadas; no cards dentro de cards si se puede evitar.
+- Tables: desktop/tablet con `overflow-x-auto`; mobile con cards resumidas para filas ejecutivas.
+- Filters: globales en header, filtros secundarios en tabs/paneles locales.
+- Buttons icon+texto para acciones criticas; icon-only solo con `aria-label`.
+- Badges: estado, alcance, fuente y calidad; no reemplazan explicacion de datos faltantes.
+
+### Loading, Empty And Error
+
+- Loading: skeleton o texto corto dentro de la region que carga.
+- Empty: explicar que filtro no tiene dataset y que accion lo resuelve.
+- Error: mensaje claro con retry cuando existe accion segura.
+- No data: no presentar cero silencioso si falta fuente esencial.
+- Not connected: mostrar conector, credenciales requeridas, ultimo intento y fallback manual.

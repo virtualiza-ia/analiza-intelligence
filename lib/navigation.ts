@@ -240,6 +240,13 @@ export const navigationItems: NavigationItem[] = [
     allowedRoles: connectorAdminRoles,
   },
   {
+    title: "APIs e integraciones",
+    href: "/protected/apis",
+    icon: DatabaseZap,
+    group: "datos",
+    allowedRoles: connectorAdminRoles,
+  },
+  {
     title: "Calidad de datos",
     href: "/protected/calidad-datos",
     icon: ShieldCheck,

@@ -33,10 +33,10 @@ Nota Sprint 1: la migracion `supabase/migrations/20260807000100_sprint1_harden_s
 
 | ID | Riesgo | Estado | Impacto | Evidencia |
 | --- | --- | --- | --- | --- |
-| P2-UX-001 | Overflow responsive en dashboards densos | Vigente | Mobile/tablet puede ser dificil de usar | `components/*dashboard*.tsx` |
+| P2-UX-001 | Overflow responsive en dashboards densos | Mitigado en pantallas ejecutivas criticas | Mobile/tablet puede ser dificil de usar en dashboards no auditados visualmente | `components/executive-dashboard.tsx`, `components/manager-bonus-dashboard.tsx`, `components/import-operations-dashboard.tsx`, `components/crm-connectors-dashboard.tsx` |
 | P2-INT-001 | Conectores sin endpoints reales | Mitigado parcialmente | Integraciones externas siguen pendientes de credenciales y prueba contra sistemas reales | `lib/data-ingestion/connectors.ts`, `app/api/connectors/status/route.ts`, `components/crm-connectors-dashboard.tsx` |
-| P2-ROUTE-001 | `/protected/apis` no existe como modulo | Vigente | Enlaces o bookmarks pueden terminar en 404 | `lib/navigation.ts`, `app/protected/[module]/page.tsx` |
-| P2-UX-002 | Error React minified #418 reportado por auditoria | No reproducido en revision estatica | Requiere reproduccion browser/runtime | Auditoria principal |
+| P2-ROUTE-001 | `/protected/apis` no existe como modulo | Resuelto local | Enlaces o bookmarks ya abren integraciones/conectores; requiere smoke en deployment | `lib/navigation.ts`, `app/protected/[module]/page.tsx` |
+| P2-UX-002 | Error React minified #418 reportado por auditoria | No reproducido en smoke local Sprint 4 | Requiere verificacion DOM/Console en deployment real | Auditoria principal, smoke local 2026-08-07 |
 | P2-BI-001 | Terminos de capacidad aun necesitan contrato final | Mitigado parcialmente | Riesgo de interpretacion operativa incorrecta al conectar fuentes reales | `components/capacity-occupancy-dashboard.tsx`, `lib/analytics/capacity-occupancy.ts`, `lib/analytics/semantic-bi.ts` |
 
 ## Riesgos transversales
@@ -60,10 +60,18 @@ Nota Sprint 1: la migracion `supabase/migrations/20260807000100_sprint1_harden_s
 - Los conectores reales de Fisioterapia, Laboratorio e Imagenes fallan cerrado si faltan credenciales; los adapters DEMO existen para validar pipeline sin bloquear el sprint.
 - Persisten como blockers manuales: migracion RLS remota, rotacion de credenciales demo historicas y verificacion DOM en deployment.
 
+## Nota Macro Sprint 4
+
+- Sprint 4 consolida la experiencia ejecutiva local: Command Center, gerentes, vistas por unidad, importaciones, conectores, ruta `/protected/apis`, responsive en pantallas criticas y documentacion de readiness.
+- En auditoria local, `next dev` con Turbopack fallo por parsing CSS generado; se cambia el script a `next dev --webpack`, alineado con `npm run build`.
+- Smoke local 2026-08-07: rutas principales respondieron 200 con cookie demo local; no se detecto password prellenado en HTML protegido ni React #418 en la respuesta.
+- No se declara Production Ready mientras sigan abiertos blockers manuales externos: migracion RLS remota, migracion ingestion remota, rotacion de credenciales demo historicas si existieron, verificacion DOM en deployment y credenciales reales de conectores.
+
 ## Decisiones pendientes
 
 - Definir matriz oficial de roles y modulos para Gerente de Operaciones, Gerente de Area, Gerente de Sucursal y usuarios operativos.
 - Definir estructura final de ambientes y flags para DEMO, staging y production.
 - Conectar dashboards ejecutivos a published rows reales cuando la DB remota tenga imports aprobados.
-- Definir si `/protected/apis` debe existir, redirigir o eliminarse.
+- Verificar en deployment que `/protected/apis` conserva el alias de conectores sin 404.
 - Obtener credenciales oficiales para LIS, RIS/PACS, CRM y facturacion antes de activar conectores reales.
+- Ejecutar Playwright/Lighthouse o E2E equivalente en staging cuando exista entorno autorizado con navegador y credenciales reales.
