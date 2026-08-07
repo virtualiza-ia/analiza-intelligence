@@ -3,13 +3,13 @@ import { redirect } from "next/navigation";
 
 import {
   demoAdminCookieName,
-  demoOrganizationId,
   demoRoleCookieName,
   getDemoAdminEmail,
   getDemoRoleFromCookie,
   hasDemoAdminCookie,
   isDemoRoleSwitchEnabled,
 } from "@/lib/auth/demo-admin";
+import { getDemoScopeForRole } from "@/lib/auth/demo-scope";
 import { readLocalSession } from "@/lib/auth/local-session";
 import { getMissingDatabaseConfig } from "@/lib/server/database";
 import { getAuthenticatedLocalUserAccess } from "@/lib/server/local-auth";
@@ -149,9 +149,7 @@ function readDemoAuthorizationActor(
     allowDemoRoleSwitch: isDemoRoleSwitchEnabled(),
     email: getDemoAdminEmail(),
     roleKey,
-    scope: {
-      organizationId: demoOrganizationId,
-    },
+    scope: getDemoScopeForRole(roleKey),
     source: "demo",
     userId: "demo-admin",
   };

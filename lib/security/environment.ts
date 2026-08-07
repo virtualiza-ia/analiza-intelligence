@@ -44,7 +44,11 @@ export function isDemoRuntimeEnvironment() {
 }
 
 export function canUseDemoFeatures() {
-  return isDemoRuntimeEnvironment() && process.env.VERCEL_ENV !== "production";
+  return (
+    isDemoRuntimeEnvironment() &&
+    process.env.VERCEL_ENV !== "production" &&
+    process.env.VERCEL_ENV !== "preview"
+  );
 }
 
 export function isDemoAdminAllowedByEnvironment() {

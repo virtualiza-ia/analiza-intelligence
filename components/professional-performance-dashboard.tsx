@@ -546,14 +546,12 @@ function ProductivityQualityMatrix({
                 <text fill="#ffffff" fontSize="9" fontWeight="700" textAnchor="middle" x={x} y={y + 3}>
                   {record.name.slice(0, 2)}
                 </text>
-                <title>
-                  {`${record.name}
+                <title>{`${record.name}
 Rol: ${record.role}
 Productividad: ${record.productivityAdjusted}
 Calidad: ${record.qualityScore}
 Pacientes/servicios: ${(record.patients || record.services).toLocaleString("en-US")}
-Estado: ${record.status}`}
-                </title>
+Estado: ${record.status}`}</title>
               </g>
             );
           })}
@@ -747,12 +745,10 @@ function SuccessUtilizationChart({ records }: { records: ProfessionalRecord[] })
                   x={x}
                   y={yScale(record.utilizationRate)}
                 >
-                  <title>
-                    {`${record.name}
+                  <title>{`${record.name}
 Utilizacion: ${record.utilizationRate}%
 Servicios exitosos: ${record.successRate}%
-Meta rol: 85%`}
-                  </title>
+Meta rol: 85%`}</title>
                 </rect>
                 <text fill="#64748b" fontSize="10" textAnchor="middle" x={x + barWidth / 2} y={height - 18}>
                   {record.name.split(" ")[0]}

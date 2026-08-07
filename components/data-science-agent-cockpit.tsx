@@ -255,9 +255,7 @@ function MiniSparkline({
       />
       {points.slice(-1).map((point) => (
         <circle fill={color} key={point.label} r="4" cx={point.x} cy={point.y}>
-          <title>
-            {point.label}: {formatMetricValue(point.value, kpi.unit)}
-          </title>
+          <title>{`${point.label}: ${formatMetricValue(point.value, kpi.unit)}`}</title>
         </circle>
       ))}
     </svg>
@@ -325,7 +323,7 @@ function LineYearChart({
           strokeLinecap="round"
           strokeWidth="4"
         >
-          <title>Meta: {formatMetricValue(kpi.targetValue ?? 0, kpi.unit)}</title>
+          <title>{`Meta: ${formatMetricValue(kpi.targetValue ?? 0, kpi.unit)}`}</title>
         </polyline>
       ) : null}
       <polyline
@@ -346,12 +344,7 @@ function LineYearChart({
       />
       {currentPoints.map((point, index) => (
         <circle fill={accent} key={point.label} r="5" cx={point.x} cy={point.y}>
-          <title>
-            {point.label} 2026: {formatMetricValue(point.value, kpi.unit)}
-            {" / "}
-            2025:{" "}
-            {formatMetricValue(kpi.monthlyLastYear[index] ?? 0, kpi.unit)}
-          </title>
+          <title>{`${point.label} 2026: ${formatMetricValue(point.value, kpi.unit)} / 2025: ${formatMetricValue(kpi.monthlyLastYear[index] ?? 0, kpi.unit)}`}</title>
         </circle>
       ))}
       {currentPoints.map((point, index) =>
@@ -417,9 +410,7 @@ function BarComparisonChart({
               x={x}
               y={y}
             >
-              <title>
-                {bar.label}: {formatMetricValue(bar.value, kpi.unit)}
-              </title>
+              <title>{`${bar.label}: ${formatMetricValue(bar.value, kpi.unit)}`}</title>
             </rect>
             <text
               className="fill-slate-700 text-[20px] font-semibold"
@@ -492,9 +483,7 @@ function DonutMixChart({
               strokeWidth="28"
               transform={`rotate(-90 ${center} ${center})`}
             >
-              <title>
-                {segment.label}: {formatMetricValue(segment.value, kpi.unit)}
-              </title>
+              <title>{`${segment.label}: ${formatMetricValue(segment.value, kpi.unit)}`}</title>
             </circle>
           );
         })}
@@ -600,9 +589,7 @@ function WaterfallCostChart({
               x={x}
               y={y}
             >
-              <title>
-                {bar.label}: {formatMetricValue(bar.value, "currency")}
-              </title>
+              <title>{`${bar.label}: ${formatMetricValue(bar.value, "currency")}`}</title>
             </rect>
             <text
               className="fill-slate-700 text-[19px] font-semibold"
@@ -691,10 +678,7 @@ function RiskScatterChart({ kpi }: { kpi: DataScienceKpi }) {
               r={Math.max(16, Math.min(point.size / 2.4, 32))}
               strokeWidth="5"
             >
-              <title>
-                {point.branch}: margen {point.margin}%, riesgo {point.risk}/100,
-                venta {formatMetricValue(point.value, "currency")}
-              </title>
+              <title>{`${point.branch}: margen ${point.margin}%, riesgo ${point.risk}/100, venta ${formatMetricValue(point.value, "currency")}`}</title>
             </circle>
             <text
               className="fill-white text-[14px] font-bold"

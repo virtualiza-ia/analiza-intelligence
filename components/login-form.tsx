@@ -17,15 +17,67 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+type DemoLoginProfile = {
+  label: string;
+  roleKey:
+    | "super_admin"
+    | "gerente_operaciones"
+    | "gerente_area"
+    | "gerente_sucursal"
+    | "usuario_operativo"
+    | "viewer";
+};
+
+const demoLoginProfiles: DemoLoginProfile[] = [
+  { label: "Direccion / Super Admin", roleKey: "super_admin" },
+  { label: "Gerente de Operaciones", roleKey: "gerente_operaciones" },
+  { label: "Gerente de Area", roleKey: "gerente_area" },
+  { label: "Gerente de Sucursal", roleKey: "gerente_sucursal" },
+  { label: "Usuario Operativo", roleKey: "usuario_operativo" },
+  { label: "Viewer", roleKey: "viewer" },
+];
+
 export function LoginForm({
+  enableLocalDemoLogin = false,
   className,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & {
+  enableLocalDemoLogin?: boolean;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeDemoRole, setActiveDemoRole] =
+    useState<DemoLoginProfile["roleKey"]>("super_admin");
   const router = useRouter();
+
+  const handleDemoLogin = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/auth/demo-session", {
+        body: JSON.stringify({ roleKey: activeDemoRole }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(payload?.error ?? "No se pudo iniciar DEMO local.");
+      }
+
+      router.push("/protected/context");
+      router.refresh();
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +142,43 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {enableLocalDemoLogin && (
+            <div className="mb-6 grid gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+              <div>
+                <div className="font-semibold">Entorno DEMO local</div>
+                <p className="mt-1 text-xs leading-5 text-amber-900">
+                  Crea una sesion demo server-side para revision visual. No usa
+                  passwords en cliente y esta bloqueado fuera de demo.
+                </p>
+              </div>
+              <Label htmlFor="demo-role">Perfil de prueba autorizado</Label>
+              <select
+                className="h-10 rounded-md border bg-background px-3 text-sm text-foreground outline-none"
+                id="demo-role"
+                value={activeDemoRole}
+                onChange={(event) =>
+                  setActiveDemoRole(
+                    event.target.value as DemoLoginProfile["roleKey"],
+                  )
+                }
+              >
+                {demoLoginProfiles.map((profile) => (
+                  <option key={profile.roleKey} value={profile.roleKey}>
+                    {profile.label}
+                  </option>
+                ))}
+              </select>
+              <Button
+                className="w-full"
+                disabled={isLoading}
+                onClick={handleDemoLogin}
+                type="button"
+                variant="secondary"
+              >
+                {isLoading ? "Creando sesion..." : "Entrar en DEMO local"}
+              </Button>
+            </div>
+          )}
           <form onSubmit={handleLogin}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">

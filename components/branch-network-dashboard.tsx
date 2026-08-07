@@ -875,14 +875,12 @@ function BubbleMatrix({
                 <text fill="#ffffff" fontSize="10" fontWeight="700" textAnchor="middle" x={x} y={y + 4}>
                   {record.city.slice(0, 2)}
                 </text>
-                <title>
-                  {`${record.branch}
+                <title>{`${record.branch}
 Score operativo: ${record.operatingScore}
 Margen: ${formatRate(record.marginRate)}
 Pacientes: ${record.patients.toLocaleString("en-US")}
 Venta: ${formatCurrency(record.netSales)}
-Estado: ${record.status}`}
-                </title>
+Estado: ${record.status}`}</title>
               </g>
             );
           })}

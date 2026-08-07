@@ -588,14 +588,12 @@ function ServiceBubbleMatrix({
                 <text fill="#ffffff" fontSize="9" fontWeight="700" textAnchor="middle" x={x} y={y + 3}>
                   {record.name.slice(0, 2)}
                 </text>
-                <title>
-                  {`${record.name}
+                <title>{`${record.name}
 Linea: ${record.line}
 ${metric.xLabel}: ${Math.round(metric.x(record)).toLocaleString("en-US")}
 ${metric.yLabel}: ${Math.round(metric.y(record)).toLocaleString("en-US")}
 ${metric.sizeLabel}: ${metric.size(record).toLocaleString("en-US")}
-Estado: ${record.status}`}
-                </title>
+Estado: ${record.status}`}</title>
               </g>
             );
           })}

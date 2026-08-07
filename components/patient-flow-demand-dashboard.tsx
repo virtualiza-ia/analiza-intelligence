@@ -813,11 +813,7 @@ function MetricTrendChart({
                 key={`${trend.labels[index]}-${value}`}
                 r="3.2"
               >
-                <title>
-                  {trend.labels[index]} · {trend.currentLabel}:{" "}
-                  {formatTrendValue(value, trend.unit)} · {trend.comparisonLabel}:{" "}
-                  {formatTrendValue(trend.previous[index] ?? 0, trend.unit)}
-                </title>
+                <title>{`${trend.labels[index]} · ${trend.currentLabel}: ${formatTrendValue(value, trend.unit)} · ${trend.comparisonLabel}: ${formatTrendValue(trend.previous[index] ?? 0, trend.unit)}`}</title>
               </circle>
             );
           })}

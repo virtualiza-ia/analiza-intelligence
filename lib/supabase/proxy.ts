@@ -4,6 +4,12 @@ import { demoAdminCookieName, hasDemoAdminCookie } from "@/lib/auth/demo-admin";
 import { localSessionCookieName } from "@/lib/auth/local-session-cookie";
 import { hasEnvVars } from "../utils";
 
+const publicAuthApiPaths = new Set([
+  "/api/auth/accept-invitation",
+  "/api/auth/demo-session",
+  "/api/auth/local-login",
+]);
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -15,6 +21,10 @@ export async function updateSession(request: NextRequest) {
   const hasLocalSession = Boolean(
     request.cookies.get(localSessionCookieName)?.value,
   );
+  const isPublicAuthPath =
+    request.nextUrl.pathname.startsWith("/auth") ||
+    request.nextUrl.pathname.startsWith("/login") ||
+    publicAuthApiPaths.has(request.nextUrl.pathname);
 
   // If the env vars are not set, skip proxy check. You can remove this
   // once you setup the project.
@@ -63,8 +73,7 @@ export async function updateSession(request: NextRequest) {
     !user &&
     !hasDemoAdminSession &&
     !hasLocalSession &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth")
+    !isPublicAuthPath
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();

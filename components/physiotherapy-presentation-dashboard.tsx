@@ -523,14 +523,13 @@ function ChartCard({ chart }: { chart: PhysioSlideChart }) {
             const y = height - ((point - min) / range) * height;
             return (
               <circle fill="#2563eb" key={`${chart.title}-${index}`} r="5" cx={x} cy={y}>
-                <title>
-                  {chart.labels[index]}:{" "}
-                  {chart.unit === "$"
+                <title>{`${chart.labels[index]}: ${
+                  chart.unit === "$"
                     ? formatCurrency(point)
                     : chart.unit === "%"
                       ? formatRate(point)
-                      : numberLabel(point)}
-                </title>
+                      : numberLabel(point)
+                }`}</title>
               </circle>
             );
           })}

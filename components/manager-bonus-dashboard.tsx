@@ -853,12 +853,10 @@ function ComplianceBonusChart({ records }: { records: ManagerBonusRecord[] }) {
                   x={x}
                   y={yScale(record.targetCompletionRate * 100)}
                 >
-                  <title>
-                    {`${record.manager}
+                  <title>{`${record.manager}
 Cumplimiento: ${formatRate(record.targetCompletionRate)}
 Bono proyectado: ${formatCurrency(record.bonusProjected)}
-Estado: ${record.bonusState}`}
-                  </title>
+Estado: ${record.bonusState}`}</title>
                 </rect>
                 <text fill="#64748b" fontSize="10" textAnchor="middle" x={x + barWidth / 2} y={height - 18}>
                   {record.manager.split(" ")[0]}
@@ -880,9 +878,7 @@ Estado: ${record.bonusState}`}
             const y = bonusY(record.bonusProjected);
             return (
               <circle cx={x} cy={y} fill="#2563eb" key={`${record.id}-bonus`} r="5">
-                <title>
-                  {`${record.manager}: ${formatCurrency(record.bonusProjected)}`}
-                </title>
+                <title>{`${record.manager}: ${formatCurrency(record.bonusProjected)}`}</title>
               </circle>
             );
           })}
@@ -1050,15 +1046,13 @@ function ProfitabilityPerformanceMatrix({
                 <text fill="#ffffff" fontSize="10" fontWeight="700" textAnchor="middle" x={x} y={y + 4}>
                   {record.manager.slice(0, 2)}
                 </text>
-                <title>
-                  {`${record.manager}
+                <title>{`${record.manager}
 Sucursal: ${record.branch}
 Score: ${record.score}
 Utilidad: ${formatCurrency(record.utility)}
 Venta: ${formatCurrency(record.netSales)}
 Bono: ${formatCurrency(record.bonusProjected)}
-Estado: ${record.bonusState}`}
-                </title>
+Estado: ${record.bonusState}`}</title>
               </g>
             );
           })}
@@ -1346,12 +1340,10 @@ function TalentMatrix({ records }: { records: ManagerBonusRecord[] }) {
                 <text fill="#ffffff" fontSize="9" fontWeight="700" textAnchor="middle" x={x} y={y + 3}>
                   {record.manager.slice(0, 2)}
                 </text>
-                <title>
-                  {`${record.manager}
+                <title>{`${record.manager}
 Desempeno: ${record.score}
 Tendencia: ${potential(record)}
-Estado: ${record.status}`}
-                </title>
+Estado: ${record.status}`}</title>
               </g>
             );
           })}

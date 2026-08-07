@@ -5,6 +5,8 @@ import {
   canAccessProtectedPath,
   canPerformAction,
 } from "../lib/security/authorization-policy.ts";
+import { getDemoScopeForRole } from "../lib/auth/demo-scope.ts";
+import { canUseDemoFeatures } from "../lib/security/environment.ts";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const countryId = "30000000-0000-4000-8000-000000000003";
@@ -45,6 +47,56 @@ const operationsManager = actor("gerente_operaciones", {
   companyId,
   countryId,
 });
+const demoBranchManager = actor(
+  "gerente_sucursal",
+  getDemoScopeForRole("gerente_sucursal"),
+);
+const demoAreaManager = actor("gerente_area", getDemoScopeForRole("gerente_area"));
+
+const originalAppEnv = process.env.APP_ENV;
+const originalAnalizaAppEnv = process.env.ANALIZA_APP_ENV;
+const originalVercelEnv = process.env.VERCEL_ENV;
+
+delete process.env.ANALIZA_APP_ENV;
+process.env.APP_ENV = "demo";
+delete process.env.VERCEL_ENV;
+assert.equal(
+  canUseDemoFeatures(),
+  true,
+  "Local APP_ENV=demo must enable local-only demo features.",
+);
+
+process.env.VERCEL_ENV = "preview";
+assert.equal(
+  canUseDemoFeatures(),
+  false,
+  "Staging/preview must not enable demo login even if APP_ENV=demo is set.",
+);
+
+process.env.VERCEL_ENV = "production";
+assert.equal(
+  canUseDemoFeatures(),
+  false,
+  "Production must never enable demo login.",
+);
+
+if (originalAppEnv === undefined) {
+  delete process.env.APP_ENV;
+} else {
+  process.env.APP_ENV = originalAppEnv;
+}
+
+if (originalAnalizaAppEnv === undefined) {
+  delete process.env.ANALIZA_APP_ENV;
+} else {
+  process.env.ANALIZA_APP_ENV = originalAnalizaAppEnv;
+}
+
+if (originalVercelEnv === undefined) {
+  delete process.env.VERCEL_ENV;
+} else {
+  process.env.VERCEL_ENV = originalVercelEnv;
+}
 
 for (const deniedPath of [
   "/protected/importaciones",
@@ -220,6 +272,47 @@ assert.equal(
   "Operations manager must execute connector sync actions in scope.",
 );
 
+assert.equal(
+  canPerformAction(demoBranchManager, "record.read", {
+    scope: demoBranchManager.scope,
+  }),
+  true,
+  "DEMO branch manager session must include an assigned branch scope.",
+);
+
+assert.equal(
+  canPerformAction(demoBranchManager, "record.read", {
+    scope: {
+      ...demoBranchManager.scope,
+      branchId: "outside-demo-branch",
+    },
+  }),
+  false,
+  "DEMO branch manager must stay limited to its assigned branch.",
+);
+
+assert.equal(
+  canPerformAction(demoAreaManager, "record.read", {
+    scope: {
+      ...demoAreaManager.scope,
+      branchId: demoBranchManager.scope.branchId,
+    },
+  }),
+  true,
+  "DEMO area manager must read branches inside its area.",
+);
+
+assert.equal(
+  canPerformAction(demoAreaManager, "record.read", {
+    scope: {
+      ...demoAreaManager.scope,
+      operationalAreaId: "outside-demo-area",
+    },
+  }),
+  false,
+  "DEMO area manager must stay limited to its assigned area.",
+);
+
 const sourceChecks = [
   "app/protected/[module]/page.tsx",
   "app/protected/overview/page.tsx",
@@ -227,9 +320,13 @@ const sourceChecks = [
   "app/api/users/invite/route.ts",
   "app/api/analia-chat/route.ts",
   "app/api/auth/demo-role/route.ts",
+  "app/api/auth/demo-session/route.ts",
   "app/forbidden/page.tsx",
+  "app/login/page.tsx",
   "components/app-sidebar.tsx",
   "components/business-module-dashboard.tsx",
+  "components/login-form.tsx",
+  "lib/auth/demo-scope.ts",
   "lib/server/authorization.ts",
   "lib/security/authorization-policy.ts",
   "lib/security/environment.ts",
@@ -243,6 +340,10 @@ for (const file of sourceChecks) {
 const modulePage = readFileSync("app/protected/[module]/page.tsx", "utf8");
 const inviteRoute = readFileSync("app/api/users/invite/route.ts", "utf8");
 const analiaRoute = readFileSync("app/api/analia-chat/route.ts", "utf8");
+const demoSessionRoute = readFileSync("app/api/auth/demo-session/route.ts", "utf8");
+const loginAliasPage = readFileSync("app/login/page.tsx", "utf8");
+const loginForm = readFileSync("components/login-form.tsx", "utf8");
+const sessionProxy = readFileSync("lib/supabase/proxy.ts", "utf8");
 const sidebar = readFileSync("components/app-sidebar.tsx", "utf8");
 const demoAdminHelper = readFileSync("lib/auth/demo-admin.ts", "utf8");
 const environment = readFileSync("lib/security/environment.ts", "utf8");
@@ -303,6 +404,37 @@ assert(
   sidebar.includes("/api/auth/demo-role") &&
     sidebar.includes("allowDemoRoleSwitch"),
   "DEMO role switch must synchronize through a server-side endpoint.",
+);
+
+assert(
+  demoSessionRoute.includes("isDemoAdminEnabled") &&
+    demoSessionRoute.includes("demoAdminCookieName") &&
+    demoSessionRoute.includes("demoRoleCookieName") &&
+    demoSessionRoute.includes("getDemoSessionCookieOptions") &&
+    !demoSessionRoute.includes("ANALIZA_DEMO_ADMIN_PASSWORD"),
+  "Local DEMO session endpoint must be server-side, environment gated, and passwordless.",
+);
+
+assert(
+  loginAliasPage.includes("enableLocalDemoLogin={isDemoAdminEnabled()}") &&
+    loginForm.includes("Entorno DEMO local") &&
+    loginForm.includes("/api/auth/demo-session") &&
+    loginForm.includes("Direccion / Super Admin") &&
+    loginForm.includes("Gerente de Operaciones") &&
+    loginForm.includes("Gerente de Area") &&
+    loginForm.includes("Gerente de Sucursal") &&
+    loginForm.includes("Usuario Operativo") &&
+    loginForm.includes("Viewer") &&
+    !loginForm.match(/type=["']password["'][^>]*value=["'][^"']+["']/i),
+  "Login must expose local DEMO profiles only when the server enables demo login.",
+);
+
+assert(
+  sessionProxy.includes("/api/auth/demo-session") &&
+    sessionProxy.includes("/api/auth/local-login") &&
+    sessionProxy.includes("publicAuthApiPaths") &&
+    sessionProxy.includes("!isPublicAuthPath"),
+  "Session proxy must allow public auth APIs while keeping protected routes guarded.",
 );
 
 assert(
