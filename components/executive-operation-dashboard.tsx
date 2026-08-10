@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { AnalyticsComparisonChart } from "@/components/analytics-comparison-chart";
+import { ImagingVerticalDashboard } from "@/components/imaging-vertical-dashboard";
 import { LaboratoryVerticalDashboard } from "@/components/laboratory-vertical-dashboard";
 import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
 import { Badge } from "@/components/ui/badge";
@@ -278,6 +279,10 @@ export function ExecutiveOperationDashboard() {
       return "fisioterapia";
     }
 
+    if (activeBusinessLine.line === "Imagenes") {
+      return "imagenes";
+    }
+
     return contextLineSlug;
   }, [activeBusinessLine.line, contextLineSlug]);
   const screen = useMemo(() => getExecutiveOperationScreen(lineSlug), [lineSlug]);
@@ -288,6 +293,10 @@ export function ExecutiveOperationDashboard() {
 
   if (lineSlug === "laboratorio") {
     return <LaboratoryVerticalDashboard mode="operations" />;
+  }
+
+  if (lineSlug === "imagenes") {
+    return <ImagingVerticalDashboard mode="operations" />;
   }
 
   return (

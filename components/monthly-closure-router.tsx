@@ -1,4 +1,5 @@
 import { LaboratoryVerticalDashboard } from "@/components/laboratory-vertical-dashboard";
+import { ImagingVerticalDashboard } from "@/components/imaging-vertical-dashboard";
 import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
 import type { AuthorizationActor } from "@/lib/security/authorization-policy";
 import { demoCompanies } from "@/lib/tenant/demo-context";
@@ -22,6 +23,15 @@ type MonthlyClosureRouterProps = {
 function requestedLine(value: string | string[] | undefined) {
   const rawValue = Array.isArray(value) ? value[0] : value;
   const normalizedValue = rawValue?.trim().toLowerCase();
+
+  if (
+    normalizedValue === "imagenes" ||
+    normalizedValue === "imagen" ||
+    normalizedValue === "imaging" ||
+    normalizedValue === "img"
+  ) {
+    return "imagenes";
+  }
 
   if (
     normalizedValue === "laboratorio" ||
@@ -58,6 +68,10 @@ export function MonthlyClosureRouter({
 
   if (selectedLine === "laboratorio") {
     return <LaboratoryVerticalDashboard mode={mode} />;
+  }
+
+  if (selectedLine === "imagenes") {
+    return <ImagingVerticalDashboard mode={mode} />;
   }
 
   return <PhysiotherapyVerticalDashboard mode={mode} />;

@@ -21,7 +21,7 @@ const roleStorageKey = "analiza:demo-role";
 const businessLineStorageKey = "analiza:demo-business-line";
 const roleChangeEvent = "analiza:role-change";
 
-type DemoBusinessLineCode = "PHYSIOTHERAPY" | "LABORATORY";
+type DemoBusinessLineCode = "PHYSIOTHERAPY" | "LABORATORY" | "IMAGING";
 
 type DemoLoginProfile = {
   label: string;
@@ -47,6 +47,7 @@ const demoBusinessLineProfiles: {
   code: DemoBusinessLineCode;
   label: string;
 }[] = [
+  { code: "IMAGING", label: "Analiza Imagenes" },
   { code: "LABORATORY", label: "Analiza Laboratorio" },
   { code: "PHYSIOTHERAPY", label: "Analiza Fisioterapia" },
 ];

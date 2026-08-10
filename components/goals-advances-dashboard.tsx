@@ -14,6 +14,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ImagingVerticalDashboard } from "@/components/imaging-vertical-dashboard";
 import { LaboratoryVerticalDashboard } from "@/components/laboratory-vertical-dashboard";
 import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
 import {
@@ -80,6 +81,10 @@ export function GoalsAdvancesDashboard() {
 
   if (activeBusinessLine.line === "Laboratorio") {
     return <LaboratoryVerticalDashboard mode="targets" />;
+  }
+
+  if (activeBusinessLine.line === "Imagenes") {
+    return <ImagingVerticalDashboard mode="targets" />;
   }
 
   if (

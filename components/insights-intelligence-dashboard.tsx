@@ -32,6 +32,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataScienceAgentCockpit } from "@/components/data-science-agent-cockpit";
+import { ImagingVerticalDashboard } from "@/components/imaging-vertical-dashboard";
 import { Input } from "@/components/ui/input";
 import { LaboratoryVerticalDashboard } from "@/components/laboratory-vertical-dashboard";
 import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
@@ -2791,6 +2792,10 @@ export function InsightsIntelligenceDashboard() {
 
   if (businessLineLabel === "Laboratorio") {
     return <LaboratoryVerticalDashboard mode="insights" />;
+  }
+
+  if (businessLineLabel === "Imagenes") {
+    return <ImagingVerticalDashboard mode="insights" />;
   }
 
   if (

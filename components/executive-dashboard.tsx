@@ -12,6 +12,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import { ImagingExecutiveSummary } from "@/components/imaging-vertical-dashboard";
 import { LaboratoryExecutiveSummary } from "@/components/laboratory-vertical-dashboard";
 import { PhysiotherapyExecutiveSummary } from "@/components/physiotherapy-vertical-dashboard";
 import { Badge } from "@/components/ui/badge";
@@ -1331,6 +1332,14 @@ export function ExecutiveDashboard() {
     return (
       <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
         <LaboratoryExecutiveSummary />
+      </section>
+    );
+  }
+
+  if (activeBusinessLine.line === "Imagenes") {
+    return (
+      <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
+        <ImagingExecutiveSummary />
       </section>
     );
   }
