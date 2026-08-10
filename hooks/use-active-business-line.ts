@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const storageKey = "analiza:selected-context";
+const demoBusinessLineStorageKey = "analiza:demo-business-line";
 const contextChangeEvent = "analiza:context-change";
 
 export type ActiveBusinessLine = "Consolidado" | "Fisioterapia" | "Laboratorio" | "Imagenes";
@@ -102,9 +103,17 @@ function getActiveBusinessLineFromBrowser(): ActiveBusinessLine {
     readStoredContext(window.localStorage) ??
     readStoredContext(window.sessionStorage) ??
     {};
+  const demoBusinessLineCode =
+    window.localStorage.getItem(demoBusinessLineStorageKey) ??
+    window.sessionStorage.getItem(demoBusinessLineStorageKey);
+  const storedBusinessLineCode =
+    storedContext.businessLineCode === "CONSOLIDATED"
+      ? undefined
+      : storedContext.businessLineCode;
 
   return resolveActiveBusinessLine({
     ...storedContext,
+    businessLineCode: storedBusinessLineCode ?? demoBusinessLineCode ?? undefined,
     lineParam: searchParams.get("line"),
   });
 }

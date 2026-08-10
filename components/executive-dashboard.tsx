@@ -12,8 +12,10 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import { LaboratoryExecutiveSummary } from "@/components/laboratory-vertical-dashboard";
 import { PhysiotherapyExecutiveSummary } from "@/components/physiotherapy-vertical-dashboard";
 import { Badge } from "@/components/ui/badge";
+import { useActiveBusinessLine } from "@/hooks/use-active-business-line";
 import {
   demoDashboardMeta,
   getAppointmentStatusByLine,
@@ -1196,6 +1198,7 @@ function OperationalLineSelector({
 }
 
 export function ExecutiveDashboard() {
+  const activeBusinessLine = useActiveBusinessLine();
   const [context, setContext] = useState<StoredContext | null>(null);
   const [selectedOperationalLineKey, setSelectedOperationalLineKey] =
     useState<BusinessLineKey | "">("");
@@ -1323,6 +1326,14 @@ export function ExecutiveDashboard() {
       setSelectedOperationalLineKey(lines[0].key);
     }
   }, [lines, selectedOperationalLineKey]);
+
+  if (activeBusinessLine.line === "Laboratorio") {
+    return (
+      <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
+        <LaboratoryExecutiveSummary />
+      </section>
+    );
+  }
 
   return (
     <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">

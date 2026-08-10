@@ -47,6 +47,9 @@ import {
   type CurrentUserAccess,
 } from "@/lib/tenant/current-user-access";
 
+const demoBusinessLineStorageKey = "analiza:demo-business-line";
+const roleChangeEvent = "analiza:role-change";
+
 type StoredContext = {
   countryId: string;
   countryName: string;
@@ -151,6 +154,9 @@ function findBusinessLineByCompanyScope(companyId?: string | null, companyName?:
 export function TenantContextHeader() {
   const [currentUserAccess, setCurrentUserAccess] =
     useState<CurrentUserAccess | null>(null);
+  const [demoBusinessLineCode, setDemoBusinessLineCode] = useState<string | null>(
+    null,
+  );
   const [countryId, setCountryId] = useState(getInitialCountryId());
   const [companyId, setCompanyId] = useState("");
   const [businessLineId, setBusinessLineId] = useState(
@@ -177,6 +183,13 @@ export function TenantContextHeader() {
         scopedBranchAccess.scope.companyName,
       )
     : null;
+  const demoScopedBusinessLine =
+    demoBusinessLineCode && !scopedBranchAccess
+      ? demoBusinessLineOptions.find(
+          (line) =>
+            line.code === demoBusinessLineCode && !line.isConsolidated,
+        ) ?? null
+      : null;
   const selectedCountry = demoCountryOptions.find(
     (country) => country.id === countryId,
   );
@@ -243,6 +256,24 @@ export function TenantContextHeader() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    function syncDemoBusinessLine() {
+      setDemoBusinessLineCode(
+        window.localStorage.getItem(demoBusinessLineStorageKey) ??
+          window.sessionStorage.getItem(demoBusinessLineStorageKey),
+      );
+    }
+
+    syncDemoBusinessLine();
+    window.addEventListener("storage", syncDemoBusinessLine);
+    window.addEventListener(roleChangeEvent, syncDemoBusinessLine);
+
+    return () => {
+      window.removeEventListener("storage", syncDemoBusinessLine);
+      window.removeEventListener(roleChangeEvent, syncDemoBusinessLine);
     };
   }, []);
 
@@ -328,6 +359,32 @@ export function TenantContextHeader() {
     scopedBusinessLine?.companyId,
     scopedBusinessLine?.id,
   ]);
+
+  useEffect(() => {
+    if (scopedBranchAccess || !demoScopedBusinessLine) {
+      return;
+    }
+
+    setBusinessLineId((currentBusinessLineId) => {
+      const currentBusinessLine = demoBusinessLineOptions.find(
+        (line) => line.id === currentBusinessLineId,
+      );
+
+      return !currentBusinessLine || currentBusinessLine.isConsolidated
+        ? demoScopedBusinessLine.id
+        : currentBusinessLineId;
+    });
+    setCompanyId((currentCompanyId) => {
+      const currentCompany = demoCompanyOptions.find(
+        (company) => company.id === currentCompanyId,
+      );
+      const demoCompany = getCompanyForBusinessLine(demoScopedBusinessLine.id);
+
+      return !currentCompany || currentCompany.isConsolidated
+        ? demoCompany.id
+        : currentCompanyId;
+    });
+  }, [demoScopedBusinessLine, scopedBranchAccess]);
 
   useEffect(() => {
     const country = demoCountryOptions.find((item) => item.id === countryId);

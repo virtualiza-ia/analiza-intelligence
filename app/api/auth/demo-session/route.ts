@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 
 import {
   demoAdminCookieName,
+  demoBusinessLineCookieName,
   demoRoleCookieName,
+  type DemoBusinessLineCode,
   getDemoAdminSessionValue,
   getDemoSessionCookieOptions,
   isDemoAdminEnabled,
@@ -10,6 +12,7 @@ import {
 import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
 
 type DemoSessionRequest = {
+  businessLineCode?: unknown;
   roleKey?: unknown;
 };
 
@@ -30,6 +33,18 @@ function isLocalDemoLoginRole(value: unknown): value is RoleKey {
   );
 }
 
+function readDemoBusinessLineCode(value: unknown): DemoBusinessLineCode {
+  if (
+    value === "PHYSIOTHERAPY" ||
+    value === "LABORATORY" ||
+    value === "IMAGING"
+  ) {
+    return value;
+  }
+
+  return "PHYSIOTHERAPY";
+}
+
 function jsonError(error: string, status: number) {
   return NextResponse.json({ error, ok: false }, { status });
 }
@@ -47,7 +62,12 @@ export async function POST(request: Request) {
     return jsonError("Perfil DEMO local invalido.", 400);
   }
 
-  const response = NextResponse.json({ ok: true, roleKey: payload.roleKey });
+  const businessLineCode = readDemoBusinessLineCode(payload.businessLineCode);
+  const response = NextResponse.json({
+    businessLineCode,
+    ok: true,
+    roleKey: payload.roleKey,
+  });
   const cookieOptions = getDemoSessionCookieOptions();
   response.cookies.set(
     demoAdminCookieName,
@@ -55,6 +75,11 @@ export async function POST(request: Request) {
     cookieOptions,
   );
   response.cookies.set(demoRoleCookieName, payload.roleKey, cookieOptions);
+  response.cookies.set(
+    demoBusinessLineCookieName,
+    businessLineCode,
+    cookieOptions,
+  );
 
   return response;
 }

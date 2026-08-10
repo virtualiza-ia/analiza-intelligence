@@ -33,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataScienceAgentCockpit } from "@/components/data-science-agent-cockpit";
 import { Input } from "@/components/ui/input";
+import { LaboratoryVerticalDashboard } from "@/components/laboratory-vertical-dashboard";
 import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
 import { formatCurrency } from "@/lib/analytics/el-salvador-result-templates";
 import {
@@ -2786,9 +2787,16 @@ export function InsightsIntelligenceDashboard() {
     insights.find((insight) => insight.id === selectedInsightId) ??
     null;
 
+  const businessLineLabel = getBusinessLineLabel(context);
+
+  if (businessLineLabel === "Laboratorio") {
+    return <LaboratoryVerticalDashboard mode="insights" />;
+  }
+
   if (
-    getBusinessLineLabel(context) === "Fisioterapia" ||
-    physiotherapyScopedInsightRoles.has(roleKey)
+    businessLineLabel === "Fisioterapia" ||
+    (businessLineLabel === "Consolidado" &&
+      physiotherapyScopedInsightRoles.has(roleKey))
   ) {
     return <PhysiotherapyVerticalDashboard mode="insights" />;
   }

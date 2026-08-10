@@ -1,15 +1,23 @@
 import { Suspense } from "react";
 
-import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
+import { MonthlyClosureRouter } from "@/components/monthly-closure-router";
 import { requireProtectedPath } from "@/lib/server/authorization";
 
-async function MyBranchGate() {
-  await requireProtectedPath("/protected/mi-sucursal");
+type MyBranchPageProps = {
+  searchParams?: Promise<{
+    line?: string | string[];
+  }>;
+};
 
-  return <PhysiotherapyVerticalDashboard mode="branch-home" />;
+async function MyBranchGate({ line }: { line?: string | string[] }) {
+  const actor = await requireProtectedPath("/protected/mi-sucursal");
+
+  return <MonthlyClosureRouter actor={actor} line={line} mode="branch-home" />;
 }
 
-export default function MyBranchPage() {
+export default async function MyBranchPage({ searchParams }: MyBranchPageProps) {
+  const params = searchParams ? await searchParams : {};
+
   return (
     <Suspense
       fallback={
@@ -18,7 +26,7 @@ export default function MyBranchPage() {
         </div>
       }
     >
-      <MyBranchGate />
+      <MyBranchGate line={params.line} />
     </Suspense>
   );
 }

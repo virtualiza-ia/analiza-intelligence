@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   demoAdminCookieName,
+  demoBusinessLineCookieName,
   demoRoleCookieName,
   getDemoAdminEmail,
   getDemoAdminPassword,
@@ -63,6 +64,11 @@ export async function POST(request: Request) {
     "super_admin",
     getDemoSessionCookieOptions(),
   );
+  response.cookies.set(
+    demoBusinessLineCookieName,
+    "PHYSIOTHERAPY",
+    getDemoSessionCookieOptions(),
+  );
 
   return response;
 }
@@ -76,6 +82,11 @@ export function DELETE() {
   );
   response.cookies.set(
     demoRoleCookieName,
+    "",
+    getExpiredDemoSessionCookieOptions(),
+  );
+  response.cookies.set(
+    demoBusinessLineCookieName,
     "",
     getExpiredDemoSessionCookieOptions(),
   );

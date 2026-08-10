@@ -14,6 +14,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { LaboratoryVerticalDashboard } from "@/components/laboratory-vertical-dashboard";
 import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
 import {
   formatMoney,
@@ -77,9 +78,14 @@ export function GoalsAdvancesDashboard() {
     };
   }, []);
 
+  if (activeBusinessLine.line === "Laboratorio") {
+    return <LaboratoryVerticalDashboard mode="targets" />;
+  }
+
   if (
     activeBusinessLine.line === "Fisioterapia" ||
-    physiotherapyScopedDemoRoles.has(demoRole ?? "")
+    (activeBusinessLine.isConsolidated &&
+      physiotherapyScopedDemoRoles.has(demoRole ?? ""))
   ) {
     return <PhysiotherapyVerticalDashboard mode="targets" />;
   }

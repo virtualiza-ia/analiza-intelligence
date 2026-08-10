@@ -18,7 +18,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const roleStorageKey = "analiza:demo-role";
+const businessLineStorageKey = "analiza:demo-business-line";
 const roleChangeEvent = "analiza:role-change";
+
+type DemoBusinessLineCode = "PHYSIOTHERAPY" | "LABORATORY";
 
 type DemoLoginProfile = {
   label: string;
@@ -40,6 +43,14 @@ const demoLoginProfiles: DemoLoginProfile[] = [
   { label: "Viewer", roleKey: "viewer" },
 ];
 
+const demoBusinessLineProfiles: {
+  code: DemoBusinessLineCode;
+  label: string;
+}[] = [
+  { code: "LABORATORY", label: "Analiza Laboratorio" },
+  { code: "PHYSIOTHERAPY", label: "Analiza Fisioterapia" },
+];
+
 export function LoginForm({
   enableLocalDemoLogin = false,
   className,
@@ -52,7 +63,9 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeDemoRole, setActiveDemoRole] =
-    useState<DemoLoginProfile["roleKey"]>("super_admin");
+    useState<DemoLoginProfile["roleKey"]>("gerente_sucursal");
+  const [activeDemoBusinessLine, setActiveDemoBusinessLine] =
+    useState<DemoBusinessLineCode>("LABORATORY");
   const router = useRouter();
 
   const handleDemoLogin = async () => {
@@ -61,7 +74,10 @@ export function LoginForm({
 
     try {
       const response = await fetch("/api/auth/demo-session", {
-        body: JSON.stringify({ roleKey: activeDemoRole }),
+        body: JSON.stringify({
+          businessLineCode: activeDemoBusinessLine,
+          roleKey: activeDemoRole,
+        }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
@@ -74,6 +90,7 @@ export function LoginForm({
       }
 
       window.localStorage.setItem(roleStorageKey, activeDemoRole);
+      window.localStorage.setItem(businessLineStorageKey, activeDemoBusinessLine);
       window.dispatchEvent(new Event(roleChangeEvent));
       router.push("/protected/context");
       router.refresh();
@@ -169,6 +186,23 @@ export function LoginForm({
               >
                 {demoLoginProfiles.map((profile) => (
                   <option key={profile.roleKey} value={profile.roleKey}>
+                    {profile.label}
+                  </option>
+                ))}
+              </select>
+              <Label htmlFor="demo-business-line">Unidad demo</Label>
+              <select
+                className="h-10 rounded-md border bg-background px-3 text-sm text-foreground outline-none"
+                id="demo-business-line"
+                value={activeDemoBusinessLine}
+                onChange={(event) =>
+                  setActiveDemoBusinessLine(
+                    event.target.value as DemoBusinessLineCode,
+                  )
+                }
+              >
+                {demoBusinessLineProfiles.map((profile) => (
+                  <option key={profile.code} value={profile.code}>
                     {profile.label}
                   </option>
                 ))}

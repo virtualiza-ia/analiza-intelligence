@@ -1,15 +1,25 @@
 import { Suspense } from "react";
 
-import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
+import { MonthlyClosureRouter } from "@/components/monthly-closure-router";
 import { requireProtectedPath } from "@/lib/server/authorization";
 
-async function NewClosureGate() {
-  await requireProtectedPath("/protected/cierres/nuevo");
+type NewClosurePageProps = {
+  searchParams?: Promise<{
+    line?: string | string[];
+  }>;
+};
 
-  return <PhysiotherapyVerticalDashboard mode="new-closure" />;
+async function NewClosureGate({ line }: { line?: string | string[] }) {
+  const actor = await requireProtectedPath("/protected/cierres/nuevo");
+
+  return <MonthlyClosureRouter actor={actor} line={line} mode="new-closure" />;
 }
 
-export default function NewClosurePage() {
+export default async function NewClosurePage({
+  searchParams,
+}: NewClosurePageProps) {
+  const params = searchParams ? await searchParams : {};
+
   return (
     <Suspense
       fallback={
@@ -18,7 +28,7 @@ export default function NewClosurePage() {
         </div>
       }
     >
-      <NewClosureGate />
+      <NewClosureGate line={params.line} />
     </Suspense>
   );
 }

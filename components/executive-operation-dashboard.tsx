@@ -10,8 +10,10 @@ import {
 } from "lucide-react";
 
 import { AnalyticsComparisonChart } from "@/components/analytics-comparison-chart";
+import { LaboratoryVerticalDashboard } from "@/components/laboratory-vertical-dashboard";
 import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
 import { Badge } from "@/components/ui/badge";
+import { useActiveBusinessLine } from "@/hooks/use-active-business-line";
 import {
   resolveBusinessLineSlug,
   type BusinessLineSlug,
@@ -248,6 +250,7 @@ function ScopeCard({
 }
 
 export function ExecutiveOperationDashboard() {
+  const activeBusinessLine = useActiveBusinessLine();
   const [context, setContext] = useState<StoredContext | null>(null);
 
   useEffect(() => {
@@ -265,11 +268,26 @@ export function ExecutiveOperationDashboard() {
     };
   }, []);
 
-  const lineSlug = useMemo(() => resolveContextLine(context), [context]);
+  const contextLineSlug = useMemo(() => resolveContextLine(context), [context]);
+  const lineSlug = useMemo(() => {
+    if (activeBusinessLine.line === "Laboratorio") {
+      return "laboratorio";
+    }
+
+    if (activeBusinessLine.line === "Fisioterapia") {
+      return "fisioterapia";
+    }
+
+    return contextLineSlug;
+  }, [activeBusinessLine.line, contextLineSlug]);
   const screen = useMemo(() => getExecutiveOperationScreen(lineSlug), [lineSlug]);
 
   if (lineSlug === "fisioterapia") {
     return <PhysiotherapyVerticalDashboard mode="operations" />;
+  }
+
+  if (lineSlug === "laboratorio") {
+    return <LaboratoryVerticalDashboard mode="operations" />;
   }
 
   return (

@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 
 import {
   demoAdminCookieName,
+  demoBusinessLineCookieName,
   demoRoleCookieName,
   getDemoAdminEmail,
+  getDemoBusinessLineFromCookie,
   getDemoRoleFromCookie,
   hasDemoAdminCookie,
   isDemoRoleSwitchEnabled,
@@ -144,12 +146,16 @@ function readDemoAuthorizationActor(
   const roleKey =
     getDemoRoleFromCookie(cookieSource.get(demoRoleCookieName)?.value) ??
     "super_admin";
+  const businessLineCode =
+    getDemoBusinessLineFromCookie(
+      cookieSource.get(demoBusinessLineCookieName)?.value,
+    ) ?? "PHYSIOTHERAPY";
 
   return {
     allowDemoRoleSwitch: isDemoRoleSwitchEnabled(),
     email: getDemoAdminEmail(),
     roleKey,
-    scope: getDemoScopeForRole(roleKey),
+    scope: getDemoScopeForRole(roleKey, businessLineCode),
     source: "demo",
     userId: "demo-admin",
   };
