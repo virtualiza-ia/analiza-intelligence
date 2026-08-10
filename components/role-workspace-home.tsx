@@ -140,8 +140,8 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
     title: "Bandeja del gerente de operaciones",
     description:
       "Entra por cierres pendientes, sucursales con riesgo, capacidad, SLA y datos faltantes.",
-    primaryHref: "/protected/operacion",
-    primaryLabel: "Ver operacion ejecutiva",
+    primaryHref: "/protected/resultados",
+    primaryLabel: "Ver resultados Fisioterapia",
     metrics: [
       { label: "Cierres pendientes", value: "5", note: "pendientes de validar" },
       { label: "Sucursales", value: "4", note: "con riesgo operativo" },
@@ -151,13 +151,13 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
       {
         title: "Cierres mensuales incompletos",
         detail: "Priorizar sucursales con campos obligatorios pendientes antes del dia 5.",
-        href: "/protected/plantillas",
+        href: "/protected/cierres",
         tone: "critical",
       },
       {
         title: "Capacidad perdida",
         detail: "Detectar donde hay horas disponibles no convertidas en produccion.",
-        href: "/protected/capacidad",
+        href: "/protected/resultados",
         tone: "action",
       },
       {
@@ -168,9 +168,9 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
       },
     ],
     shortcutHrefs: [
-      "/protected/operacion",
+      "/protected/resultados",
       "/protected/sucursales",
-      "/protected/plantillas",
+      "/protected/cierres",
       "/protected/calidad-datos",
     ],
   },
@@ -190,7 +190,7 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
       {
         title: "Explicaciones pendientes por sucursal",
         detail: "Pedir causa y accion a gerentes antes de cerrar el periodo.",
-        href: "/protected/sucursales",
+        href: "/protected/cierres",
         tone: "critical",
       },
       {
@@ -207,9 +207,10 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
       },
     ],
     shortcutHrefs: [
+      "/protected/resultados",
+      "/protected/cierres",
       "/protected/sucursales",
       "/protected/gerentes",
-      "/protected/plantillas",
       "/protected/metas",
     ],
   },
@@ -218,7 +219,7 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
     title: "Bandeja del gerente de sucursal",
     description:
       "Muestra solo lo que necesita completar o explicar: cierre mensual, metas, alertas y evidencias.",
-    primaryHref: "/protected/plantillas",
+    primaryHref: "/protected/cierres/nuevo",
     primaryLabel: "Completar cierre mensual",
     metrics: [
       { label: "Cierre", value: "33%", note: "DEMO completado" },
@@ -229,13 +230,13 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
       {
         title: "Completar cierre de julio",
         detail: "Ingresar resultados, costos, capacidad y observaciones antes de publicar.",
-        href: "/protected/plantillas",
+        href: "/protected/cierres/nuevo",
         tone: "critical",
       },
       {
         title: "Explicar variacion de ventas",
         detail: "Agregar causa, evidencia y accion para que operaciones valide.",
-        href: "/protected/sucursales",
+        href: "/protected/mi-sucursal",
         tone: "action",
       },
       {
@@ -246,8 +247,10 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
       },
     ],
     shortcutHrefs: [
-      "/protected/plantillas",
-      "/protected/sucursales",
+      "/protected/mi-sucursal",
+      "/protected/cierres/nuevo",
+      "/protected/cierres",
+      "/protected/resultados",
       "/protected/metas",
       "/protected/insights",
     ],

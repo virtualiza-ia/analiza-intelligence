@@ -7,10 +7,16 @@ import type { ScopeBoundary } from "../tenant/delegation-policy.ts";
 
 const demoOrganizationId = "10000000-0000-4000-8000-000000000001";
 const fallbackCountryId = "30000000-0000-4000-8000-000000000003";
-const fallbackCompanyId = "40000000-0000-4000-8000-000000000002";
+const fallbackCompanyId = "40000000-0000-4000-8000-000000000001";
 
 function getScopedDemoBranch() {
   return (
+    demoBranches.find(
+      (branch) =>
+        branch.businessLineCode === "PHYSIOTHERAPY" &&
+        branch.operationalAreaId &&
+        branch.isActive !== false,
+    ) ??
     demoBranches.find((branch) => branch.operationalAreaId && branch.isActive !== false) ??
     demoBranches.find((branch) => branch.isActive !== false) ??
     demoBranches[0] ??

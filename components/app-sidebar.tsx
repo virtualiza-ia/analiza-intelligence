@@ -43,29 +43,10 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
   useEffect(() => {
     setCollapsed(window.localStorage.getItem(storageKey) === "true");
 
-    if (!allowDemoRoleSwitch) {
-      setActiveRole(roleKey);
-      window.localStorage.setItem(roleStorageKey, roleKey);
-      window.dispatchEvent(new Event(roleChangeEvent));
-      return;
-    }
-
-    const storedRole = window.localStorage.getItem(roleStorageKey);
-
-    if (roleKeys.includes(storedRole as RoleKey)) {
-      const nextRole = storedRole as RoleKey;
-      setActiveRole(nextRole);
-      void fetch("/api/auth/demo-role", {
-        body: JSON.stringify({ roleKey: nextRole }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      });
-      return;
-    }
-
     setActiveRole(roleKey);
     window.localStorage.setItem(roleStorageKey, roleKey);
-  }, [allowDemoRoleSwitch, roleKey]);
+    window.dispatchEvent(new Event(roleChangeEvent));
+  }, [roleKey]);
 
   function toggleCollapsed() {
     setCollapsed((currentValue) => {

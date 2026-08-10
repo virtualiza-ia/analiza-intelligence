@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { AnalyticsComparisonChart } from "@/components/analytics-comparison-chart";
+import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
 import { Badge } from "@/components/ui/badge";
 import {
   resolveBusinessLineSlug,
@@ -266,6 +267,10 @@ export function ExecutiveOperationDashboard() {
 
   const lineSlug = useMemo(() => resolveContextLine(context), [context]);
   const screen = useMemo(() => getExecutiveOperationScreen(lineSlug), [lineSlug]);
+
+  if (lineSlug === "fisioterapia") {
+    return <PhysiotherapyVerticalDashboard mode="operations" />;
+  }
 
   return (
     <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">

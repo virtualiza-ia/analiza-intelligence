@@ -111,22 +111,63 @@ const delegatedUserAdminRoles: RoleKey[] = [
 
 const ceoFocusedRoles: RoleKey[] = ["ceo"];
 const operationsFocusedRoles: RoleKey[] = ["gerente_operaciones"];
-const branchFocusedRoles: RoleKey[] = [
-  "gerente_operaciones",
-  "gerente_area",
-  "gerente_sucursal",
-];
 const adminDataRoles: RoleKey[] = [...adminRoles, "gerente_operaciones"];
 const importMutationRoles: RoleKey[] = [
   ...adminRoles,
   "gerente_operaciones",
   "gerente_area",
-  "gerente_sucursal",
   "usuario_operativo",
 ];
 const deepDiagnosticRoles: RoleKey[] = [];
 
 export const navigationItems: NavigationItem[] = [
+  {
+    title: "Mi sucursal",
+    href: "/protected/mi-sucursal",
+    icon: Building2,
+    group: "operacion",
+    allowedRoles: ["gerente_sucursal"],
+  },
+  {
+    title: "Nuevo cierre mensual",
+    href: "/protected/cierres/nuevo",
+    icon: ClipboardCheck,
+    group: "operacion",
+    allowedRoles: [
+      ...adminRoles,
+      "gerente_operaciones",
+      "gerente_area",
+      "gerente_sucursal",
+    ],
+  },
+  {
+    title: "Historial de cierres",
+    href: "/protected/cierres",
+    icon: CalendarClock,
+    group: "operacion",
+    allowedRoles: [
+      ...adminRoles,
+      "ceo",
+      "gerente_operaciones",
+      "gerente_area",
+      "gerente_sucursal",
+      "viewer",
+    ],
+  },
+  {
+    title: "Resultados",
+    href: "/protected/resultados",
+    icon: BarChart3,
+    group: "direccion",
+    allowedRoles: [
+      ...adminRoles,
+      "ceo",
+      "gerente_operaciones",
+      "gerente_area",
+      "gerente_sucursal",
+      "viewer",
+    ],
+  },
   {
     title: "Resumen ejecutivo",
     href: "/protected/overview",
@@ -167,7 +208,12 @@ export const navigationItems: NavigationItem[] = [
     href: "/protected/sucursales",
     icon: Building2,
     group: "operacion",
-    allowedRoles: [...branchFocusedRoles, "ceo"],
+    allowedRoles: [
+      ...adminRoles,
+      "ceo",
+      "gerente_operaciones",
+      "gerente_area",
+    ],
   },
   {
     title: "Gerentes y bonos",
@@ -230,7 +276,12 @@ export const navigationItems: NavigationItem[] = [
     href: "/protected/plantillas",
     icon: ClipboardCheck,
     group: "datos",
-    allowedRoles: [...branchFocusedRoles, "usuario_operativo"],
+    allowedRoles: [
+      ...adminRoles,
+      "gerente_operaciones",
+      "gerente_area",
+      "usuario_operativo",
+    ],
   },
   {
     title: "Conectores",
@@ -258,7 +309,7 @@ export const navigationItems: NavigationItem[] = [
     href: "/protected/metas",
     icon: Goal,
     group: "direccion",
-    allowedRoles: ["ceo", "gerente_area", "gerente_sucursal"],
+    allowedRoles: ["ceo", "gerente_operaciones", "gerente_area", "gerente_sucursal"],
   },
   {
     title: "Usuarios y permisos",

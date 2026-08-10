@@ -33,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataScienceAgentCockpit } from "@/components/data-science-agent-cockpit";
 import { Input } from "@/components/ui/input";
+import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
 import { formatCurrency } from "@/lib/analytics/el-salvador-result-templates";
 import {
   actionStatuses,
@@ -95,6 +96,12 @@ const contextChangeEvent = "analiza:context-change";
 const roleStorageKey = "analiza:demo-role";
 const roleChangeEvent = "analiza:role-change";
 const currentDate = "2026-07-23";
+const physiotherapyScopedInsightRoles = new Set<RoleKey>([
+  "gerente_operaciones",
+  "gerente_area",
+  "gerente_sucursal",
+  "viewer",
+]);
 
 const tabs = [
   "Alertas tempranas",
@@ -2778,6 +2785,13 @@ export function InsightsIntelligenceDashboard() {
     filteredInsights[0] ??
     insights.find((insight) => insight.id === selectedInsightId) ??
     null;
+
+  if (
+    getBusinessLineLabel(context) === "Fisioterapia" ||
+    physiotherapyScopedInsightRoles.has(roleKey)
+  ) {
+    return <PhysiotherapyVerticalDashboard mode="insights" />;
+  }
 
   function showNotice(message: string) {
     setNotice(message);

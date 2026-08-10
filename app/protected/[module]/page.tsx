@@ -33,12 +33,22 @@ type ModulePageProps = {
 const operationsModuleSlugs = [
   "gerentes",
 ] as const;
+const staticProtectedModuleSlugs = new Set([
+  "cierres",
+  "mi-sucursal",
+  "resultados",
+]);
 
 export function generateStaticParams() {
   return navigationItems
     .filter((item) => item.href !== "/protected/overview")
+    .map((item) => item.href.replace("/protected/", ""))
+    .filter(
+      (module) =>
+        !module.includes("/") && !staticProtectedModuleSlugs.has(module),
+    )
     .map((item) => ({
-      module: item.href.replace("/protected/", ""),
+      module: item,
     }));
 }
 

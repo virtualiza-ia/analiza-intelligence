@@ -5,12 +5,15 @@ import { Button } from "@/components/ui/button";
 import { hasEnvVars } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
+const roleStorageKey = "analiza:demo-role";
+
 export function LogoutButton() {
   const router = useRouter();
 
   const logout = async () => {
     await fetch("/auth/demo-admin", { method: "DELETE" });
     await fetch("/api/auth/local-login", { method: "DELETE" });
+    window.localStorage.removeItem(roleStorageKey);
 
     if (hasEnvVars) {
       const supabase = createClient();

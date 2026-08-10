@@ -17,6 +17,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+const roleStorageKey = "analiza:demo-role";
+const roleChangeEvent = "analiza:role-change";
+
 type DemoLoginProfile = {
   label: string;
   roleKey:
@@ -70,6 +73,8 @@ export function LoginForm({
         throw new Error(payload?.error ?? "No se pudo iniciar DEMO local.");
       }
 
+      window.localStorage.setItem(roleStorageKey, activeDemoRole);
+      window.dispatchEvent(new Event(roleChangeEvent));
       router.push("/protected/context");
       router.refresh();
     } catch (error: unknown) {

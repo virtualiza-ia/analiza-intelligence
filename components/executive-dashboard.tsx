@@ -12,6 +12,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import { PhysiotherapyExecutiveSummary } from "@/components/physiotherapy-vertical-dashboard";
 import { Badge } from "@/components/ui/badge";
 import {
   demoDashboardMeta,
@@ -1372,6 +1373,7 @@ export function ExecutiveDashboard() {
       ) : (
         <>
           <ExecutiveKpiGrid metrics={commandMetrics} />
+          <PhysiotherapyExecutiveSummary />
           <AttentionCards items={attentionItems} />
           <ExecutiveStatusTable lines={lines} />
           <BusinessLineSummary lines={lines} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BadgeDollarSign,
   CheckCircle2,
@@ -14,12 +14,21 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
 import {
   formatMoney,
   goalStrategySuggestions,
   type GoalStrategySuggestion,
 } from "@/lib/analytics/business-control-center";
 import { useActiveBusinessLine } from "@/hooks/use-active-business-line";
+
+const roleStorageKey = "analiza:demo-role";
+const roleChangeEvent = "analiza:role-change";
+const physiotherapyScopedDemoRoles = new Set([
+  "gerente_operaciones",
+  "gerente_area",
+  "gerente_sucursal",
+]);
 
 function confidenceClass(confidence: GoalStrategySuggestion["confidence"]) {
   if (confidence === "Alta") {
@@ -50,7 +59,31 @@ function ProgressBar({ value }: { value: number }) {
 
 export function GoalsAdvancesDashboard() {
   const activeBusinessLine = useActiveBusinessLine();
+  const [demoRole, setDemoRole] = useState<string | null>(null);
   const [approvedIds, setApprovedIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    function syncRole() {
+      setDemoRole(window.localStorage.getItem(roleStorageKey));
+    }
+
+    syncRole();
+    window.addEventListener("storage", syncRole);
+    window.addEventListener(roleChangeEvent, syncRole);
+
+    return () => {
+      window.removeEventListener("storage", syncRole);
+      window.removeEventListener(roleChangeEvent, syncRole);
+    };
+  }, []);
+
+  if (
+    activeBusinessLine.line === "Fisioterapia" ||
+    physiotherapyScopedDemoRoles.has(demoRole ?? "")
+  ) {
+    return <PhysiotherapyVerticalDashboard mode="targets" />;
+  }
+
   const visibleGoalSuggestions =
     activeBusinessLine.isConsolidated
       ? goalStrategySuggestions
