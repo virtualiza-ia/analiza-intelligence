@@ -1,5 +1,6 @@
 import { AuthButton } from "@/components/auth-button";
 import { AppSidebar } from "@/components/app-sidebar";
+import { MobileNavigation } from "@/components/mobile-navigation";
 import { TenantContextHeader } from "@/components/tenant-context-header";
 import { requireProtectedAccess } from "@/lib/server/authorization";
 import Link from "next/link";
@@ -28,6 +29,7 @@ async function ProtectedShell({
               >
                 Analiza Intelligence
               </Link>
+              <MobileNavigation roleKey={access.roleKey} />
               <TenantContextHeader />
               <Suspense>
                 <AuthButton />

@@ -18,6 +18,8 @@ Configurar estas variables en Vercel Project Settings > Environment Variables:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `APP_ENV`
+- `APP_URL`
 - `OPENAI_API_KEY`
 - `ANALIA_OPENAI_MODEL`
 - `ANALIZA_DISABLE_DEMO_ADMIN`
@@ -25,6 +27,7 @@ Configurar estas variables en Vercel Project Settings > Environment Variables:
 - `ANALIZA_DEMO_ADMIN_EMAIL`
 - `ANALIZA_DEMO_ADMIN_PASSWORD`
 - `ANALIZA_DEMO_ADMIN_SESSION_TOKEN`
+- `ANALIZA_POSTGRES_RLS_VERIFIED`
 
 Para pruebas internas sin datos reales, usar:
 
@@ -32,12 +35,15 @@ Para pruebas internas sin datos reales, usar:
 - `ANALIZA_DISABLE_DEMO_ADMIN=false`
 - `ANALIZA_DEMO_ADMIN_EMAIL=admin.demo@analiza.local`
 - `ANALIZA_DEMO_ADMIN_PASSWORD`: una contrasena privada para la demo
-- `ANALIZA_DEMO_ADMIN_SESSION_TOKEN`: una cadena privada larga para firmar la sesion demo
+- `ANALIZA_DEMO_ADMIN_SESSION_TOKEN`: una cadena privada larga de al menos 32 caracteres para firmar la sesion demo
 
 Para produccion real con datos reales:
 
+- `APP_ENV=production`
+- `APP_URL=https://dominio-oficial`
 - `ANALIZA_ENABLE_DEMO_ADMIN=false`
 - `ANALIZA_DISABLE_DEMO_ADMIN=true`
+- `ANALIZA_POSTGRES_RLS_VERIFIED=true` solo despues de validar que el rol PostgreSQL no omite RLS y que las denegaciones funcionan en staging/production.
 
 ## Configuracion de build
 

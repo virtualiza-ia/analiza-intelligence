@@ -5,9 +5,12 @@ import { Building2, Database, ShieldCheck } from "lucide-react";
 import { AuthButton } from "@/components/auth-button";
 import { EnvVarWarning } from "@/components/env-var-warning";
 import { Button } from "@/components/ui/button";
+import { isDemoAdminEnabled } from "@/lib/auth/demo-admin";
 import { hasEnvVars } from "@/lib/utils";
 
 export default function Home() {
+  const demoAdminEnabled = isDemoAdminEnabled();
+
   return (
     <main className="min-h-screen bg-muted/30">
       <nav className="border-b bg-background">
@@ -49,9 +52,11 @@ export default function Home() {
               <Button asChild variant="outline">
                 <Link href="/auth/sign-up">Crear cuenta</Link>
               </Button>
-              <Button asChild variant="outline">
-                <Link href="/auth/login">Admin DEMO</Link>
-              </Button>
+              {demoAdminEnabled ? (
+                <Button asChild variant="outline">
+                  <Link href="/auth/login">Admin DEMO</Link>
+                </Button>
+              ) : null}
               <Button asChild variant="outline">
                 <Link href="/protected/context">Ver dashboard ejecutivo</Link>
               </Button>
@@ -60,7 +65,7 @@ export default function Home() {
 
           <div className="rounded-md border bg-background p-5">
             <div className="mb-4 text-sm font-medium">
-              Panel ejecutivo DEMO
+              {demoAdminEnabled ? "Panel ejecutivo DEMO" : "Panel ejecutivo"}
             </div>
             <dl className="grid gap-4 text-sm">
               <div className="flex items-start gap-3">

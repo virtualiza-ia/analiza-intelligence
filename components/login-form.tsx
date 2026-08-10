@@ -27,6 +27,7 @@ type DemoLoginProfile = {
   label: string;
   roleKey:
     | "super_admin"
+    | "ceo"
     | "gerente_operaciones"
     | "gerente_area"
     | "gerente_sucursal"
@@ -36,6 +37,7 @@ type DemoLoginProfile = {
 
 const demoLoginProfiles: DemoLoginProfile[] = [
   { label: "Direccion / Super Admin", roleKey: "super_admin" },
+  { label: "CEO / Direccion Ejecutiva", roleKey: "ceo" },
   { label: "Gerente de Operaciones", roleKey: "gerente_operaciones" },
   { label: "Gerente de Area", roleKey: "gerente_area" },
   { label: "Gerente de Sucursal", roleKey: "gerente_sucursal" },

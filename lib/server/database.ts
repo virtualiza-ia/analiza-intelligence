@@ -1,5 +1,7 @@
 import { Pool, type PoolConfig } from "pg";
 
+import { isProductionRuntimeEnvironment } from "../security/environment.ts";
+
 const databaseUrlEnvNames = [
   "DATABASE_URL",
   "POSTGRES_URL",
@@ -30,17 +32,35 @@ export function getDatabaseUrl() {
 }
 
 export function getMissingDatabaseConfig() {
+  const missingConfig: string[] = [];
+
   if (getDatabaseUrl()) {
-    return [];
+    if (
+      isProductionRuntimeEnvironment() &&
+      process.env.ANALIZA_POSTGRES_RLS_VERIFIED !== "true"
+    ) {
+      missingConfig.push("ANALIZA_POSTGRES_RLS_VERIFIED");
+    }
+
+    return missingConfig;
   }
 
   const missingDiscreteConfig = discreteDatabaseEnvNames.filter(
     (envName) => !process.env[envName]?.trim(),
   );
 
-  return missingDiscreteConfig.length === 0
-    ? []
-    : ["DATABASE_URL", ...missingDiscreteConfig];
+  if (missingDiscreteConfig.length > 0) {
+    missingConfig.push("DATABASE_URL", ...missingDiscreteConfig);
+  }
+
+  if (
+    isProductionRuntimeEnvironment() &&
+    process.env.ANALIZA_POSTGRES_RLS_VERIFIED !== "true"
+  ) {
+    missingConfig.push("ANALIZA_POSTGRES_RLS_VERIFIED");
+  }
+
+  return missingConfig;
 }
 
 function readDiscreteDatabaseConfig(): PoolConfig | null {

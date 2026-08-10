@@ -8,6 +8,7 @@ import { createUserInvitation } from "@/lib/server/user-invitations";
 import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
 import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
 import { canPerformAction } from "@/lib/security/authorization-policy";
+import { isProductionRuntimeEnvironment } from "@/lib/security/environment";
 
 type InviteUserRequest = {
   email?: unknown;
@@ -51,11 +52,17 @@ function readScope(value: unknown): ScopeBoundary | null {
 }
 
 function getRequestOrigin(request: Request) {
-  return (
+  const configuredOrigin =
     process.env.APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    new URL(request.url).origin
-  );
+    (!isProductionRuntimeEnvironment()
+      ? process.env.NEXT_PUBLIC_APP_URL?.trim()
+      : "");
+
+  if (configuredOrigin) {
+    return configuredOrigin;
+  }
+
+  return isProductionRuntimeEnvironment() ? null : new URL(request.url).origin;
 }
 
 function jsonError(error: string, status: number, missingConfig: string[] = []) {
@@ -78,6 +85,16 @@ export async function POST(request: Request) {
       "Faltan variables privadas para enviar invitaciones reales.",
       503,
       missingConfig,
+    );
+  }
+
+  const appUrl = getRequestOrigin(request);
+
+  if (!appUrl) {
+    return jsonError(
+      "Falta configurar APP_URL para enviar invitaciones en produccion.",
+      503,
+      ["APP_URL"],
     );
   }
 
@@ -123,7 +140,7 @@ export async function POST(request: Request) {
 
   try {
     const invitation = await createUserInvitation({
-      appUrl: getRequestOrigin(request),
+      appUrl,
       email,
       fullName,
       roleKey: payload.roleKey,

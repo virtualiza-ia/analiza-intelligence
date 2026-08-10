@@ -32,7 +32,7 @@ export function getAnalizaRuntimeEnvironment(): AnalizaRuntimeEnvironment {
     return "staging";
   }
 
-  return "demo";
+  return process.env.NODE_ENV === "production" ? "production" : "demo";
 }
 
 export function isProductionRuntimeEnvironment() {
@@ -56,15 +56,11 @@ export function isDemoAdminAllowedByEnvironment() {
     return false;
   }
 
-  if (process.env.ANALIZA_ENABLE_DEMO_ADMIN === "false") {
-    return false;
-  }
-
   if (process.env.ANALIZA_DISABLE_DEMO_ADMIN === "true") {
     return false;
   }
 
-  return true;
+  return process.env.ANALIZA_ENABLE_DEMO_ADMIN === "true";
 }
 
 export function isDemoRoleSwitchAllowedByEnvironment() {

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 
 import { AcceptInvitationForm } from "@/components/accept-invitation-form";
 import { Button } from "@/components/ui/button";
+import { isDemoAdminEnabled } from "@/lib/auth/demo-admin";
 import {
   Card,
   CardContent,
@@ -26,6 +27,7 @@ async function SignUpContent({
   const invitedEmail = params.email;
   const invitationToken = params.invitation;
   const hasInvitation = Boolean(invitationToken && invitedEmail);
+  const demoAdminEnabled = isDemoAdminEnabled();
 
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
@@ -60,7 +62,7 @@ async function SignUpContent({
                 <Link href="/auth/login">Volver al login</Link>
               </Button>
             ) : null}
-            {!hasInvitation ? (
+            {!hasInvitation && demoAdminEnabled ? (
               <Button asChild className="w-full" variant="outline">
                 <Link href="/auth/demo-admin">Entrar como Admin DEMO</Link>
               </Button>

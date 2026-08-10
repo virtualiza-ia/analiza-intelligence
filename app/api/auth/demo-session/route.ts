@@ -18,6 +18,7 @@ type DemoSessionRequest = {
 
 const localDemoLoginRoles: RoleKey[] = [
   "super_admin",
+  "ceo",
   "gerente_operaciones",
   "gerente_area",
   "gerente_sucursal",

@@ -1,8 +1,8 @@
 import {
   isDemoAdminAllowedByEnvironment,
   isDemoRoleSwitchAllowedByEnvironment,
-} from "@/lib/security/environment";
-import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
+} from "../security/environment.ts";
+import { roleKeys, type RoleKey } from "../tenant/demo-context.ts";
 
 export const demoAdminCookieName = "analiza_demo_admin";
 export const demoRoleCookieName = "analiza_demo_role";
@@ -30,13 +30,14 @@ export function getDemoAdminPassword() {
 }
 
 export function getDemoAdminSessionValue() {
-  return process.env.ANALIZA_DEMO_ADMIN_SESSION_TOKEN ?? "enabled";
+  return process.env.ANALIZA_DEMO_ADMIN_SESSION_TOKEN?.trim() ?? "";
 }
 
 export function isDemoAdminEnabled() {
   return (
     process.env.VERCEL_ENV !== "production" &&
-    isDemoAdminAllowedByEnvironment()
+    isDemoAdminAllowedByEnvironment() &&
+    getDemoAdminSessionValue().length >= 32
   );
 }
 

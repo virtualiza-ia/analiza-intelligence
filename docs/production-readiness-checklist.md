@@ -1,6 +1,6 @@
 # Production Readiness Checklist
 
-Fecha de revision: 2026-08-07  
+Fecha de revision: 2026-08-10
 Estado: Executive demo local preparada; produccion bloqueada por tareas manuales externas.
 
 ## Security
@@ -11,11 +11,16 @@ Estado: Executive demo local preparada; produccion bloqueada por tareas manuales
 - [x] RBAC server-side para rutas protegidas dinamicas.
 - [x] APIs sensibles de invitaciones, AnaliA, imports y conectores derivan actor server-side.
 - [x] Selector `Rol DEMO` queda controlado por ambiente server-side.
+- [x] DEMO admin requiere `APP_ENV=demo`, `ANALIZA_ENABLE_DEMO_ADMIN=true` y token server-only largo.
+- [x] Produccion sin `APP_ENV` explicito falla cerrado como production.
+- [x] Invitaciones en produccion exigen `APP_URL` canonico.
 - [ ] Auditoria remota de cambios sensibles validada contra base autorizada.
+- [ ] Confirmar `ANALIZA_POSTGRES_RLS_VERIFIED=true` solo despues de probar RLS real con rol sin `BYPASSRLS`.
 
 ## Database
 
 - [ ] Aplicar migracion remota de ingestiones `20260807000200_sprint3_ingestion_connectors.sql`.
+- [ ] Aplicar migraciones remotas de cierres Fisioterapia, Laboratorio e Imagenes.
 - [ ] Confirmar backup antes de aplicar migraciones en staging/production.
 - [ ] Ejecutar plan de rollback de migraciones en staging.
 - [ ] Revisar indices reales con volumen de datos productivo.
@@ -61,7 +66,7 @@ Estado: Executive demo local preparada; produccion bloqueada por tareas manuales
 
 ## Deploy
 
-- [ ] Variables `APP_ENV=production`, `ANALIZA_LOCAL_AUTH_SECRET`, Supabase y SMTP configuradas en entorno autorizado.
+- [ ] Variables `APP_ENV=production`, `APP_URL`, `ANALIZA_LOCAL_AUTH_SECRET`, Supabase/PostgreSQL, SMTP y `ANALIZA_POSTGRES_RLS_VERIFIED=true` configuradas en entorno autorizado.
 - [ ] Dominio productivo confirmado por owner.
 - [ ] SSL activo.
 - [x] Build local pasa.
@@ -72,6 +77,8 @@ Estado: Executive demo local preparada; produccion bloqueada por tareas manuales
 
 - Aplicar migracion RLS remota.
 - Aplicar migracion de ingestion remota.
+- Aplicar migraciones de cierres remotas.
+- Verificar rol PostgreSQL sin `BYPASSRLS` y RLS con denegaciones reales.
 - Rotar credenciales demo historicas si existieron.
 - Verificar DOM en deployment.
 - Configurar credenciales reales de conectores.

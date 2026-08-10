@@ -751,7 +751,7 @@ function Header({
     operations:
       "Consolidado por area y sucursal dentro del alcance autorizado.",
     overview:
-      "Lectura ejecutiva de la primera vertical productiva del reset.",
+      "Lectura ejecutiva de Fisioterapia desde cierres publicados.",
     results:
       "KPIs automaticos calculados desde la misma fuente de verdad publicada.",
     targets:
@@ -923,7 +923,7 @@ export function PhysiotherapyVerticalDashboard({
 
     const timeout = window.setTimeout(() => {
       void saveDraft(formValues, true).catch(() => undefined);
-    }, 900);
+    }, 1600);
 
     return () => window.clearTimeout(timeout);
   }, [dirty, formValues, mode, saveDraft, workspace?.canCreateClosure]);

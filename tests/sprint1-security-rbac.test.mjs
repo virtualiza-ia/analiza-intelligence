@@ -7,6 +7,7 @@ import {
 } from "../lib/security/authorization-policy.ts";
 import { getDemoScopeForRole } from "../lib/auth/demo-scope.ts";
 import { canUseDemoFeatures } from "../lib/security/environment.ts";
+import { getMissingDatabaseConfig } from "../lib/server/database.ts";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const countryId = "30000000-0000-4000-8000-000000000003";
@@ -56,6 +57,11 @@ const demoAreaManager = actor("gerente_area", getDemoScopeForRole("gerente_area"
 const originalAppEnv = process.env.APP_ENV;
 const originalAnalizaAppEnv = process.env.ANALIZA_APP_ENV;
 const originalVercelEnv = process.env.VERCEL_ENV;
+const originalNodeEnv = process.env.NODE_ENV;
+const originalEnableDemoAdmin = process.env.ANALIZA_ENABLE_DEMO_ADMIN;
+const originalDemoSessionToken = process.env.ANALIZA_DEMO_ADMIN_SESSION_TOKEN;
+const originalDatabaseUrl = process.env.DATABASE_URL;
+const originalPostgresRlsVerified = process.env.ANALIZA_POSTGRES_RLS_VERIFIED;
 
 delete process.env.ANALIZA_APP_ENV;
 process.env.APP_ENV = "demo";
@@ -80,6 +86,51 @@ assert.equal(
   "Production must never enable demo login.",
 );
 
+process.env.NODE_ENV = "production";
+delete process.env.APP_ENV;
+delete process.env.ANALIZA_APP_ENV;
+delete process.env.VERCEL_ENV;
+assert.equal(
+  canUseDemoFeatures(),
+  false,
+  "Production NODE_ENV without explicit APP_ENV must fail closed instead of defaulting to demo.",
+);
+
+process.env.NODE_ENV = originalNodeEnv ?? "test";
+process.env.APP_ENV = "demo";
+process.env.ANALIZA_ENABLE_DEMO_ADMIN = "true";
+process.env.ANALIZA_DEMO_ADMIN_SESSION_TOKEN = "local-demo-session-token-32-chars-min";
+const { isDemoAdminEnabled } = await import("../lib/auth/demo-admin.ts");
+assert.equal(
+  isDemoAdminEnabled(),
+  true,
+  "Local demo admin must require explicit enablement and a long server-side token.",
+);
+
+delete process.env.ANALIZA_DEMO_ADMIN_SESSION_TOKEN;
+assert.equal(
+  isDemoAdminEnabled(),
+  false,
+  "Local demo admin must stay disabled without a configured session token.",
+);
+
+process.env.NODE_ENV = "production";
+process.env.APP_ENV = "production";
+process.env.DATABASE_URL = "postgres://user:password@localhost:5432/analiza";
+delete process.env.ANALIZA_POSTGRES_RLS_VERIFIED;
+assert.deepEqual(
+  getMissingDatabaseConfig(),
+  ["ANALIZA_POSTGRES_RLS_VERIFIED"],
+  "Production PostgreSQL access must require an explicit RLS verification gate.",
+);
+
+process.env.ANALIZA_POSTGRES_RLS_VERIFIED = "true";
+assert.deepEqual(
+  getMissingDatabaseConfig(),
+  [],
+  "Production PostgreSQL access may proceed only after RLS verification is declared.",
+);
+
 if (originalAppEnv === undefined) {
   delete process.env.APP_ENV;
 } else {
@@ -96,6 +147,36 @@ if (originalVercelEnv === undefined) {
   delete process.env.VERCEL_ENV;
 } else {
   process.env.VERCEL_ENV = originalVercelEnv;
+}
+
+if (originalNodeEnv === undefined) {
+  delete process.env.NODE_ENV;
+} else {
+  process.env.NODE_ENV = originalNodeEnv;
+}
+
+if (originalEnableDemoAdmin === undefined) {
+  delete process.env.ANALIZA_ENABLE_DEMO_ADMIN;
+} else {
+  process.env.ANALIZA_ENABLE_DEMO_ADMIN = originalEnableDemoAdmin;
+}
+
+if (originalDemoSessionToken === undefined) {
+  delete process.env.ANALIZA_DEMO_ADMIN_SESSION_TOKEN;
+} else {
+  process.env.ANALIZA_DEMO_ADMIN_SESSION_TOKEN = originalDemoSessionToken;
+}
+
+if (originalDatabaseUrl === undefined) {
+  delete process.env.DATABASE_URL;
+} else {
+  process.env.DATABASE_URL = originalDatabaseUrl;
+}
+
+if (originalPostgresRlsVerified === undefined) {
+  delete process.env.ANALIZA_POSTGRES_RLS_VERIFIED;
+} else {
+  process.env.ANALIZA_POSTGRES_RLS_VERIFIED = originalPostgresRlsVerified;
 }
 
 for (const deniedPath of [
@@ -328,6 +409,7 @@ const sourceChecks = [
   "components/login-form.tsx",
   "lib/auth/demo-scope.ts",
   "lib/server/authorization.ts",
+  "lib/server/database.ts",
   "lib/security/authorization-policy.ts",
   "lib/security/environment.ts",
   "supabase/migrations/20260807000100_sprint1_harden_security_rbac.sql",
@@ -346,6 +428,7 @@ const loginForm = readFileSync("components/login-form.tsx", "utf8");
 const sessionProxy = readFileSync("lib/supabase/proxy.ts", "utf8");
 const sidebar = readFileSync("components/app-sidebar.tsx", "utf8");
 const demoAdminHelper = readFileSync("lib/auth/demo-admin.ts", "utf8");
+const databaseHelper = readFileSync("lib/server/database.ts", "utf8");
 const environment = readFileSync("lib/security/environment.ts", "utf8");
 const localSession = readFileSync("lib/auth/local-session.ts", "utf8");
 const sprint1Migration = readFileSync(
@@ -373,7 +456,8 @@ assert(
 assert(
   demoAdminHelper.includes("VERCEL_ENV !== \"production\"") &&
     demoAdminHelper.includes("isDemoAdminAllowedByEnvironment") &&
-    demoAdminHelper.includes("getDemoRoleFromCookie"),
+    demoAdminHelper.includes("getDemoRoleFromCookie") &&
+    demoAdminHelper.includes("getDemoAdminSessionValue().length >= 32"),
   "DEMO admin and role switch must be controlled by server-side environment checks.",
 );
 
@@ -382,13 +466,23 @@ assert(
     environment.includes('"staging"') &&
     environment.includes('"production"') &&
     environment.includes("ANALIZA_APP_ENV") &&
+    environment.includes('NODE_ENV === "production"') &&
+    environment.includes('ANALIZA_ENABLE_DEMO_ADMIN === "true"') &&
     environment.includes("ANALIZA_DISABLE_DEMO_ROLE_SWITCH"),
   "Runtime environment separation must cover demo, staging and production.",
 );
 
 assert(
+  databaseHelper.includes("ANALIZA_POSTGRES_RLS_VERIFIED") &&
+    databaseHelper.includes("isProductionRuntimeEnvironment"),
+  "Production database access must fail closed until PostgreSQL/RLS has been verified.",
+);
+
+assert(
   inviteRoute.includes("getCurrentAuthorizationActor") &&
     inviteRoute.includes("canPerformAction") &&
+    inviteRoute.includes("APP_URL") &&
+    inviteRoute.includes("isProductionRuntimeEnvironment") &&
     !inviteRoute.includes("payload?.actorRole") &&
     !inviteRoute.includes("payload?.actorScope"),
   "Invitation API must derive actor role and scope server-side.",
@@ -420,6 +514,7 @@ assert(
     loginForm.includes("Entorno DEMO local") &&
     loginForm.includes("/api/auth/demo-session") &&
     loginForm.includes("Direccion / Super Admin") &&
+    loginForm.includes("CEO / Direccion Ejecutiva") &&
     loginForm.includes("Gerente de Operaciones") &&
     loginForm.includes("Gerente de Area") &&
     loginForm.includes("Gerente de Sucursal") &&

@@ -901,7 +901,7 @@ function Header({
     operations:
       "Consolidado por area y sucursal dentro del alcance autorizado.",
     overview:
-      "Lectura ejecutiva de la primera vertical productiva del reset.",
+      "Lectura ejecutiva de Laboratorio desde cierres publicados.",
     results:
       "KPIs automaticos calculados desde la misma fuente de verdad publicada.",
     targets:
@@ -912,8 +912,8 @@ function Header({
     <div className="grid gap-4 xl:grid-cols-[1fr_320px] xl:items-end">
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="w-fit bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-            Vertical Laboratorio
+          <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
+            Entorno DEMO
           </Badge>
           <Badge variant="outline">Laboratorio end-to-end</Badge>
           <Badge variant="outline">Fuente: cierre publicado</Badge>
@@ -1073,7 +1073,7 @@ export function LaboratoryVerticalDashboard({
 
     const timeout = window.setTimeout(() => {
       void saveDraft(formValues, true).catch(() => undefined);
-    }, 900);
+    }, 1600);
 
     return () => window.clearTimeout(timeout);
   }, [dirty, formValues, mode, saveDraft, workspace?.canCreateClosure]);

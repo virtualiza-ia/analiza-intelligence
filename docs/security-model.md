@@ -4,9 +4,11 @@
 
 Supabase Auth can be used as an authentication provider, but self-hosted deployments may authenticate invited users directly against PostgreSQL. The app supports login, invitation activation, logout, secure sessions, and protected routes. Public self-registration must be disabled from the product flow.
 
-Local DEMO administrator access is available for local exploration before real users are provisioned. It uses HTTP-only cookies, is labeled DEMO, is gated by `APP_ENV=demo`/runtime checks, is disabled in Vercel production and preview/staging, and can be disabled locally with `ANALIZA_DISABLE_DEMO_ADMIN=true`.
+Local DEMO administrator access is available for local exploration before real users are provisioned. It uses HTTP-only cookies, is labeled DEMO, is gated by `APP_ENV=demo`/runtime checks, is disabled in Vercel production and preview/staging, and can be disabled locally with `ANALIZA_DISABLE_DEMO_ADMIN=true`. It is not enabled by default: local demo access requires `ANALIZA_ENABLE_DEMO_ADMIN=true` and a server-only `ANALIZA_DEMO_ADMIN_SESSION_TOKEN` of at least 32 characters.
 
 The local executive demo login is created server-side through `/api/auth/demo-session`. The browser selects only an approved profile label; the server validates the role, writes the demo session cookies, and `AuthorizationService` resolves the actor and scope. No demo password is rendered in HTML, DOM, source code, or `NEXT_PUBLIC` variables.
+
+When `NODE_ENV=production` and no explicit `APP_ENV`/`ANALIZA_APP_ENV` is present, the runtime fails closed as `production`; it must not silently become `demo`.
 
 Self-hosted deployments may keep operational data, invitations, users, password hashes, and role assignments in PostgreSQL while email delivery uses an SMTP provider such as Google Workspace. User invitations are stored in `user_invitations` with a hashed token; the raw invitation token is sent only in the email link and must not be logged or stored in public data. When the user accepts the invitation, they create a password, the system stores only a server-side password hash in `auth.users.encrypted_password`, activates `profiles` and `user_roles`, clears the invitation token hash, and issues an HTTP-only local session cookie. SMTP credentials and local session secrets are server-only environment variables and are never exposed with `NEXT_PUBLIC_`.
 
@@ -82,6 +84,8 @@ Users and managers are deactivated with soft delete fields and history, not phys
 Phase 3 extends RLS to appointments, capacity, professionals, anonymous patients, and service events. Operational reads are scoped through `current_user_can_access_branch`.
 
 Write access to operational data is limited to `webmaster_admin`, `gerente_operaciones`, `gerente_area`, and the controlled monthly form path for `gerente_sucursal`. Published closes require authorization before replacement.
+
+Self-hosted PostgreSQL persistence also applies server-side authorization before reads and writes. Production database access requires an explicit `ANALIZA_POSTGRES_RLS_VERIFIED=true` gate after confirming that the configured database role does not bypass RLS and that deny cases fail in the target environment. This is a production readiness blocker, not a client-side control.
 
 ## Secret Handling
 
