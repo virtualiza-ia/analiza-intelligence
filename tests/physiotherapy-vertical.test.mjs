@@ -90,7 +90,7 @@ assert.ok(
   "Demo branch manager must receive one scoped physiotherapy branch.",
 );
 
-const initialBranchWorkspace = getPhysiotherapyWorkspace(branchManager);
+const initialBranchWorkspace = await getPhysiotherapyWorkspace(branchManager);
 assert.equal(
   initialBranchWorkspace.branches.length,
   1,
@@ -107,13 +107,13 @@ assert.equal(
   "Fisioterapia vertical must use the demo current period.",
 );
 
-const viewerWorkspace = getPhysiotherapyWorkspace(viewer);
+const viewerWorkspace = await getPhysiotherapyWorkspace(viewer);
 assert.equal(
   viewerWorkspace.canCreateClosure,
   false,
   "Viewer must not create monthly closures.",
 );
-assert.throws(
+await assert.rejects(
   () => savePhysiotherapyClosureDraft(viewer, validPayload(branchManager.scope.branchId)),
   /no puede crear ni publicar/,
   "Viewer must be blocked server-side from creating closures.",
@@ -130,26 +130,26 @@ assert.equal(
   "Viewer may inspect authorized results.",
 );
 
-upsertPhysiotherapyTarget(operationsManager, {
+await upsertPhysiotherapyTarget(operationsManager, {
   branchId: branchManager.scope.branchId,
   kpiId: "facturacion_neta",
   period: currentPeriod,
   targetValue: 80000,
 });
-upsertPhysiotherapyTarget(operationsManager, {
+await upsertPhysiotherapyTarget(operationsManager, {
   branchId: branchManager.scope.branchId,
   kpiId: "ocupacion_efectiva",
   period: currentPeriod,
   targetValue: 0.75,
 });
-upsertPhysiotherapyTarget(operationsManager, {
+await upsertPhysiotherapyTarget(operationsManager, {
   branchId: branchManager.scope.branchId,
   direction: "LOWER_IS_BETTER",
   kpiId: "tasa_no_show",
   period: currentPeriod,
   targetValue: 0.08,
 });
-const inactiveSessionsTarget = upsertPhysiotherapyTarget(operationsManager, {
+const inactiveSessionsTarget = await upsertPhysiotherapyTarget(operationsManager, {
   branchId: branchManager.scope.branchId,
   kpiId: "sesiones_total",
   period: currentPeriod,
@@ -161,7 +161,7 @@ assert.equal(
   "inactive",
   "Targets must support active/inactive lifecycle state.",
 );
-assert.throws(
+await assert.rejects(
   () =>
     upsertPhysiotherapyTarget(operationsManager, {
       branchId: branchManager.scope.branchId,
@@ -173,7 +173,7 @@ assert.throws(
   "Empty targets must not be silently converted to zero.",
 );
 
-const missingRevenueDraft = savePhysiotherapyClosureDraft(branchManager, {
+const missingRevenueDraft = await savePhysiotherapyClosureDraft(branchManager, {
   ...validPayload(branchManager.scope.branchId),
   inputs: {
     ...validPayload(branchManager.scope.branchId).inputs,
@@ -181,7 +181,7 @@ const missingRevenueDraft = savePhysiotherapyClosureDraft(branchManager, {
   },
 });
 const missingRevenueValidation =
-  validatePhysiotherapyClosureDraft(branchManager, missingRevenueDraft.id);
+  await validatePhysiotherapyClosureDraft(branchManager, missingRevenueDraft.id);
 assert.ok(
   missingRevenueValidation.validation.errors.some(
     (issue) => issue.code === "number.missing_required",
@@ -196,7 +196,7 @@ assert.equal(
   "Missing revenue must make facturacion_neta not calculable.",
 );
 
-const warningDraft = savePhysiotherapyClosureDraft(branchManager, {
+const warningDraft = await savePhysiotherapyClosureDraft(branchManager, {
   ...validPayload(branchManager.scope.branchId),
   inputs: {
     ...validPayload(branchManager.scope.branchId).inputs,
@@ -204,7 +204,7 @@ const warningDraft = savePhysiotherapyClosureDraft(branchManager, {
     attendedHours: 470,
   },
 });
-const warningValidation = validatePhysiotherapyClosureDraft(
+const warningValidation = await validatePhysiotherapyClosureDraft(
   branchManager,
   warningDraft.id,
 );
@@ -231,13 +231,13 @@ assert.ok(
   "Attended hours greater than available hours must warn.",
 );
 
-const draft = savePhysiotherapyClosureDraft(
+const draft = await savePhysiotherapyClosureDraft(
   branchManager,
   validPayload(branchManager.scope.branchId),
 );
 assert.equal(draft.status, "draft", "First save must persist a draft.");
 
-const validated = validatePhysiotherapyClosureDraft(branchManager, draft.id);
+const validated = await validatePhysiotherapyClosureDraft(branchManager, draft.id);
 assert.equal(
   validated.validation.errors.length,
   0,
@@ -245,7 +245,7 @@ assert.equal(
 );
 assertValidKpis(validated);
 
-const published = publishPhysiotherapyClosure(branchManager, draft.id);
+const published = await publishPhysiotherapyClosure(branchManager, draft.id);
 assert.equal(published.status, "published", "Validated closure must publish.");
 assert.equal(
   published.isDemo,
@@ -271,7 +271,7 @@ assert.ok(
   "Published closure must keep an audit event.",
 );
 
-const afterPublishWorkspace = getPhysiotherapyWorkspace(branchManager, {
+const afterPublishWorkspace = await getPhysiotherapyWorkspace(branchManager, {
   period: currentPeriod,
 });
 assert.equal(
@@ -290,11 +290,11 @@ assert.ok(
   "Branch dashboard summaries must stay scoped to the branch.",
 );
 
-const duplicateDraft = savePhysiotherapyClosureDraft(
+const duplicateDraft = await savePhysiotherapyClosureDraft(
   branchManager,
   validPayload(branchManager.scope.branchId),
 );
-const duplicateValidation = validatePhysiotherapyClosureDraft(
+const duplicateValidation = await validatePhysiotherapyClosureDraft(
   branchManager,
   duplicateDraft.id,
 );
@@ -304,13 +304,13 @@ assert.ok(
   ),
   "Duplicate period draft must receive a validation error before publish.",
 );
-assert.throws(
+await assert.rejects(
   () => publishPhysiotherapyClosure(branchManager, duplicateDraft.id),
   /cierre bloqueado/,
   "Duplicate period publish must be blocked unless it is a versioned correction.",
 );
 
-const correctionDraft = savePhysiotherapyClosureDraft(branchManager, {
+const correctionDraft = await savePhysiotherapyClosureDraft(branchManager, {
   ...validPayload(branchManager.scope.branchId),
   inputs: {
     ...validPayload(branchManager.scope.branchId).inputs,
@@ -319,7 +319,7 @@ const correctionDraft = savePhysiotherapyClosureDraft(branchManager, {
   },
   replacesClosureId: published.id,
 });
-const correction = publishPhysiotherapyClosure(branchManager, correctionDraft.id);
+const correction = await publishPhysiotherapyClosure(branchManager, correctionDraft.id);
 assert.equal(correction.status, "published", "Versioned correction must publish.");
 assert.equal(
   correction.replacesClosureId,
@@ -327,7 +327,7 @@ assert.equal(
   "Correction must preserve lineage to the replaced closure.",
 );
 
-const correctedWorkspace = getPhysiotherapyWorkspace(branchManager, {
+const correctedWorkspace = await getPhysiotherapyWorkspace(branchManager, {
   period: currentPeriod,
 });
 const replacedOriginal = correctedWorkspace.closures.find(
@@ -339,7 +339,7 @@ assert.equal(
   "Original published closure must be marked as replaced.",
 );
 
-const areaWorkspace = getPhysiotherapyWorkspace(areaManager, {
+const areaWorkspace = await getPhysiotherapyWorkspace(areaManager, {
   period: currentPeriod,
 });
 assert.ok(
@@ -349,7 +349,7 @@ assert.ok(
   "Area manager must only consolidate branches from the assigned area.",
 );
 
-const operationsWorkspace = getPhysiotherapyWorkspace(operationsManager, {
+const operationsWorkspace = await getPhysiotherapyWorkspace(operationsManager, {
   period: currentPeriod,
 });
 assert.ok(
@@ -364,7 +364,7 @@ assert.equal(
   "Operations manager must be allowed to configure targets.",
 );
 
-const ceoWorkspace = getPhysiotherapyWorkspace(ceo, { period: currentPeriod });
+const ceoWorkspace = await getPhysiotherapyWorkspace(ceo, { period: currentPeriod });
 assert.equal(
   ceoWorkspace.canCreateClosure,
   false,

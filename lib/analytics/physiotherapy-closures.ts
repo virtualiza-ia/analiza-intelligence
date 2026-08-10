@@ -1,7 +1,14 @@
+import type { PoolClient } from "pg";
+
+import {
+  getMissingDatabaseConfig,
+  getPostgresPool,
+} from "../server/database.ts";
 import {
   canPerformAction,
   type AuthorizationActor,
 } from "../security/authorization-policy.ts";
+import { isDemoRuntimeEnvironment } from "../security/environment.ts";
 import {
   demoBranches,
   demoCompanies,
@@ -49,8 +56,10 @@ export type PhysiotherapyInsightPriority =
   | "positiva";
 
 export type PhysiotherapyClosureAction =
+  | "autosave"
   | "draft_created"
   | "draft_updated"
+  | "target.changed"
   | "validated"
   | "validation_blocked"
   | "published"
@@ -111,7 +120,7 @@ export type PhysiotherapyTarget = {
   countryId: string;
   direction: PhysiotherapyTargetDirection;
   id: string;
-  isDemo: true;
+  isDemo: boolean;
   kpiId: PhysiotherapyTargetableKpiId;
   label: string;
   period: string;
@@ -170,7 +179,7 @@ export type PhysiotherapyClosure = {
   duplicateOfClosureId: string | null;
   id: string;
   inputs: PhysiotherapyClosureInputs;
-  isDemo: true;
+  isDemo: boolean;
   kpiResults: PhysiotherapyKpiResult[];
   period: string;
   publishedAt: string | null;
@@ -1576,7 +1585,7 @@ function appendAudit(
   store.auditEvents = [event, ...store.auditEvents];
 }
 
-export function savePhysiotherapyClosureDraft(
+function saveDemoPhysiotherapyClosureDraft(
   actor: AuthorizationActor,
   rawPayload: unknown,
 ) {
@@ -1663,7 +1672,7 @@ export function savePhysiotherapyClosureDraft(
   return closure;
 }
 
-export function validatePhysiotherapyClosureDraft(
+function validateDemoPhysiotherapyClosureDraft(
   actor: AuthorizationActor,
   closureId: string,
 ) {
@@ -1707,14 +1716,14 @@ export function validatePhysiotherapyClosureDraft(
   return validated;
 }
 
-export function publishPhysiotherapyClosure(
+function publishDemoPhysiotherapyClosure(
   actor: AuthorizationActor,
   closureId: string,
 ) {
   assertWritableRole(actor);
 
   const store = getStore();
-  const closure = validatePhysiotherapyClosureDraft(actor, closureId);
+  const closure = validateDemoPhysiotherapyClosureDraft(actor, closureId);
 
   if (closure.validation.errors.length > 0) {
     throw new Error("No se puede publicar un cierre bloqueado.");
@@ -1813,7 +1822,7 @@ function readTargetLifecycleStatus(
   return value === "inactive" ? "inactive" : "active";
 }
 
-export function upsertPhysiotherapyTarget(
+function upsertDemoPhysiotherapyTarget(
   actor: AuthorizationActor,
   rawPayload: unknown,
 ) {
@@ -2420,7 +2429,1572 @@ function currentPeriodStatus(
   return "sin_cierre";
 }
 
-export function getPhysiotherapyWorkspace(
+type DbBranchRow = {
+  area_manager_name: string | null;
+  branch_manager_name: string | null;
+  code: string;
+  company_id: string;
+  company_name: string;
+  country_id: string;
+  country_name: string;
+  id: string;
+  is_demo: boolean;
+  name: string;
+  operational_area_id: string | null;
+  operational_area_name: string | null;
+  organization_id: string;
+};
+
+type DbTargetRow = {
+  approved_at: Date | string | null;
+  approved_by_email: string | null;
+  branch_id: string;
+  company_id: string;
+  country_id: string;
+  direction: PhysiotherapyTargetDirection;
+  id: string;
+  is_demo: boolean;
+  kpi_id: PhysiotherapyTargetableKpiId;
+  label: string;
+  period_month: Date | string;
+  status: PhysiotherapyTargetLifecycleStatus;
+  target_max_value: string | number | null;
+  target_min_value: string | number | null;
+  target_value: string | number;
+  unit: PhysiotherapyTarget["unit"];
+  version: number;
+};
+
+type DbClosureRow = {
+  appointments_cancelled: string | number | null;
+  appointments_completed: string | number | null;
+  appointments_scheduled: string | number | null;
+  attended_hours: string | number | null;
+  available_hours: string | number | null;
+  branch_id: string;
+  closure_observations: string | null;
+  company_id: string;
+  country_id: string;
+  created_at: Date | string;
+  data_quality_score: string | number;
+  direct_costs: string | number | null;
+  errors: unknown;
+  id: string;
+  is_demo: boolean;
+  monthly_closing_id: string;
+  no_show_appointments: string | number | null;
+  orders_total: string | number | null;
+  patients_attended: string | number | null;
+  period_month: Date | string;
+  physiotherapists_active: string | number | null;
+  published_at: Date | string | null;
+  published_by_email: string | null;
+  revenue_total: string | number | null;
+  scheduled_hours: string | number | null;
+  sessions_total: string | number | null;
+  source_lineage: unknown;
+  status: DbMonthlyClosingStatus;
+  submitted_by_email: string;
+  superseded_by_version_id: string | null;
+  supersedes_version_id: string | null;
+  updated_at: Date | string;
+  validated_at: Date | string | null;
+  validation_state: PhysiotherapyValidationState | null;
+  version_number: number;
+  warnings: unknown;
+};
+
+type DbAuditRow = {
+  action: PhysiotherapyClosureAction;
+  actor_email: string;
+  actor_user_id: string | null;
+  branch_id: string | null;
+  closing_version_id: string | null;
+  created_at: Date | string;
+  details: string;
+  period_month: Date | string | null;
+};
+
+type DbMonthlyClosingStatus =
+  | "DRAFT"
+  | "VALIDATED"
+  | "WARNING"
+  | "BLOCKED"
+  | "PUBLISHED"
+  | "SUPERSEDED";
+
+type PostgresContext = {
+  auditEvents: PhysiotherapyAuditEvent[];
+  branches: PhysiotherapyClosureScope[];
+  closures: PhysiotherapyClosure[];
+  targets: PhysiotherapyTarget[];
+};
+
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function shouldUsePostgresPersistence() {
+  return !isDemoRuntimeEnvironment();
+}
+
+function ensurePostgresPersistenceConfigured() {
+  const missingConfig = getMissingDatabaseConfig();
+
+  if (missingConfig.length > 0) {
+    throw new Error(
+      `PostgreSQL no esta configurado para persistencia real: ${missingConfig.join(", ")}.`,
+    );
+  }
+}
+
+async function withPostgresClient<T>(
+  work: (client: PoolClient) => Promise<T>,
+) {
+  ensurePostgresPersistenceConfigured();
+
+  const pool = getPostgresPool();
+  const client = await pool.connect();
+
+  try {
+    return await work(client);
+  } finally {
+    client.release();
+  }
+}
+
+async function withPostgresTransaction<T>(
+  work: (client: PoolClient) => Promise<T>,
+) {
+  return withPostgresClient(async (client) => {
+    await client.query("begin");
+
+    try {
+      const result = await work(client);
+
+      await client.query("commit");
+      return result;
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    }
+  });
+}
+
+function uuidOrNull(value: string) {
+  return uuidPattern.test(value) ? value : null;
+}
+
+function periodToDate(period: string) {
+  if (!isValidPeriod(period)) {
+    throw new Error("El periodo debe tener formato YYYY-MM.");
+  }
+
+  return `${period}-01`;
+}
+
+function periodFromDate(value: Date | string | null) {
+  if (!value) {
+    return currentDemoPeriod;
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 7);
+  }
+
+  return value.slice(0, 7);
+}
+
+function isoString(value: Date | string | null) {
+  if (!value) {
+    return null;
+  }
+
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function dbNumber(value: string | number | null) {
+  if (value === null) {
+    return Number.NaN;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function numberOrNull(value: number) {
+  return Number.isFinite(value) ? value : null;
+}
+
+function optionalDbNumber(value: string | number | null) {
+  const parsed = dbNumber(value);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function dbStatusToClosureStatus(
+  status: DbMonthlyClosingStatus,
+): PhysiotherapyClosureStatus {
+  if (status === "PUBLISHED") {
+    return "published";
+  }
+
+  if (status === "SUPERSEDED") {
+    return "replaced";
+  }
+
+  if (status === "BLOCKED") {
+    return "validation_failed";
+  }
+
+  if (status === "VALIDATED" || status === "WARNING") {
+    return "validated";
+  }
+
+  return "draft";
+}
+
+function validationToDbStatus(
+  validation: PhysiotherapyClosure["validation"],
+): DbMonthlyClosingStatus {
+  if (validation.errors.length > 0) {
+    return "BLOCKED";
+  }
+
+  return validation.warnings.length > 0 ? "WARNING" : "VALIDATED";
+}
+
+function readJsonArray(value: unknown) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsedValue: unknown = JSON.parse(value);
+      return Array.isArray(parsedValue) ? parsedValue : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function readValidationIssues(value: unknown): PhysiotherapyValidationIssue[] {
+  return readJsonArray(value).flatMap((issue) => {
+    if (typeof issue !== "object" || issue === null || Array.isArray(issue)) {
+      return [];
+    }
+
+    const record = issue as Record<string, unknown>;
+    const code = typeof record.code === "string" ? record.code : null;
+    const message = typeof record.message === "string" ? record.message : null;
+    const severity =
+      record.severity === "warning" || record.severity === "error"
+        ? record.severity
+        : null;
+
+    if (!code || !message || !severity) {
+      return [];
+    }
+
+    return [
+      {
+        code,
+        field:
+          typeof record.field === "string"
+            ? (record.field as PhysiotherapyValidationIssue["field"])
+            : undefined,
+        message,
+        severity,
+      },
+    ];
+  });
+}
+
+function dbSourceLineage(value: unknown) {
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return value as PhysiotherapyClosure["sourceLineage"];
+  }
+
+  return sourceLineage();
+}
+
+function branchRowToScope(row: DbBranchRow): PhysiotherapyClosureScope {
+  return {
+    areaManagerName:
+      row.area_manager_name ??
+      row.operational_area_name ??
+      "Gerente de area pendiente",
+    branchCode: row.code,
+    branchId: row.id,
+    branchName: row.name,
+    businessLine: "PHYSIOTHERAPY",
+    companyId: row.company_id,
+    companyName: row.company_name,
+    countryId: row.country_id,
+    countryName: row.country_name,
+    managerName: row.branch_manager_name ?? "Gerente de sucursal pendiente",
+    operationalAreaId: row.operational_area_id,
+    organizationId: row.organization_id,
+  };
+}
+
+function targetRowToTarget(row: DbTargetRow): PhysiotherapyTarget {
+  return {
+    approvedAt: isoString(row.approved_at) ?? "",
+    approvedBy: row.approved_by_email ?? (row.approved_at ? "Aprobado" : ""),
+    branchId: row.branch_id,
+    companyId: row.company_id,
+    countryId: row.country_id,
+    direction: row.direction,
+    id: row.id,
+    isDemo: row.is_demo,
+    kpiId: row.kpi_id,
+    label: row.label,
+    period: periodFromDate(row.period_month),
+    status: row.status,
+    targetMaxValue: optionalDbNumber(row.target_max_value),
+    targetMinValue: optionalDbNumber(row.target_min_value),
+    targetValue: dbNumber(row.target_value),
+    unit: row.unit,
+    version: row.version,
+  };
+}
+
+function closureRowToClosure(
+  row: DbClosureRow,
+  scope: PhysiotherapyClosureScope,
+): PhysiotherapyClosure {
+  const validationState = row.validation_state ?? "BLOQUEADO";
+
+  return {
+    auditEvents: [],
+    createdAt: isoString(row.created_at) ?? nowIso(),
+    createdBy: row.submitted_by_email,
+    dataQualityScore: dbNumber(row.data_quality_score),
+    duplicateOfClosureId: null,
+    id: row.id,
+    inputs: {
+      appointmentsCancelled: dbNumber(row.appointments_cancelled),
+      appointmentsCompleted: dbNumber(row.appointments_completed),
+      appointmentsScheduled: dbNumber(row.appointments_scheduled),
+      attendedHours: dbNumber(row.attended_hours),
+      availableHours: dbNumber(row.available_hours),
+      closureObservations: row.closure_observations ?? "",
+      directCosts: dbNumber(row.direct_costs),
+      ordersTotal: dbNumber(row.orders_total),
+      patientsAttended: dbNumber(row.patients_attended),
+      physiotherapistsActive: dbNumber(row.physiotherapists_active),
+      revenueTotal: dbNumber(row.revenue_total),
+      scheduledHours: dbNumber(row.scheduled_hours),
+      sessionsTotal: dbNumber(row.sessions_total),
+      noShowAppointments: dbNumber(row.no_show_appointments),
+    },
+    isDemo: row.is_demo,
+    kpiResults: [],
+    period: periodFromDate(row.period_month),
+    publishedAt: isoString(row.published_at),
+    publishedBy: row.published_by_email,
+    replacedByClosureId: row.superseded_by_version_id,
+    replacesClosureId: row.supersedes_version_id,
+    scope,
+    sourceLineage: dbSourceLineage(row.source_lineage),
+    status: dbStatusToClosureStatus(row.status),
+    submittedBy: row.submitted_by_email,
+    targetComparisons: [],
+    updatedAt: isoString(row.updated_at) ?? nowIso(),
+    validatedAt: isoString(row.validated_at),
+    validation: {
+      errors: readValidationIssues(row.errors),
+      state: validationState,
+      warnings: readValidationIssues(row.warnings),
+    },
+    version: row.version_number,
+  };
+}
+
+async function getPostgresBranchesForActor(
+  client: PoolClient,
+  actor: AuthorizationActor,
+) {
+  const result = await client.query<DbBranchRow>(
+    `
+      select
+        b.id,
+        b.organization_id,
+        b.country_id,
+        c.name as country_name,
+        b.company_id,
+        co.name as company_name,
+        b.code,
+        b.name,
+        b.operational_area_id,
+        oa.name as operational_area_name,
+        bm.display_name as branch_manager_name,
+        area_profile.display_name as area_manager_name,
+        b.is_demo
+      from public.branches b
+      join public.countries c on c.id = b.country_id
+      join public.companies co on co.id = b.company_id
+      left join public.operational_areas oa on oa.id = b.operational_area_id
+      left join public.branch_managers bm
+        on bm.branch_id = b.id
+       and (bm.ends_on is null or bm.ends_on >= current_date)
+      left join public.manager_assignments ma
+        on ma.operational_area_id = b.operational_area_id
+       and ma.status = 'active'
+       and ma.branch_id is null
+      left join public.profiles area_profile on area_profile.id = ma.profile_id
+      where co.unit_type = 'fisioterapia'
+        and b.is_enabled = true
+      order by b.name
+    `,
+  );
+
+  return result.rows
+    .map(branchRowToScope)
+    .filter((scope) =>
+      canPerformAction(actor, "record.read", {
+        scope,
+      }),
+    );
+}
+
+async function getPostgresTargets(
+  client: PoolClient,
+  branchIds: string[],
+) {
+  if (branchIds.length === 0) {
+    return [];
+  }
+
+  const result = await client.query<DbTargetRow>(
+    `
+      select
+        id,
+        country_id,
+        company_id,
+        branch_id,
+        period_month,
+        kpi_id,
+        label,
+        direction,
+        target_value,
+        target_min_value,
+        target_max_value,
+        unit,
+        status,
+        version,
+        is_demo,
+        approved_at,
+        approved_by_email
+      from public.kpi_targets
+      where business_line = 'PHYSIOTHERAPY'
+        and branch_id = any($1::uuid[])
+      order by period_month desc, branch_id, kpi_id, version desc
+    `,
+    [branchIds],
+  );
+
+  return result.rows.map(targetRowToTarget);
+}
+
+async function getPostgresClosures(
+  client: PoolClient,
+  branches: PhysiotherapyClosureScope[],
+  targets: PhysiotherapyTarget[],
+) {
+  const branchIds = branches.flatMap((branch) =>
+    branch.branchId && uuidPattern.test(branch.branchId) ? [branch.branchId] : [],
+  );
+
+  if (branchIds.length === 0) {
+    return [];
+  }
+
+  const branchMap = new Map(
+    branches.flatMap((branch) =>
+      branch.branchId ? [[branch.branchId, branch] as const] : [],
+    ),
+  );
+  const result = await client.query<DbClosureRow>(
+    `
+      select
+        cv.id,
+        cv.monthly_closing_id,
+        cv.country_id,
+        cv.company_id,
+        cv.branch_id,
+        cv.period_month,
+        cv.version_number,
+        cv.status,
+        cv.supersedes_version_id,
+        cv.superseded_by_version_id,
+        cv.submitted_by_email,
+        cv.published_by_email,
+        cv.validated_at,
+        cv.published_at,
+        cv.data_quality_score,
+        cv.is_demo,
+        cv.created_at,
+        cv.updated_at,
+        pci.revenue_total,
+        pci.orders_total,
+        pci.sessions_total,
+        pci.patients_attended,
+        pci.direct_costs,
+        pci.physiotherapists_active,
+        pci.appointments_scheduled,
+        pci.appointments_completed,
+        pci.appointments_cancelled,
+        pci.no_show_appointments,
+        pci.available_hours,
+        pci.scheduled_hours,
+        pci.attended_hours,
+        pci.closure_observations,
+        pci.source_lineage,
+        cvr.validation_state,
+        cvr.errors,
+        cvr.warnings
+      from public.closing_versions cv
+      join public.monthly_closings mc on mc.id = cv.monthly_closing_id
+      left join public.physiotherapy_closing_inputs pci
+        on pci.closing_version_id = cv.id
+      left join public.closing_validation_results cvr
+        on cvr.closing_version_id = cv.id
+      where cv.business_line = 'PHYSIOTHERAPY'
+        and cv.branch_id = any($1::uuid[])
+      order by cv.period_month desc, cv.version_number desc
+    `,
+    [branchIds],
+  );
+  const baseClosures = result.rows.flatMap((row) => {
+    const scope = branchMap.get(row.branch_id);
+
+    return scope ? [closureRowToClosure(row, scope)] : [];
+  });
+  const store: PhysiotherapyStore = {
+    auditEvents: [],
+    closures: new Map(baseClosures.map((closure) => [closure.id, closure])),
+    targets: new Map(targets.map((target) => [target.id, target])),
+  };
+
+  return baseClosures.map((closure) => withCalculatedFields(store, closure));
+}
+
+async function getPostgresAuditEvents(
+  client: PoolClient,
+  branchIds: string[],
+) {
+  if (branchIds.length === 0) {
+    return [];
+  }
+
+  const result = await client.query<DbAuditRow>(
+    `
+      select
+        actor_user_id,
+        actor_email,
+        action,
+        details,
+        closing_version_id,
+        branch_id,
+        period_month,
+        created_at
+      from public.closing_audit_events
+      where business_line = 'PHYSIOTHERAPY'
+        and branch_id = any($1::uuid[])
+      order by created_at desc
+      limit 50
+    `,
+    [branchIds],
+  );
+
+  return result.rows.map((row) => ({
+    action: row.action,
+    actorEmail: row.actor_email,
+    actorId: row.actor_user_id ?? row.actor_email,
+    at: isoString(row.created_at) ?? nowIso(),
+    branchId: row.branch_id ?? "",
+    closureId: row.closing_version_id ?? "",
+    details: row.details,
+    period: periodFromDate(row.period_month),
+  }));
+}
+
+async function getPostgresContext(
+  client: PoolClient,
+  actor: AuthorizationActor,
+): Promise<PostgresContext> {
+  const branches = await getPostgresBranchesForActor(client, actor);
+  const branchIds = branches.flatMap((branch) =>
+    branch.branchId && uuidPattern.test(branch.branchId) ? [branch.branchId] : [],
+  );
+  const targets = await getPostgresTargets(client, branchIds);
+  const closures = await getPostgresClosures(client, branches, targets);
+  const auditEvents = await getPostgresAuditEvents(client, branchIds);
+
+  return {
+    auditEvents,
+    branches,
+    closures,
+    targets,
+  };
+}
+
+function buildWorkspaceFromContext(
+  actor: AuthorizationActor,
+  context: PostgresContext,
+  options: { period?: string } = {},
+): PhysiotherapyWorkspace {
+  const currentPeriod = new Date().toISOString().slice(0, 7);
+  const reportingPeriod =
+    options.period && isValidPeriod(options.period)
+      ? options.period
+      : getLatestPublishedPeriod(context.closures);
+  const publishedClosures = context.closures.filter(
+    (closure) =>
+      closure.status === "published" && closure.period === reportingPeriod,
+  );
+  const draftClosure =
+    context.closures.find(
+      (closure) =>
+        closure.period === currentPeriod &&
+        (closure.status === "draft" ||
+          closure.status === "validation_failed" ||
+          closure.status === "validated"),
+    ) ?? null;
+  const latestPublishedClosure =
+    publishedClosures[0] ??
+    context.closures.find((closure) => closure.status === "published") ??
+    null;
+  const targetComparisons = buildRollupComparisons(
+    publishedClosures,
+    context.targets,
+  );
+  const summary = buildRollupSummary(publishedClosures, context.branches.length);
+  const pendingClosureCount = context.branches.filter(
+    (branch) =>
+      !context.closures.some(
+        (closure) =>
+          closure.scope.branchId === branch.branchId &&
+          closure.period === currentPeriod &&
+          closure.status === "published",
+      ),
+  ).length;
+
+  return {
+    actorRole: actor.roleKey,
+    auditEvents: context.auditEvents,
+    branches: context.branches,
+    branchSummaries: buildBranchSummaries(publishedClosures),
+    canCreateClosure: canWriteClosure(actor),
+    canManageTargets: canManageTargets(actor),
+    canPublishClosure: canWriteClosure(actor),
+    closures: context.closures,
+    currentPeriod,
+    currentPeriodStatus: currentPeriodStatus(context.closures, currentPeriod),
+    draftClosure,
+    insights: publishedClosures.flatMap((closure) =>
+      buildInsightsForClosure(closure, context.closures),
+    ),
+    latestPublishedClosure,
+    pendingClosureCount,
+    publishedClosures,
+    reportingPeriod,
+    summary,
+    targetComparisons,
+    targets: context.targets,
+  };
+}
+
+async function insertPostgresAuditEvent(
+  client: PoolClient,
+  actor: AuthorizationActor,
+  closure: PhysiotherapyClosure,
+  action: PhysiotherapyClosureAction,
+  details: string,
+) {
+  await client.query(
+    `
+      insert into public.closing_audit_events (
+        monthly_closing_id,
+        closing_version_id,
+        organization_id,
+        country_id,
+        company_id,
+        branch_id,
+        business_line,
+        period_month,
+        actor_user_id,
+        actor_email,
+        action,
+        details
+      )
+      select
+        cv.monthly_closing_id,
+        cv.id,
+        cv.organization_id,
+        cv.country_id,
+        cv.company_id,
+        cv.branch_id,
+        cv.business_line,
+        cv.period_month,
+        $2::uuid,
+        $3,
+        $4,
+        $5
+      from public.closing_versions cv
+      where cv.id = $1::uuid
+    `,
+    [closure.id, uuidOrNull(actor.userId), actor.email, action, details],
+  );
+}
+
+async function persistPostgresCalculatedResults(
+  client: PoolClient,
+  actor: AuthorizationActor,
+  closure: PhysiotherapyClosure,
+  allClosures: PhysiotherapyClosure[],
+  options: { includeInsights?: boolean } = {},
+) {
+  await client.query(
+    `
+      insert into public.closing_validation_results (
+        closing_version_id,
+        validation_state,
+        errors,
+        warnings,
+        data_quality_score,
+        validated_by
+      )
+      values ($1::uuid, $2, $3::jsonb, $4::jsonb, $5, $6::uuid)
+      on conflict (closing_version_id) do update set
+        validation_state = excluded.validation_state,
+        errors = excluded.errors,
+        warnings = excluded.warnings,
+        data_quality_score = excluded.data_quality_score,
+        validated_at = now(),
+        validated_by = excluded.validated_by
+    `,
+    [
+      closure.id,
+      closure.validation.state,
+      JSON.stringify(closure.validation.errors),
+      JSON.stringify(closure.validation.warnings),
+      closure.dataQualityScore,
+      uuidOrNull(actor.userId),
+    ],
+  );
+  await client.query(
+    "delete from public.closing_kpi_results where closing_version_id = $1::uuid",
+    [closure.id],
+  );
+
+  for (const kpi of closure.kpiResults) {
+    await client.query(
+      `
+        insert into public.closing_kpi_results (
+          closing_version_id,
+          kpi_id,
+          label,
+          formula,
+          status,
+          unit,
+          value,
+          required_fields,
+          missing_fields
+        )
+        values ($1::uuid, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb)
+      `,
+      [
+        closure.id,
+        kpi.id,
+        kpi.label,
+        kpi.formula,
+        kpi.status,
+        kpi.unit,
+        kpi.value,
+        JSON.stringify(kpi.requiredFields),
+        JSON.stringify(kpi.missingFields),
+      ],
+    );
+  }
+
+  if (!options.includeInsights) {
+    return;
+  }
+
+  await client.query(
+    "delete from public.generated_insights where closing_version_id = $1::uuid",
+    [closure.id],
+  );
+
+  for (const insight of buildInsightsForClosure(closure, allClosures)) {
+    await client.query(
+      `
+        insert into public.generated_insights (
+          closing_version_id,
+          rule_key,
+          severity,
+          kpi_id,
+          organization_id,
+          country_id,
+          company_id,
+          branch_id,
+          business_line,
+          period_month,
+          context,
+          title,
+          message,
+          comparison,
+          impact,
+          recommended_action,
+          evidence
+        )
+        values (
+          $1::uuid,
+          $2,
+          $3,
+          $4,
+          $5::uuid,
+          $6::uuid,
+          $7::uuid,
+          $8::uuid,
+          'PHYSIOTHERAPY',
+          $9::date,
+          $10::jsonb,
+          $11,
+          $12,
+          $13,
+          $14,
+          $15,
+          $16
+        )
+        on conflict (closing_version_id, rule_key) do update set
+          severity = excluded.severity,
+          context = excluded.context,
+          title = excluded.title,
+          message = excluded.message,
+          comparison = excluded.comparison,
+          impact = excluded.impact,
+          recommended_action = excluded.recommended_action,
+          evidence = excluded.evidence
+      `,
+      [
+        closure.id,
+        insight.id.replace(`${closure.id}-`, ""),
+        insight.priority,
+        insight.kpiId,
+        closure.scope.organizationId,
+        closure.scope.countryId,
+        closure.scope.companyId,
+        closure.scope.branchId,
+        periodToDate(closure.period),
+        JSON.stringify({
+          branchName: insight.branchName,
+          whatHappened: insight.whatHappened,
+        }),
+        insight.title,
+        insight.whatHappened,
+        insight.comparison,
+        insight.impact,
+        insight.recommendation,
+        insight.evidence,
+      ],
+    );
+  }
+}
+
+async function getWritablePostgresBranch(
+  client: PoolClient,
+  actor: AuthorizationActor,
+  branchId: string,
+) {
+  const branch = (await getPostgresBranchesForActor(client, actor)).find(
+    (candidate) => candidate.branchId === branchId,
+  );
+
+  if (!branch) {
+    throw new Error("Sucursal de Fisioterapia no encontrada o fuera de alcance.");
+  }
+
+  return branch;
+}
+
+async function getPostgresClosureById(
+  client: PoolClient,
+  actor: AuthorizationActor,
+  closureId: string,
+) {
+  const context = await getPostgresContext(client, actor);
+  const closure = context.closures.find((candidate) => candidate.id === closureId);
+
+  if (!closure) {
+    throw new Error("Cierre no encontrado.");
+  }
+
+  return { closure, context };
+}
+
+async function savePostgresPhysiotherapyClosureDraft(
+  actor: AuthorizationActor,
+  rawPayload: unknown,
+) {
+  assertWritableRole(actor);
+
+  return withPostgresTransaction(async (client) => {
+    const payload = (typeof rawPayload === "object" && rawPayload !== null
+      ? rawPayload
+      : {}) as PhysiotherapyDraftPayload;
+    const branchId = readString(payload.branchId);
+    const branch = await getWritablePostgresBranch(client, actor, branchId);
+    const period = readString(payload.period) || new Date().toISOString().slice(0, 7);
+    const periodMonth = periodToDate(period);
+    const inputs = parseInputs(payload);
+    const existingId = readString(payload.id);
+    const replacesClosureId = readString(payload.replacesClosureId) || null;
+    const monthlyClosing = await client.query<{ id: string }>(
+      `
+        insert into public.monthly_closings (
+          organization_id,
+          country_id,
+          company_id,
+          branch_id,
+          business_line,
+          period_month,
+          created_by,
+          created_by_email
+        )
+        values ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'PHYSIOTHERAPY', $5::date, $6::uuid, $7)
+        on conflict (organization_id, country_id, company_id, branch_id, business_line, period_month)
+        do update set updated_at = now()
+        returning id
+      `,
+      [
+        branch.organizationId,
+        branch.countryId,
+        branch.companyId,
+        branch.branchId,
+        periodMonth,
+        uuidOrNull(actor.userId),
+        actor.email,
+      ],
+    );
+    const monthlyClosingId = monthlyClosing.rows[0]?.id;
+
+    if (!monthlyClosingId) {
+      throw new Error("No se pudo preparar el cierre mensual.");
+    }
+
+    let versionId = existingId;
+    let isExistingVersion = false;
+
+    if (versionId) {
+      const existingVersion = await client.query<{
+        branch_id: string;
+        period_month: Date | string;
+        status: DbMonthlyClosingStatus;
+      }>(
+        `
+          select branch_id, period_month, status
+          from public.closing_versions
+          where id = $1::uuid
+          limit 1
+        `,
+        [versionId],
+      );
+      const version = existingVersion.rows[0];
+
+      if (!version) {
+        throw new Error("Cierre no encontrado.");
+      }
+
+      if (version.status === "PUBLISHED" || version.status === "SUPERSEDED") {
+        throw new Error("Un cierre publicado no se edita de forma silenciosa.");
+      }
+
+      if (
+        version.branch_id !== branch.branchId ||
+        periodFromDate(version.period_month) !== period
+      ) {
+        throw new Error("El borrador no coincide con la sucursal y periodo.");
+      }
+
+      isExistingVersion = true;
+    } else {
+      if (replacesClosureId) {
+        const replaced = await client.query<{
+          branch_id: string;
+          period_month: Date | string;
+          status: DbMonthlyClosingStatus;
+        }>(
+          `
+            select branch_id, period_month, status
+            from public.closing_versions
+            where id = $1::uuid
+            limit 1
+          `,
+          [replacesClosureId],
+        );
+        const replacedVersion = replaced.rows[0];
+
+        if (
+          !replacedVersion ||
+          replacedVersion.status !== "PUBLISHED" ||
+          replacedVersion.branch_id !== branch.branchId ||
+          periodFromDate(replacedVersion.period_month) !== period
+        ) {
+          throw new Error(
+            "La correccion versionada no coincide con el cierre publicado.",
+          );
+        }
+      }
+
+      const existingDraft = await client.query<{ id: string }>(
+        `
+          select id
+          from public.closing_versions
+          where monthly_closing_id = $1::uuid
+            and status in ('DRAFT', 'VALIDATED', 'WARNING', 'BLOCKED')
+            and supersedes_version_id is not distinct from $2::uuid
+          order by version_number desc
+          limit 1
+        `,
+        [monthlyClosingId, replacesClosureId],
+      );
+
+      versionId = existingDraft.rows[0]?.id ?? "";
+      isExistingVersion = Boolean(versionId);
+    }
+
+    if (!versionId) {
+      const versionResult = await client.query<{ id: string; version_number: number }>(
+        `
+          insert into public.closing_versions (
+            monthly_closing_id,
+            organization_id,
+            country_id,
+            company_id,
+            branch_id,
+            business_line,
+            period_month,
+            version_number,
+            status,
+            supersedes_version_id,
+            correction_reason,
+            submitted_by,
+            submitted_by_email
+          )
+          values (
+            $1::uuid,
+            $2::uuid,
+            $3::uuid,
+            $4::uuid,
+            $5::uuid,
+            'PHYSIOTHERAPY',
+            $6::date,
+            (
+              select coalesce(max(version_number), 0) + 1
+              from public.closing_versions
+              where monthly_closing_id = $1::uuid
+            ),
+            'DRAFT',
+            $7::uuid,
+            $8,
+            $9::uuid,
+            $10
+          )
+          returning id, version_number
+        `,
+        [
+          monthlyClosingId,
+          branch.organizationId,
+          branch.countryId,
+          branch.companyId,
+          branch.branchId,
+          periodMonth,
+          replacesClosureId,
+          inputs.closureObservations || null,
+          uuidOrNull(actor.userId),
+          actor.email,
+        ],
+      );
+
+      versionId = versionResult.rows[0]?.id ?? "";
+    }
+
+    await client.query(
+      `
+        update public.monthly_closings
+        set current_status = 'DRAFT',
+            active_version_id = $2::uuid
+        where id = $1::uuid
+      `,
+      [monthlyClosingId, versionId],
+    );
+    await client.query(
+      `
+        update public.closing_versions
+        set status = 'DRAFT',
+            data_quality_score = 0,
+            submitted_by = $2::uuid,
+            submitted_by_email = $3
+        where id = $1::uuid
+      `,
+      [versionId, uuidOrNull(actor.userId), actor.email],
+    );
+    await client.query(
+      `
+        insert into public.physiotherapy_closing_inputs (
+          closing_version_id,
+          revenue_total,
+          orders_total,
+          sessions_total,
+          patients_attended,
+          direct_costs,
+          physiotherapists_active,
+          appointments_scheduled,
+          appointments_completed,
+          appointments_cancelled,
+          no_show_appointments,
+          available_hours,
+          scheduled_hours,
+          attended_hours,
+          closure_observations,
+          source_lineage
+        )
+        values (
+          $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb
+        )
+        on conflict (closing_version_id) do update set
+          revenue_total = excluded.revenue_total,
+          orders_total = excluded.orders_total,
+          sessions_total = excluded.sessions_total,
+          patients_attended = excluded.patients_attended,
+          direct_costs = excluded.direct_costs,
+          physiotherapists_active = excluded.physiotherapists_active,
+          appointments_scheduled = excluded.appointments_scheduled,
+          appointments_completed = excluded.appointments_completed,
+          appointments_cancelled = excluded.appointments_cancelled,
+          no_show_appointments = excluded.no_show_appointments,
+          available_hours = excluded.available_hours,
+          scheduled_hours = excluded.scheduled_hours,
+          attended_hours = excluded.attended_hours,
+          closure_observations = excluded.closure_observations,
+          source_lineage = excluded.source_lineage
+      `,
+      [
+        versionId,
+        numberOrNull(inputs.revenueTotal),
+        numberOrNull(inputs.ordersTotal),
+        numberOrNull(inputs.sessionsTotal),
+        numberOrNull(inputs.patientsAttended),
+        numberOrNull(inputs.directCosts),
+        numberOrNull(inputs.physiotherapistsActive),
+        numberOrNull(inputs.appointmentsScheduled),
+        numberOrNull(inputs.appointmentsCompleted),
+        numberOrNull(inputs.appointmentsCancelled),
+        numberOrNull(inputs.noShowAppointments),
+        numberOrNull(inputs.availableHours),
+        numberOrNull(inputs.scheduledHours),
+        numberOrNull(inputs.attendedHours),
+        inputs.closureObservations,
+        JSON.stringify(sourceLineage()),
+      ],
+    );
+
+    const { closure, context } = await getPostgresClosureById(
+      client,
+      actor,
+      versionId,
+    );
+
+    await persistPostgresCalculatedResults(client, actor, closure, context.closures);
+    await insertPostgresAuditEvent(
+      client,
+      actor,
+      closure,
+      isExistingVersion ? "autosave" : "draft_created",
+      isExistingVersion
+        ? "Autosave de borrador Fisioterapia."
+        : "Borrador creado desde formulario Fisioterapia.",
+    );
+
+    return closure;
+  });
+}
+
+async function validatePostgresPhysiotherapyClosureDraft(
+  actor: AuthorizationActor,
+  closureId: string,
+) {
+  assertWritableRole(actor);
+
+  return withPostgresTransaction(async (client) => {
+    const { closure, context } = await getPostgresClosureById(
+      client,
+      actor,
+      closureId,
+    );
+
+    if (closure.status === "published" || closure.status === "replaced") {
+      throw new Error("Un cierre publicado no se edita de forma silenciosa.");
+    }
+
+    const dbStatus = validationToDbStatus(closure.validation);
+
+    await client.query(
+      `
+        update public.closing_versions
+        set status = $2::public.monthly_closing_status,
+            data_quality_score = $3,
+            validated_at = now(),
+            validated_by = $4::uuid
+        where id = $1::uuid
+      `,
+      [closure.id, dbStatus, closure.dataQualityScore, uuidOrNull(actor.userId)],
+    );
+    await client.query(
+      `
+        update public.monthly_closings mc
+        set current_status = $2::public.monthly_closing_status,
+            active_version_id = $1::uuid
+        from public.closing_versions cv
+        where cv.id = $1::uuid
+          and mc.id = cv.monthly_closing_id
+      `,
+      [closure.id, dbStatus],
+    );
+    await persistPostgresCalculatedResults(client, actor, closure, context.closures);
+    await insertPostgresAuditEvent(
+      client,
+      actor,
+      closure,
+      closure.validation.errors.length > 0 ? "validation_blocked" : "validated",
+      closure.validation.errors.length > 0
+        ? "Validacion bloqueada por reglas de calidad."
+        : "Cierre validado por reglas server-side.",
+    );
+
+    const nextContext = await getPostgresContext(client, actor);
+    const validatedClosure = nextContext.closures.find(
+      (candidate) => candidate.id === closure.id,
+    );
+
+    if (!validatedClosure) {
+      throw new Error("Cierre no encontrado despues de validar.");
+    }
+
+    return validatedClosure;
+  });
+}
+
+async function publishPostgresPhysiotherapyClosure(
+  actor: AuthorizationActor,
+  closureId: string,
+) {
+  assertWritableRole(actor);
+
+  return withPostgresTransaction(async (client) => {
+    const { closure, context } = await getPostgresClosureById(
+      client,
+      actor,
+      closureId,
+    );
+
+    if (closure.validation.errors.length > 0) {
+      throw new Error("No se puede publicar un cierre bloqueado.");
+    }
+
+    const existingPublished = await client.query<{
+      id: string;
+      monthly_closing_id: string;
+    }>(
+      `
+        select id, monthly_closing_id
+        from public.closing_versions
+        where monthly_closing_id = (
+          select monthly_closing_id
+          from public.closing_versions
+          where id = $1::uuid
+        )
+          and status = 'PUBLISHED'
+          and superseded_by_version_id is null
+        limit 1
+      `,
+      [closure.id],
+    );
+    const publishedVersion = existingPublished.rows[0];
+
+    if (
+      publishedVersion &&
+      publishedVersion.id !== closure.replacesClosureId &&
+      publishedVersion.id !== closure.id
+    ) {
+      throw new Error("Ya existe un cierre publicado. Use correccion versionada.");
+    }
+
+    if (closure.replacesClosureId) {
+      await client.query(
+        `
+          update public.closing_versions
+          set status = 'SUPERSEDED',
+              superseded_by_version_id = $2::uuid
+          where id = $1::uuid
+        `,
+        [closure.replacesClosureId, closure.id],
+      );
+      await insertPostgresAuditEvent(
+        client,
+        actor,
+        {
+          ...closure,
+          id: closure.replacesClosureId,
+          status: "replaced",
+        },
+        "replaced",
+        `Reemplazado por correccion versionada ${closure.id}.`,
+      );
+    }
+
+    await client.query(
+      `
+        update public.closing_versions
+        set status = 'PUBLISHED',
+            data_quality_score = $2,
+            published_at = now(),
+            published_by = $3::uuid,
+            published_by_email = $4
+        where id = $1::uuid
+      `,
+      [closure.id, closure.dataQualityScore, uuidOrNull(actor.userId), actor.email],
+    );
+    await client.query(
+      `
+        update public.monthly_closings mc
+        set current_status = 'PUBLISHED',
+            active_version_id = $1::uuid,
+            published_version_id = $1::uuid
+        from public.closing_versions cv
+        where cv.id = $1::uuid
+          and mc.id = cv.monthly_closing_id
+      `,
+      [closure.id],
+    );
+    const nextContext = await getPostgresContext(client, actor);
+    const publishedClosure = nextContext.closures.find(
+      (candidate) => candidate.id === closure.id,
+    );
+
+    if (!publishedClosure) {
+      throw new Error("Cierre no encontrado despues de publicar.");
+    }
+
+    await persistPostgresCalculatedResults(client, actor, publishedClosure, [
+      ...context.closures.filter((candidate) => candidate.id !== closure.id),
+      publishedClosure,
+    ], { includeInsights: true });
+    await insertPostgresAuditEvent(
+      client,
+      actor,
+      publishedClosure,
+      "published",
+      "Cierre publicado y disponible para KPIs, metas e insights.",
+    );
+
+    return publishedClosure;
+  });
+}
+
+async function upsertPostgresPhysiotherapyTarget(
+  actor: AuthorizationActor,
+  rawPayload: unknown,
+) {
+  if (!canManageTargets(actor)) {
+    throw new Error("Este rol no puede configurar metas.");
+  }
+
+  return withPostgresTransaction(async (client) => {
+    const payload = (typeof rawPayload === "object" && rawPayload !== null
+      ? rawPayload
+      : {}) as PhysiotherapyTargetPayload;
+    const branchId = readString(payload.branchId);
+    const branch = await getWritablePostgresBranch(client, actor, branchId);
+    const period = readString(payload.period) || new Date().toISOString().slice(0, 7);
+    const kpiId = readTargetKpiId(payload.kpiId);
+    const definition = targetableKpis[kpiId];
+    const direction = readTargetDirection(payload.direction, definition.direction);
+    const targetValue = readNumber(payload.targetValue);
+    const targetMinValue = readNumber(payload.targetMinValue);
+    const targetMaxValue = readNumber(payload.targetMaxValue);
+
+    if (!Number.isFinite(targetValue)) {
+      throw new Error("La meta es obligatoria y debe ser numerica.");
+    }
+
+    if (targetValue < 0) {
+      throw new Error("La meta debe ser cero o mayor.");
+    }
+
+    if (
+      direction === "RANGE" &&
+      (!Number.isFinite(targetMinValue) ||
+        !Number.isFinite(targetMaxValue) ||
+        targetMinValue > targetMaxValue)
+    ) {
+      throw new Error("El rango de meta debe tener minimo y maximo validos.");
+    }
+
+    const versionResult = await client.query<{ next_version: number }>(
+      `
+        select coalesce(max(version), 0) + 1 as next_version
+        from public.kpi_targets
+        where organization_id = $1::uuid
+          and branch_id = $2::uuid
+          and business_line = 'PHYSIOTHERAPY'
+          and period_month = $3::date
+          and kpi_id = $4
+      `,
+      [branch.organizationId, branch.branchId, periodToDate(period), kpiId],
+    );
+    const version = versionResult.rows[0]?.next_version ?? 1;
+    const insertResult = await client.query<DbTargetRow>(
+      `
+        insert into public.kpi_targets (
+          organization_id,
+          country_id,
+          company_id,
+          branch_id,
+          business_line,
+          period_month,
+          kpi_id,
+          label,
+          target_type,
+          direction,
+          target_value,
+          target_min_value,
+          target_max_value,
+          unit,
+          status,
+          version,
+          created_by,
+          created_by_email,
+          approved_by,
+          approved_by_email,
+          approved_at
+        )
+        values (
+          $1::uuid,
+          $2::uuid,
+          $3::uuid,
+          $4::uuid,
+          'PHYSIOTHERAPY',
+          $5::date,
+          $6,
+          $7,
+          $8,
+          $9,
+          $10,
+          $11,
+          $12,
+          $13,
+          $14::public.kpi_target_status,
+          $15,
+          $16::uuid,
+          $17,
+          $16::uuid,
+          $17,
+          now()
+        )
+        returning
+          id,
+          country_id,
+          company_id,
+          branch_id,
+          period_month,
+          kpi_id,
+          label,
+          direction,
+          target_value,
+          target_min_value,
+          target_max_value,
+          unit,
+          status,
+          version,
+          is_demo,
+          approved_at,
+          approved_by_email
+      `,
+      [
+        branch.organizationId,
+        branch.countryId,
+        branch.companyId,
+        branch.branchId,
+        periodToDate(period),
+        kpiId,
+        definition.label,
+        direction === "RANGE" ? "RANGE" : "SINGLE_VALUE",
+        direction,
+        targetValue,
+        direction === "RANGE" ? targetMinValue : null,
+        direction === "RANGE" ? targetMaxValue : null,
+        definition.unit,
+        readTargetLifecycleStatus(payload.status),
+        version,
+        uuidOrNull(actor.userId),
+        actor.email,
+      ],
+    );
+
+    await client.query(
+      `
+        insert into public.closing_audit_events (
+          organization_id,
+          country_id,
+          company_id,
+          branch_id,
+          business_line,
+          period_month,
+          actor_user_id,
+          actor_email,
+          action,
+          details,
+          metadata
+        )
+        values (
+          $1::uuid,
+          $2::uuid,
+          $3::uuid,
+          $4::uuid,
+          'PHYSIOTHERAPY',
+          $5::date,
+          $6::uuid,
+          $7,
+          'target.changed',
+          'Meta Fisioterapia guardada.',
+          $8::jsonb
+        )
+      `,
+      [
+        branch.organizationId,
+        branch.countryId,
+        branch.companyId,
+        branch.branchId,
+        periodToDate(period),
+        uuidOrNull(actor.userId),
+        actor.email,
+        JSON.stringify({ kpiId, version }),
+      ],
+    );
+
+    return targetRowToTarget(insertResult.rows[0]);
+  });
+}
+
+function getDemoPhysiotherapyWorkspace(
   actor: AuthorizationActor,
   options: { period?: string } = {},
 ): PhysiotherapyWorkspace {
@@ -2485,6 +4059,67 @@ export function getPhysiotherapyWorkspace(
     targetComparisons,
     targets,
   };
+}
+
+export async function getPhysiotherapyWorkspace(
+  actor: AuthorizationActor,
+  options: { period?: string } = {},
+): Promise<PhysiotherapyWorkspace> {
+  if (shouldUsePostgresPersistence()) {
+    return withPostgresClient(async (client) =>
+      buildWorkspaceFromContext(
+        actor,
+        await getPostgresContext(client, actor),
+        options,
+      ),
+    );
+  }
+
+  return getDemoPhysiotherapyWorkspace(actor, options);
+}
+
+export async function savePhysiotherapyClosureDraft(
+  actor: AuthorizationActor,
+  rawPayload: unknown,
+) {
+  if (shouldUsePostgresPersistence()) {
+    return savePostgresPhysiotherapyClosureDraft(actor, rawPayload);
+  }
+
+  return saveDemoPhysiotherapyClosureDraft(actor, rawPayload);
+}
+
+export async function validatePhysiotherapyClosureDraft(
+  actor: AuthorizationActor,
+  closureId: string,
+) {
+  if (shouldUsePostgresPersistence()) {
+    return validatePostgresPhysiotherapyClosureDraft(actor, closureId);
+  }
+
+  return validateDemoPhysiotherapyClosureDraft(actor, closureId);
+}
+
+export async function publishPhysiotherapyClosure(
+  actor: AuthorizationActor,
+  closureId: string,
+) {
+  if (shouldUsePostgresPersistence()) {
+    return publishPostgresPhysiotherapyClosure(actor, closureId);
+  }
+
+  return publishDemoPhysiotherapyClosure(actor, closureId);
+}
+
+export async function upsertPhysiotherapyTarget(
+  actor: AuthorizationActor,
+  rawPayload: unknown,
+) {
+  if (shouldUsePostgresPersistence()) {
+    return upsertPostgresPhysiotherapyTarget(actor, rawPayload);
+  }
+
+  return upsertDemoPhysiotherapyTarget(actor, rawPayload);
 }
 
 export function getPhysiotherapyTargetDefinitions() {

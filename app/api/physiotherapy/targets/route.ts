@@ -17,7 +17,7 @@ export async function GET() {
   return NextResponse.json({
     definitions: getPhysiotherapyTargetDefinitions(),
     ok: true,
-    workspace: getPhysiotherapyWorkspace(actor),
+    workspace: await getPhysiotherapyWorkspace(actor),
   });
 }
 
@@ -26,12 +26,12 @@ export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as unknown;
 
   try {
-    const target = upsertPhysiotherapyTarget(actor, payload);
+    const target = await upsertPhysiotherapyTarget(actor, payload);
 
     return NextResponse.json({
       ok: true,
       target,
-      workspace: getPhysiotherapyWorkspace(actor),
+      workspace: await getPhysiotherapyWorkspace(actor),
     });
   } catch (error) {
     return jsonError(

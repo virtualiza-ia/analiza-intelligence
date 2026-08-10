@@ -21,12 +21,12 @@ export async function POST(_request: Request, context: ClosureRouteContext) {
   const { closureId } = await context.params;
 
   try {
-    const closure = publishPhysiotherapyClosure(actor, closureId);
+    const closure = await publishPhysiotherapyClosure(actor, closureId);
 
     return NextResponse.json({
       closure,
       ok: true,
-      workspace: getPhysiotherapyWorkspace(actor),
+      workspace: await getPhysiotherapyWorkspace(actor),
     });
   } catch (error) {
     return jsonError(

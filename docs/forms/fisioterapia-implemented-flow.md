@@ -68,9 +68,9 @@ Every API route resolves the authenticated actor server-side with `requireProtec
 
 ## Data Model Implemented In This Phase
 
-The current implementation uses a server-side DEMO store so the full product flow can be reviewed visually before database migrations are introduced. The model is intentionally shaped like the future persistent model:
+The flow keeps a server-side DEMO store only when `APP_ENV=demo` so the product can still be reviewed visually without a database dependency. Outside DEMO, the service is prepared to use PostgreSQL persistence through the server-side database pool:
 
-- Closure identity: branch, period, version.
+- Closure identity: organization, country, company, branch, business line, period and version.
 - Closure status: `draft`, `validation_failed`, `validated`, `published`, `replaced`.
 - Scope: country, company, operational area, branch and managers.
 - Inputs: monthly Fisioterapia source fields.
@@ -81,7 +81,22 @@ The current implementation uses a server-side DEMO store so the full product flo
 - Insights: generated from real closure values versus targets, prior period and allowed benchmarks.
 - Audit: draft, validation, publish and replacement events.
 
-No production database migration was created in this vertical.
+The PostgreSQL migration is intentionally new and has not been applied to production by this task.
+
+## Persistence Prepared
+
+The new persistent model separates source inputs from calculated outputs:
+
+- `monthly_closings`: one logical monthly closing by organization, country, company, branch, business line and period.
+- `closing_versions`: immutable version lineage for drafts, published closings, superseded closings and corrections.
+- `physiotherapy_closing_inputs`: manual Fisioterapia source inputs only.
+- `closing_validation_results`: server-side validation state, errors, warnings and data quality score.
+- `closing_kpi_results`: derived KPI results recalculated server-side.
+- `kpi_targets`: governed KPI targets by period, branch, KPI, type, value, status and approvers.
+- `generated_insights`: deterministic insights tied to closing version, KPI, severity and rule.
+- `closing_audit_events`: creation, autosave, validation, publication, correction and target changes.
+
+The migration enables RLS on every table and keeps the branch hierarchy as the access boundary. Application code still applies server-side RBAC before reads and writes.
 
 ## Form Fields
 
@@ -204,7 +219,9 @@ For Gerente de Sucursal, navigation is intentionally reduced to the Fisioterapia
 
 ## Current Limitations
 
-- Persistence is server-memory DEMO only. A future phase must add PostgreSQL tables, migrations and repository adapters.
+- The PostgreSQL migration is prepared but not applied to production or a remote environment by this task.
+- Full restart persistence must be validated against an authorized local/staging PostgreSQL database after applying the new migration.
+- DEMO fallback remains available only for `APP_ENV=demo`.
 - Seed data is DEMO and exists only to review the executive flow.
 - Laboratorio and Imagenes still use the existing modules and are not part of Vertical 1.
 - Real connector ingestion is not part of this implementation.

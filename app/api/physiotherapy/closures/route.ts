@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    workspace: getPhysiotherapyWorkspace(actor, { period }),
+    workspace: await getPhysiotherapyWorkspace(actor, { period }),
   });
 }
 
@@ -26,12 +26,12 @@ export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as unknown;
 
   try {
-    const closure = savePhysiotherapyClosureDraft(actor, payload);
+    const closure = await savePhysiotherapyClosureDraft(actor, payload);
 
     return NextResponse.json({
       closure,
       ok: true,
-      workspace: getPhysiotherapyWorkspace(actor),
+      workspace: await getPhysiotherapyWorkspace(actor),
     });
   } catch (error) {
     return jsonError(
