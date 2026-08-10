@@ -111,6 +111,7 @@ const delegatedUserAdminRoles: RoleKey[] = [
 
 const ceoFocusedRoles: RoleKey[] = ["ceo"];
 const operationsFocusedRoles: RoleKey[] = ["gerente_operaciones"];
+const executiveLineReadRoles: RoleKey[] = ["ceo"];
 const adminDataRoles: RoleKey[] = [...adminRoles, "gerente_operaciones"];
 const importMutationRoles: RoleKey[] = [
   ...adminRoles,
@@ -241,21 +242,21 @@ export const navigationItems: NavigationItem[] = [
     href: "/protected/fisioterapia",
     icon: HeartPulse,
     group: "lineas",
-    allowedRoles: deepDiagnosticRoles,
+    allowedRoles: executiveLineReadRoles,
   },
   {
     title: "Laboratorio",
     href: "/protected/laboratorio",
     icon: FlaskConical,
     group: "lineas",
-    allowedRoles: deepDiagnosticRoles,
+    allowedRoles: executiveLineReadRoles,
   },
   {
     title: "Imagenes",
     href: "/protected/imagenes",
     icon: ImagePlus,
     group: "lineas",
-    allowedRoles: deepDiagnosticRoles,
+    allowedRoles: executiveLineReadRoles,
   },
   {
     title: "Insights",

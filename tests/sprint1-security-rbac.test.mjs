@@ -33,6 +33,7 @@ function actor(roleKey, scope, overrides = {}) {
 }
 
 const viewer = actor("viewer", { countryId, companyId });
+const ceo = actor("ceo", { countryId, companyId });
 const branchManager = actor("gerente_sucursal", {
   branchId,
   companyId,
@@ -204,6 +205,66 @@ for (const allowedPath of [
     canAccessProtectedPath(viewer, allowedPath),
     true,
     `Viewer should access explicitly authorized path ${allowedPath}.`,
+  );
+}
+
+for (const executiveLinePath of [
+  "/protected/fisioterapia",
+  "/protected/laboratorio",
+  "/protected/imagenes",
+]) {
+  assert.equal(
+    canAccessProtectedPath(ceo, executiveLinePath),
+    true,
+    `CEO must have read-only access to ${executiveLinePath}.`,
+  );
+  assert.equal(
+    canAccessProtectedPath(viewer, executiveLinePath),
+    false,
+    `Viewer must keep current restrictions for ${executiveLinePath}.`,
+  );
+}
+
+for (const sensitiveCeoPath of [
+  "/protected/cierres/nuevo",
+  "/protected/importaciones",
+  "/protected/usuarios-permisos",
+  "/protected/auditoria",
+  "/protected/conectores",
+  "/protected/apis",
+  "/protected/calidad-datos",
+  "/protected/gerentes",
+]) {
+  assert.equal(
+    canAccessProtectedPath(ceo, sensitiveCeoPath),
+    false,
+    `CEO direct line read access must not grant sensitive route ${sensitiveCeoPath}.`,
+  );
+}
+
+for (const sensitiveAction of [
+  "imports.upload",
+  "imports.publish",
+  "imports.rollback",
+  "users.invite",
+  "users.change_role",
+  "users.change_scope",
+  "connectors.manage",
+  "connectors.run",
+]) {
+  assert.equal(
+    canPerformAction(ceo, sensitiveAction, {
+      roleKey: "gerente_area",
+      scope: {
+        branchId,
+        companyId,
+        countryId,
+        operationalAreaId: areaId,
+        organizationId,
+      },
+    }),
+    false,
+    `CEO read-only line access must not grant ${sensitiveAction}.`,
   );
 }
 
