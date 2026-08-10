@@ -492,6 +492,16 @@ const demoAdminHelper = readFileSync("lib/auth/demo-admin.ts", "utf8");
 const databaseHelper = readFileSync("lib/server/database.ts", "utf8");
 const environment = readFileSync("lib/security/environment.ts", "utf8");
 const localSession = readFileSync("lib/auth/local-session.ts", "utf8");
+const localLoginRoute = readFileSync("app/api/auth/local-login/route.ts", "utf8");
+const localPasswordRoute = readFileSync(
+  "app/api/auth/local-password/route.ts",
+  "utf8",
+);
+const authorizationService = readFileSync("lib/server/authorization.ts", "utf8");
+const requiredPasswordChangeMigration = readFileSync(
+  "supabase/migrations/20260810000400_require_local_password_change.sql",
+  "utf8",
+);
 const sprint1Migration = readFileSync(
   "supabase/migrations/20260807000100_sprint1_harden_security_rbac.sql",
   "utf8",
@@ -512,6 +522,22 @@ assert(
     localSession.includes("return null") &&
     localSession.includes("!isDemoRuntimeEnvironment()"),
   "Local sessions must reject invalid tokens and require configured secrets outside demo.",
+);
+
+assert(
+  localLoginRoute.includes("requiresPasswordChange") &&
+    localLoginRoute.includes("/auth/update-password") &&
+    authorizationService.includes("actor.requiresPasswordChange") &&
+    authorizationService.includes("redirect(\"/auth/update-password\")"),
+  "Local users marked for password rotation must be redirected before protected access.",
+);
+
+assert(
+  localPasswordRoute.includes("readLocalSession") &&
+    localPasswordRoute.includes("changeAuthenticatedLocalUserPassword") &&
+    !localPasswordRoute.includes("service_role") &&
+    !localPasswordRoute.includes("NEXT_PUBLIC"),
+  "Local password changes must be server-side and require an existing local session.",
 );
 
 assert(
@@ -620,5 +646,11 @@ for (const requiredMigrationText of [
     `Sprint 1 migration is missing: ${requiredMigrationText}`,
   );
 }
+
+assert(
+  requiredPasswordChangeMigration.includes("requires_password_change") &&
+    requiredPasswordChangeMigration.includes("public.profiles"),
+  "Password rotation migration must persist the required-change flag on profiles.",
+);
 
 console.log("Sprint 1 security RBAC checks passed.");

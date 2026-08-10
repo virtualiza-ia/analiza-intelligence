@@ -49,7 +49,13 @@ export async function POST(request: Request) {
     return jsonError("Usuario o contrasena incorrectos.", 401);
   }
 
-  const response = NextResponse.json({ ok: true });
+  const response = NextResponse.json({
+    ok: true,
+    redirectTo: user.requiresPasswordChange
+      ? "/auth/update-password"
+      : "/protected/context",
+    requiresPasswordChange: user.requiresPasswordChange,
+  });
   response.cookies.set(
     localSessionCookieName,
     createLocalSessionToken(user),

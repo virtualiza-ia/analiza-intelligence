@@ -158,7 +158,11 @@ export function LoginForm({
       });
 
       if (localResponse.ok) {
-        router.push("/protected/context");
+        const localPayload = (await localResponse.json().catch(() => null)) as
+          | { redirectTo?: string }
+          | null;
+
+        router.push(localPayload?.redirectTo ?? "/protected/context");
         router.refresh();
         return;
       }

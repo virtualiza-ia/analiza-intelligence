@@ -17,6 +17,7 @@ export type AuthorizationActor = {
   allowDemoRoleSwitch: boolean;
   canInviteOperationalUsers?: boolean;
   email: string;
+  requiresPasswordChange?: boolean;
   roleKey: RoleKey;
   scope: ScopeBoundary;
   source: AuthorizationActorSource;

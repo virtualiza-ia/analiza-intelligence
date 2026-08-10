@@ -9,6 +9,7 @@ const signUpPath = "app/auth/sign-up/page.tsx";
 const acceptInvitationFormPath = "components/accept-invitation-form.tsx";
 const acceptInvitationRoutePath = "app/api/auth/accept-invitation/route.ts";
 const localLoginRoutePath = "app/api/auth/local-login/route.ts";
+const localPasswordRoutePath = "app/api/auth/local-password/route.ts";
 const localAuthPath = "lib/server/local-auth.ts";
 const passwordPath = "lib/server/passwords.ts";
 const localSessionPath = "lib/auth/local-session.ts";
@@ -27,6 +28,7 @@ for (const file of [
   acceptInvitationFormPath,
   acceptInvitationRoutePath,
   localLoginRoutePath,
+  localPasswordRoutePath,
   localAuthPath,
   passwordPath,
   localSessionPath,
@@ -47,6 +49,7 @@ const signUp = readFileSync(signUpPath, "utf8");
 const acceptInvitationForm = readFileSync(acceptInvitationFormPath, "utf8");
 const acceptInvitationRoute = readFileSync(acceptInvitationRoutePath, "utf8");
 const localLoginRoute = readFileSync(localLoginRoutePath, "utf8");
+const localPasswordRoute = readFileSync(localPasswordRoutePath, "utf8");
 const localAuth = readFileSync(localAuthPath, "utf8");
 const passwords = readFileSync(passwordPath, "utf8");
 const localSession = readFileSync(localSessionPath, "utf8");
@@ -154,10 +157,25 @@ for (const requiredLocalLoginText of [
   "authenticateLocalUser",
   "createLocalSessionToken",
   "getExpiredLocalSessionCookieOptions",
+  "requiresPasswordChange",
+  "/auth/update-password",
   "Usuario o contrasena incorrectos",
 ]) {
   if (!localLoginRoute.includes(requiredLocalLoginText)) {
     throw new Error(`Local login route is missing: ${requiredLocalLoginText}`);
+  }
+}
+
+for (const requiredLocalPasswordText of [
+  "readLocalSession",
+  "changeAuthenticatedLocalUserPassword",
+  "currentPassword",
+  "newPassword",
+]) {
+  if (!localPasswordRoute.includes(requiredLocalPasswordText)) {
+    throw new Error(
+      `Local password route is missing: ${requiredLocalPasswordText}`,
+    );
   }
 }
 
@@ -167,6 +185,8 @@ for (const requiredLocalAuthText of [
   "public.profiles",
   "public.user_roles",
   "public.user_invitations",
+  "requires_password_change",
+  "local_password.changed",
   "invitation_token_hash = null",
   "user_invitation.accepted",
 ]) {

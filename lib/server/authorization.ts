@@ -127,6 +127,7 @@ async function readLocalAuthorizationActor(
   return {
     allowDemoRoleSwitch: false,
     email: user.email,
+    requiresPasswordChange: user.requiresPasswordChange,
     roleKey: user.roleKey,
     scope,
     source: "local",
@@ -217,6 +218,10 @@ export async function requireProtectedAccess() {
 
   if (!actor) {
     redirect("/auth/login");
+  }
+
+  if (actor.source === "local" && actor.requiresPasswordChange) {
+    redirect("/auth/update-password");
   }
 
   return actor;

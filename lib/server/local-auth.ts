@@ -29,6 +29,7 @@ type LocalAuthUserRow = {
   encrypted_password: string | null;
   id: string;
   profile_status: string | null;
+  requires_password_change: boolean | null;
   role_key: string | null;
 };
 
@@ -47,11 +48,13 @@ type LocalUserScopeRow = {
   operational_area_name: string | null;
   organization_id: string | null;
   organization_name: string | null;
+  requires_password_change: boolean | null;
   role_key: string | null;
 };
 
 export type AuthenticatedLocalUser = {
   email: string;
+  requiresPasswordChange: boolean;
   roleKey: RoleKey;
   scope?: CurrentUserScope;
   userId: string;
@@ -61,6 +64,23 @@ export type AcceptInvitationInput = {
   email: string;
   password: string;
   token: string;
+};
+
+type ChangeAuthenticatedLocalUserPasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+  userId: string;
+};
+
+type LocalPasswordChangeUserRow = {
+  branch_id: string | null;
+  company_id: string | null;
+  country_id: string | null;
+  email: string;
+  encrypted_password: string | null;
+  id: string;
+  organization_id: string | null;
+  profile_status: string | null;
 };
 
 function normalizeEmail(email: string) {
@@ -363,6 +383,7 @@ export async function acceptUserInvitation({
 
     return {
       email: user.email,
+      requiresPasswordChange: false,
       roleKey: coerceRoleKey(invitation.role_key),
       userId: user.id,
     };
@@ -390,6 +411,7 @@ export async function authenticateLocalUser({
         u.email,
         u.encrypted_password,
         p.status as profile_status,
+        coalesce(p.requires_password_change, false) as requires_password_change,
         r.key as role_key
       from auth.users u
       join public.profiles p on p.id = u.id
@@ -429,9 +451,133 @@ export async function authenticateLocalUser({
 
   return {
     email: user.email,
+    requiresPasswordChange: user.requires_password_change === true,
     roleKey: coerceRoleKey(user.role_key),
     userId: user.id,
   };
+}
+
+export async function changeAuthenticatedLocalUserPassword({
+  currentPassword,
+  newPassword,
+  userId,
+}: ChangeAuthenticatedLocalUserPasswordInput): Promise<AuthenticatedLocalUser> {
+  if (!currentPassword) {
+    throw new Error("Ingresa la contrasena temporal o actual.");
+  }
+
+  if (currentPassword === newPassword) {
+    throw new Error("La nueva contrasena debe ser diferente.");
+  }
+
+  const passwordPolicyError = getPasswordPolicyError(newPassword);
+
+  if (passwordPolicyError) {
+    throw new Error(passwordPolicyError);
+  }
+
+  const pool = getPostgresPool();
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+
+    const result = await client.query<LocalPasswordChangeUserRow>(
+      `
+        select
+          u.id,
+          u.email,
+          u.encrypted_password,
+          p.status as profile_status,
+          p.organization_id,
+          p.default_country_id as country_id,
+          p.default_company_id as company_id,
+          p.default_branch_id as branch_id
+        from auth.users u
+        join public.profiles p on p.id = u.id
+        where u.id = $1
+          and p.deactivated_at is null
+          and p.deleted_at is null
+        for update
+        limit 1
+      `,
+      [userId],
+    );
+    const user = result.rows[0];
+
+    if (
+      !user?.encrypted_password ||
+      user.profile_status !== "active" ||
+      !(await verifyPassword(currentPassword, user.encrypted_password))
+    ) {
+      throw new Error("La contrasena actual no es correcta.");
+    }
+
+    const encryptedPassword = await hashPassword(newPassword);
+
+    await client.query(
+      `
+        update auth.users
+        set encrypted_password = $1,
+            updated_at = now()
+        where id = $2
+      `,
+      [encryptedPassword, user.id],
+    );
+
+    await client.query(
+      `
+        update public.profiles
+        set requires_password_change = false,
+            updated_at = now()
+        where id = $1
+      `,
+      [user.id],
+    );
+
+    await client.query(
+      `
+        insert into public.audit_logs (
+          organization_id,
+          actor_user_id,
+          action,
+          entity_table,
+          entity_id,
+          country_id,
+          company_id,
+          branch_id,
+          metadata
+        )
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+      `,
+      [
+        user.organization_id,
+        user.id,
+        "local_password.changed",
+        "profiles",
+        user.id,
+        user.country_id,
+        user.company_id,
+        user.branch_id,
+        JSON.stringify({ source: "required-local-password-change" }),
+      ],
+    );
+
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  const updatedUser = await getAuthenticatedLocalUserAccess(userId);
+
+  if (!updatedUser) {
+    throw new Error("No se pudo cargar la sesion actualizada.");
+  }
+
+  return updatedUser;
 }
 
 function buildCurrentUserScope(row: LocalUserScopeRow): CurrentUserScope {
@@ -459,6 +605,7 @@ export async function getAuthenticatedLocalUserAccess(userId: string) {
         u.id,
         u.email,
         r.key as role_key,
+        coalesce(p.requires_password_change, false) as requires_password_change,
         coalesce(ur.organization_id, p.organization_id) as organization_id,
         o.name as organization_name,
         coalesce(ur.country_id, p.default_country_id, b.country_id) as country_id,
@@ -515,6 +662,7 @@ export async function getAuthenticatedLocalUserAccess(userId: string) {
 
   return {
     email: user.email,
+    requiresPasswordChange: user.requires_password_change === true,
     roleKey: coerceRoleKey(user.role_key),
     scope: buildCurrentUserScope(user),
     userId: user.id,

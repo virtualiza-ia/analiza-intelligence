@@ -17,6 +17,7 @@ export type CurrentUserScope = {
 
 export type CurrentUserAccess = {
   email: string;
+  requiresPasswordChange?: boolean;
   roleKey: RoleKey;
   scope: CurrentUserScope;
   userId: string;
