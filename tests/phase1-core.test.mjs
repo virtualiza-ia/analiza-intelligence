@@ -121,8 +121,12 @@ if (!loginForm.includes("Crear cuenta")) {
   throw new Error("Login form should link to controlled account creation.");
 }
 
-if (!loginForm.includes("Admin DEMO tambien requiere usuario y contrasena")) {
-  throw new Error("Login form should expose controlled DEMO admin access.");
+if (
+  !loginForm.includes("enableLocalDemoLogin") ||
+  !loginForm.includes("Entorno DEMO local") ||
+  !loginForm.includes("/api/auth/demo-session")
+) {
+  throw new Error("Login form should expose controlled local DEMO access only behind the server flag.");
 }
 
 if (!demoAdminRoute.includes("getDemoAdminPassword")) {
