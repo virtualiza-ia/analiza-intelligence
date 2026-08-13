@@ -30,8 +30,12 @@ const labLine = "business-line-laboratorio";
 
 for (const file of [
   "lib/analytics/global-filters.ts",
+  "lib/analytics/analytics-intelligence.ts",
   "lib/analytics/semantic-bi.ts",
+  "lib/analytics/branch-network.ts",
   "components/executive-dashboard.tsx",
+  "components/branch-network-dashboard.tsx",
+  "components/analytics-comparison-chart.tsx",
   "components/financial-health-dashboard.tsx",
   "components/capacity-occupancy-dashboard.tsx",
   "components/data-quality-analia-dashboard.tsx",
@@ -142,6 +146,27 @@ assert.ok(
 );
 assert.equal(escalonWithoutLoadedResults.lines.length, 0);
 assert.equal(escalonWithoutLoadedResults.noDataReason, semanticMessages.noData);
+assert.ok(
+  labAll.branchRows.every(
+    (row) =>
+      typeof row.normalizedPerformanceScore === "number" &&
+      row.normalizedPerformanceScore >= 0 &&
+      row.normalizedPerformanceScore <= 100,
+  ),
+  "Executive branch rows must expose a normalized comparable score.",
+);
+assert.ok(
+  labAll.branchRows.some((row) => (row.outlierFlags ?? []).length > 0),
+  "Executive branch rows must mark outliers instead of removing them.",
+);
+assert.ok(
+  labAll.managerRows.every(
+    (row) =>
+      typeof row.normalizedPerformanceScore === "number" &&
+      row.comparisonBasis?.includes("no suma por volumen"),
+  ),
+  "Executive manager rows must summarize normalized performance by assigned branches.",
+);
 
 for (const line of labAll.lines) {
   assert.equal(areFinanceInvariantsPassing(line.finance), true);
@@ -241,11 +266,30 @@ const dataQualityDashboard = readFileSync(
   "components/data-quality-analia-dashboard.tsx",
   "utf8",
 );
+const branchNetworkDashboard = readFileSync(
+  "components/branch-network-dashboard.tsx",
+  "utf8",
+);
+const branchNetworkAnalytics = readFileSync(
+  "lib/analytics/branch-network.ts",
+  "utf8",
+);
+const comparisonChart = readFileSync(
+  "components/analytics-comparison-chart.tsx",
+  "utf8",
+);
+const analyticsReview = readFileSync(
+  "docs/analytics-review/data-science-bi-review.md",
+  "utf8",
+);
 
 for (const requiredText of [
   "Tabla ejecutiva por sucursal",
   "Tabla ejecutiva por gerente",
   "Sin datos disponibles para este filtro",
+  "Score comparable",
+  "Base",
+  "Atipicos",
 ]) {
   assert.ok(executiveDashboard.includes(requiredText));
 }
@@ -253,5 +297,14 @@ for (const requiredText of [
 assert.ok(financialDashboard.includes("Margen contribucion"));
 assert.ok(capacityDashboard.includes("CapacityNoDataState"));
 assert.ok(dataQualityDashboard.includes("Reglas de calidad del filtro activo"));
+assert.ok(branchNetworkDashboard.includes('useState<SortKey>("normalizedPerformanceScore")'));
+assert.ok(branchNetworkDashboard.includes("Score comparable"));
+assert.ok(branchNetworkDashboard.includes("Base comparable"));
+assert.ok(branchNetworkAnalytics.includes("normalizedPerformanceScore"));
+assert.ok(branchNetworkAnalytics.includes("outlierFlags"));
+assert.ok(comparisonChart.includes("isBenchmarkSeries"));
+assert.ok(comparisonChart.includes("strokeDasharray={benchmarkSeries"));
+assert.ok(analyticsReview.includes("No comparar solo facturacion"));
+assert.ok(analyticsReview.includes("Score Comparable"));
 
 console.log("Macro Sprint 2 BI integrity checks passed.");

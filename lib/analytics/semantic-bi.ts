@@ -5,6 +5,14 @@ import {
 } from "./el-salvador-result-templates.ts";
 import { safeDivide, type BusinessLineCode } from "./kpi-registry.ts";
 import {
+  createOutlierFlag,
+  median,
+  scoreRate,
+  scoreTargetFulfillment,
+  weightedScore,
+  type AnalyticsOutlierFlag,
+} from "./analytics-intelligence.ts";
+import {
   allBranchesValue,
   allChannelsValue,
   allManagersValue,
@@ -134,6 +142,9 @@ export type ExecutiveBranchRow = {
   contributionMarginRate: number | null;
   effectiveOccupancy: number | null;
   alert: string;
+  normalizedPerformanceScore?: number;
+  comparisonBasis?: string;
+  outlierFlags?: AnalyticsOutlierFlag[];
 };
 
 export type ExecutiveManagerRow = {
@@ -146,6 +157,9 @@ export type ExecutiveManagerRow = {
   contributionMarginRate: number | null;
   effectiveOccupancy: number | null;
   action: string;
+  normalizedPerformanceScore?: number;
+  comparisonBasis?: string;
+  outlierFlags?: AnalyticsOutlierFlag[];
 };
 
 export type ExecutiveSemanticKpi = {
@@ -1290,8 +1304,116 @@ function getNoDataReason(context: GlobalFilterContext, lines: SemanticLine[]) {
   return noDataMessage;
 }
 
+function buildExecutiveComparableScore(row: ExecutiveBranchRow) {
+  return weightedScore([
+    { value: scoreTargetFulfillment(row.targetFulfillment), weight: 35 },
+    { value: scoreRate(row.contributionMarginRate), weight: 25 },
+    { value: scoreRate(row.effectiveOccupancy), weight: 25 },
+    { value: row.qualityScore, weight: 15 },
+  ]);
+}
+
+function buildExecutiveOutlierFlags(
+  row: ExecutiveBranchRow,
+  peers: ExecutiveBranchRow[],
+): AnalyticsOutlierFlag[] {
+  const flags: AnalyticsOutlierFlag[] = [];
+  const marginMedian = median(
+    peers
+      .map((peer) => peer.contributionMarginRate)
+      .filter((value): value is number => value !== null),
+  );
+  const occupancyMedian = median(
+    peers
+      .map((peer) => peer.effectiveOccupancy)
+      .filter((value): value is number => value !== null),
+  );
+
+  if ((row.targetFulfillment ?? 1) < 0.9) {
+    flags.push(
+      createOutlierFlag({
+        benchmark: "Meta aprobada del periodo",
+        explanation:
+          "Brecha contra meta; revisar alcance, capacidad y responsable antes de concluir por volumen.",
+        metric: "Meta",
+        severity: (row.targetFulfillment ?? 1) < 0.8 ? "critical" : "warning",
+        value: formatPercent(row.targetFulfillment),
+      }),
+    );
+  }
+
+  if (
+    row.effectiveOccupancy !== null &&
+    (row.effectiveOccupancy >= 0.9 || row.effectiveOccupancy <= 0.65)
+  ) {
+    flags.push(
+      createOutlierFlag({
+        benchmark: occupancyMedian === null ? "Grupo comparable" : formatPercent(occupancyMedian),
+        explanation:
+          row.effectiveOccupancy >= 0.9
+            ? "Utilizacion alta; validar si hay saturacion o deterioro de SLA."
+            : "Utilizacion baja; revisar capacidad ociosa y demanda disponible.",
+        metric: "Ocupacion",
+        severity: "warning",
+        value: formatPercent(row.effectiveOccupancy),
+      }),
+    );
+  }
+
+  if (
+    marginMedian !== null &&
+    row.contributionMarginRate !== null &&
+    row.contributionMarginRate <= marginMedian - 0.06
+  ) {
+    flags.push(
+      createOutlierFlag({
+        benchmark: `Mediana pares ${formatPercent(marginMedian)}`,
+        explanation:
+          "Margen debajo del grupo comparable; separar mix, costo y ticket.",
+        metric: "Margen",
+        severity: "warning",
+        value: formatPercent(row.contributionMarginRate),
+      }),
+    );
+  }
+
+  if (row.qualityScore < 80) {
+    flags.push(
+      createOutlierFlag({
+        benchmark: "Umbral minimo 80",
+        explanation:
+          "Calidad de datos baja; no emitir conclusion ejecutiva fuerte sin conciliacion.",
+        metric: "Calidad",
+        severity: row.qualityScore < 70 ? "critical" : "warning",
+        value: `${row.qualityScore}`,
+      }),
+    );
+  }
+
+  return flags;
+}
+
+function enrichExecutiveBranchRows(rows: ExecutiveBranchRow[]) {
+  return rows.map((row) => {
+    const peers = rows.filter(
+      (peer) => peer.company === row.company && peer.branch !== row.branch,
+    );
+    const fallbackPeers = peers.length >= 2 ? peers : rows.filter((peer) => peer.branch !== row.branch);
+
+    return {
+      ...row,
+      comparisonBasis:
+        peers.length >= 2
+          ? `${row.company}; sucursales de la misma linea`
+          : "Vista ejecutiva filtrada; pares disponibles limitados",
+      normalizedPerformanceScore: buildExecutiveComparableScore(row),
+      outlierFlags: buildExecutiveOutlierFlags(row, fallbackPeers),
+    };
+  });
+}
+
 function buildBranchRows(lines: SemanticLine[]): ExecutiveBranchRow[] {
-  return lines.flatMap((line) => {
+  const rows = lines.flatMap((line) => {
     if (line.key === "laboratorio" && line.branchId === allBranchesValue) {
       return elSalvadorBranchResultTemplates.map((branch) => ({
         alert:
@@ -1328,6 +1450,8 @@ function buildBranchRows(lines: SemanticLine[]): ExecutiveBranchRow[] {
       },
     ];
   });
+
+  return enrichExecutiveBranchRows(rows);
 }
 
 function buildManagerRows(branchRows: ExecutiveBranchRow[]): ExecutiveManagerRow[] {
@@ -1352,6 +1476,12 @@ function buildManagerRows(branchRows: ExecutiveBranchRow[]): ExecutiveManagerRow
       const averageOccupancy =
         rows.reduce((sum, row) => sum + (row.effectiveOccupancy ?? 0), 0) /
         rows.length;
+      const averageComparableScore =
+        rows.reduce(
+          (sum, row) => sum + (row.normalizedPerformanceScore ?? row.qualityScore),
+          0,
+        ) / rows.length;
+      const outlierFlags = rows.flatMap((row) => row.outlierFlags ?? []).slice(0, 4);
 
       return {
         action:
@@ -1364,8 +1494,11 @@ function buildManagerRows(branchRows: ExecutiveBranchRow[]): ExecutiveManagerRow
         contributionMarginRate: averageMargin,
         effectiveOccupancy: averageOccupancy,
         manager,
+        comparisonBasis: "Promedio de sucursales asignadas, no suma por volumen",
         qualityLevel: qualityLevelFromScore(averageQuality),
         qualityScore: Math.round(averageQuality),
+        normalizedPerformanceScore: Math.round(averageComparableScore),
+        outlierFlags,
         scope: rows.map((row) => row.branch).join(", "),
         targetFulfillment: averageTarget,
       };
@@ -1552,17 +1685,19 @@ function buildExecutiveInsights(lines: SemanticLine[]): ExecutiveSemanticInsight
         insights.push({
           affectedIndicator: "Calidad de datos",
           priority: "alta",
-          recommendation: insufficientExecutiveDataMessage,
-          title: `${line.shortName}: calidad insuficiente`,
+          recommendation: `${line.branchName}: calidad ${line.qualityScore} vs umbral minimo 70. Impacto: no emitir conclusion ejecutiva fuerte. Accion: conciliar fuente, periodo y duplicados antes de publicar.`,
+          title: `${line.shortName}: calidad insuficiente en ${line.branchName}`,
         });
       }
 
       if ((line.finance.targetFulfillment ?? 1) < 0.9) {
+        const targetGap = line.finance.target - line.finance.netBilling;
+
         insights.push({
           affectedIndicator: "Meta de ingresos",
           priority: "media",
-          recommendation: "Revisar brecha de meta por sucursal y responsable antes de concluir tendencia.",
-          title: `${line.shortName}: brecha de meta`,
+          recommendation: `${line.branchName}: ${formatPercent(line.finance.targetFulfillment)} vs meta 100%, brecha ${formatCurrency(targetGap)}. Impacto: riesgo de cierre bajo meta. Accion: revisar plan por gerente, capacidad disponible y servicios con mayor brecha.`,
+          title: `${line.shortName}: brecha de meta en ${line.branchName}`,
         });
       }
 
@@ -1570,7 +1705,7 @@ function buildExecutiveInsights(lines: SemanticLine[]): ExecutiveSemanticInsight
         insights.push({
           affectedIndicator: "Brecha agenda/efectiva",
           priority: "alta",
-          recommendation: "Corregir conversion, no-show o cancelacion antes de ampliar capacidad.",
+          recommendation: `${line.branchName}: brecha agenda/atencion de ${line.capacity.conversionGapPoints} pts vs capacidad agendada. Impacto: capacidad reservada no se convierte en servicio. Accion: confirmar citas, activar lista de espera y medir recuperacion.`,
           title: `${line.shortName}: agenda no se convierte en atencion real`,
         });
       }
@@ -1579,7 +1714,7 @@ function buildExecutiveInsights(lines: SemanticLine[]): ExecutiveSemanticInsight
         insights.push({
           affectedIndicator: "Margen de contribucion",
           priority: "media",
-          recommendation: "Separar costo directo por servicio, canal y sucursal.",
+          recommendation: `${line.branchName}: margen ${formatPercent(line.finance.contributionMarginRate)} vs umbral de vigilancia 45%. Impacto: venta puede no convertirse en contribucion. Accion: separar costo directo por servicio, canal y sucursal antes de escalar volumen.`,
           title: `${line.shortName}: margen bajo vigilancia`,
         });
       }

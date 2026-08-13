@@ -64,6 +64,10 @@ const markerClasses: Record<TrendSeries["color"], string> = {
   teal: "bg-cyan-600",
 };
 
+function isBenchmarkSeries(label: string) {
+  return /meta|presupuesto|presupuestado|proyeccion|proyectad/i.test(label);
+}
+
 function insightClass(tone: TrendTone) {
   if (tone === "positive") {
     return "border-emerald-200 bg-emerald-50 text-emerald-800";
@@ -195,7 +199,7 @@ export function AnalyticsComparisonChart({
   const selectableSeries = useMemo(
     () =>
       activeSeries.filter(
-        (item) => !/meta|presupuesto/i.test(item.label),
+        (item) => !isBenchmarkSeries(item.label),
       ),
     [activeSeries],
   );
@@ -207,7 +211,7 @@ export function AnalyticsComparisonChart({
       );
       const targetSeries =
         comparisonMode === "target"
-          ? activeSeries.filter((item) => /meta|presupuesto/i.test(item.label))
+          ? activeSeries.filter((item) => isBenchmarkSeries(item.label))
           : [];
       const fallbackSeries =
         selectedSeries.length > 0
@@ -224,7 +228,7 @@ export function AnalyticsComparisonChart({
     }
 
     const targetSeries = comparisonSeries.filter((item) =>
-      /meta|presupuesto/i.test(item.label),
+      isBenchmarkSeries(item.label),
     );
     const historicalSeries =
       comparisonSeries.find((item) => /2025|anterior/i.test(item.label)) ??
@@ -522,7 +526,10 @@ export function AnalyticsComparisonChart({
           </div>
           {visibleSeries.map((item) => (
             <div
-              className="flex h-8 items-center gap-2 rounded-full border bg-background px-3 text-xs"
+              className={cn(
+                "flex h-8 items-center gap-2 rounded-full border bg-background px-3 text-xs",
+                isBenchmarkSeries(item.label) ? "border-dashed" : "",
+              )}
               key={item.label}
             >
               <span
@@ -556,7 +563,8 @@ export function AnalyticsComparisonChart({
           </div>
           <div>
             <span className="font-medium text-foreground">Lineas de color: </span>
-            cada color representa una comparacion activa, gerente, sucursal o meta.
+            cada color representa una comparacion activa, gerente o sucursal; las
+            metas, presupuesto y proyeccion aparecen con trazo punteado.
           </div>
           <div>
             <span className="font-medium text-foreground">Pasa encima: </span>
@@ -603,15 +611,17 @@ export function AnalyticsComparisonChart({
             {visibleSeries.map((item) => {
               const polyline = buildPolyline(item.points, maxValue, width, height);
               const lastPoint = getLastPoint(item.points, maxValue, width, height);
+              const benchmarkSeries = isBenchmarkSeries(item.label);
               return (
                 <g key={item.label}>
                   <polyline
                     fill="none"
                     points={polyline}
                     stroke={seriesColors[item.color]}
+                    strokeDasharray={benchmarkSeries ? "8 6" : undefined}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                  strokeWidth="3.2"
+                    strokeWidth={benchmarkSeries ? "2.4" : "3.2"}
                   />
                   <circle
                     cx={lastPoint.x}

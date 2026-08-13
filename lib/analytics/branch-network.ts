@@ -5,6 +5,15 @@ import type {
 } from "@/components/analytics-comparison-chart";
 import type { BusinessLineSlug } from "@/lib/analytics/business-line-operations";
 import {
+  clampScore,
+  createOutlierFlag,
+  median,
+  scoreAgainstPeerMedian,
+  scoreRate,
+  weightedScore,
+  type AnalyticsOutlierFlag,
+} from "@/lib/analytics/analytics-intelligence";
+import {
   elSalvadorBranchResultTemplates,
   formatCurrency,
   formatRate,
@@ -60,7 +69,21 @@ export type BranchNetworkRecord = {
   movedPatients: number;
   incomingPatients: number;
   alerts: string[];
+  normalizedPerformanceScore: number;
+  comparisonBasis: string;
+  capacityGapPoints: number;
+  productivityIndex: number;
+  outlierFlags: AnalyticsOutlierFlag[];
 };
+
+type BranchNetworkBaseRecord = Omit<
+  BranchNetworkRecord,
+  | "capacityGapPoints"
+  | "comparisonBasis"
+  | "normalizedPerformanceScore"
+  | "outlierFlags"
+  | "productivityIndex"
+>;
 
 export type BranchNetworkScreen = {
   slug: BusinessLineSlug;
@@ -153,7 +176,207 @@ function buildRatePoints(value: number) {
   );
 }
 
-const laboratoryRecords: BranchNetworkRecord[] =
+function peerRecords(
+  record: BranchNetworkBaseRecord,
+  records: BranchNetworkBaseRecord[],
+) {
+  const comparablePeers = records.filter(
+    (peer) =>
+      peer.id !== record.id &&
+      peer.lineSlug === record.lineSlug &&
+      peer.size === record.size &&
+      peer.serviceMix === record.serviceMix,
+  );
+
+  if (comparablePeers.length >= 2) {
+    return comparablePeers;
+  }
+
+  return records.filter(
+    (peer) => peer.id !== record.id && peer.lineSlug === record.lineSlug,
+  );
+}
+
+function comparisonBasis(record: BranchNetworkBaseRecord, peers: BranchNetworkBaseRecord[]) {
+  const peerLabel = peers.length >= 2 ? "grupo comparable" : "misma linea";
+
+  return `${record.line} / ${record.size} / ${record.serviceMix}; referencia: ${peerLabel}`;
+}
+
+function normalizedPerformanceScore(
+  record: BranchNetworkBaseRecord,
+  peers: BranchNetworkBaseRecord[],
+) {
+  const marginPeerMedian = median(peers.map((peer) => peer.marginRate));
+  const ticketPeerMedian = median(peers.map((peer) => peer.ticket));
+  const targetScore = clampScore(100 + record.targetGap);
+  const marginScore = scoreAgainstPeerMedian(record.marginRate, marginPeerMedian);
+  const utilizationScore = scoreRate(record.occupancyRate);
+  const slaScore = scoreRate(record.slaRate);
+  const productivityScore = scoreAgainstPeerMedian(record.ticket, ticketPeerMedian);
+  const growthScore = clampScore(70 + record.growthRate * 120);
+  const recurrenceScore = scoreRate(record.recurrenceRate);
+
+  if (record.lineSlug === "fisioterapia") {
+    return weightedScore([
+      { value: targetScore, weight: 25 },
+      { value: utilizationScore, weight: 24 },
+      { value: recurrenceScore, weight: 16 },
+      { value: marginScore, weight: 14 },
+      { value: slaScore, weight: 10 },
+      { value: record.dataQuality, weight: 8 },
+      { value: growthScore, weight: 3 },
+    ]);
+  }
+
+  if (record.lineSlug === "laboratorio") {
+    return weightedScore([
+      { value: targetScore, weight: 26 },
+      { value: productivityScore, weight: 18 },
+      { value: marginScore, weight: 18 },
+      { value: slaScore, weight: 14 },
+      { value: record.dataQuality, weight: 14 },
+      { value: growthScore, weight: 10 },
+    ]);
+  }
+
+  if (record.lineSlug === "imagenes") {
+    return weightedScore([
+      { value: targetScore, weight: 26 },
+      { value: utilizationScore, weight: 24 },
+      { value: marginScore, weight: 18 },
+      { value: slaScore, weight: 14 },
+      { value: record.dataQuality, weight: 10 },
+      { value: productivityScore, weight: 5 },
+      { value: growthScore, weight: 3 },
+    ]);
+  }
+
+  return weightedScore([
+    { value: targetScore, weight: 25 },
+    { value: utilizationScore, weight: 20 },
+    { value: productivityScore, weight: 15 },
+    { value: marginScore, weight: 15 },
+    { value: slaScore, weight: 10 },
+    { value: record.dataQuality, weight: 10 },
+    { value: growthScore, weight: 5 },
+  ]);
+}
+
+function buildOutlierFlags(
+  record: BranchNetworkBaseRecord,
+  peers: BranchNetworkBaseRecord[],
+): AnalyticsOutlierFlag[] {
+  const flags: AnalyticsOutlierFlag[] = [];
+  const marginPeerMedian = median(peers.map((peer) => peer.marginRate));
+  const occupancyPeerMedian = median(peers.map((peer) => peer.occupancyRate));
+  const growthPeerMedian = median(peers.map((peer) => peer.growthRate));
+  const ticketPeerMedian = median(peers.map((peer) => peer.ticket));
+
+  if (record.targetGap <= -10) {
+    flags.push(
+      createOutlierFlag({
+        benchmark: "Meta del periodo",
+        explanation:
+          "Brecha relevante contra meta; revisar antes de comparar por venta absoluta.",
+        metric: "Meta vs real",
+        severity: record.targetGap <= -15 ? "critical" : "warning",
+        value: `${record.targetGap} pts`,
+      }),
+    );
+  }
+
+  if (record.occupancyRate >= 0.9 || record.occupancyRate <= 0.65) {
+    flags.push(
+      createOutlierFlag({
+        benchmark: occupancyPeerMedian === null ? "Grupo comparable" : formatRate(occupancyPeerMedian),
+        explanation:
+          record.occupancyRate >= 0.9
+            ? "Utilizacion alta; puede indicar saturacion si SLA o lista de espera se deterioran."
+            : "Utilizacion baja; revisar capacidad ociosa, demanda y derivaciones disponibles.",
+        metric: "Ocupacion/utilizacion",
+        severity: record.occupancyRate >= 0.94 || record.occupancyRate <= 0.61 ? "critical" : "warning",
+        value: formatRate(record.occupancyRate),
+      }),
+    );
+  }
+
+  if (marginPeerMedian !== null && record.marginRate <= marginPeerMedian - 0.06) {
+    flags.push(
+      createOutlierFlag({
+        benchmark: `Mediana pares ${formatRate(marginPeerMedian)}`,
+        explanation:
+          "Margen debajo del grupo comparable; separar mix, costo y ticket antes de concluir desempeno.",
+        metric: "Margen",
+        severity: "warning",
+        value: formatRate(record.marginRate),
+      }),
+    );
+  }
+
+  if (ticketPeerMedian !== null && record.ticket <= ticketPeerMedian * 0.85) {
+    flags.push(
+      createOutlierFlag({
+        benchmark: `Mediana pares ${formatCurrency(ticketPeerMedian)}`,
+        explanation:
+          "Ticket por servicio bajo frente a pares; revisar mezcla y precios antes de aumentar volumen.",
+        metric: "Productividad/ticket",
+        severity: "warning",
+        value: formatCurrency(record.ticket),
+      }),
+    );
+  }
+
+  if (growthPeerMedian !== null && Math.abs(record.growthRate - growthPeerMedian) >= 0.12) {
+    flags.push(
+      createOutlierFlag({
+        benchmark: `Mediana pares ${formatRate(growthPeerMedian)}`,
+        explanation:
+          "Cambio brusco contra pares; validar si es estacionalidad, recuperacion o problema de captura.",
+        metric: "Tendencia",
+        severity: Math.abs(record.growthRate - growthPeerMedian) >= 0.2 ? "critical" : "warning",
+        value: formatRate(record.growthRate),
+      }),
+    );
+  }
+
+  if (record.dataQuality < 80) {
+    flags.push(
+      createOutlierFlag({
+        benchmark: "Umbral minimo 80",
+        explanation:
+          "Calidad de datos debajo del umbral; bloquear conclusiones ejecutivas fuertes.",
+        metric: "Calidad de datos",
+        severity: record.dataQuality < 70 ? "critical" : "warning",
+        value: `${record.dataQuality}`,
+      }),
+    );
+  }
+
+  return flags;
+}
+
+function enrichBranchNetworkRecords(records: BranchNetworkBaseRecord[]): BranchNetworkRecord[] {
+  return records.map((record) => {
+    const peers = peerRecords(record, records);
+    const occupancyPeerMedian = median(peers.map((peer) => peer.occupancyRate));
+    const ticketPeerMedian = median(peers.map((peer) => peer.ticket));
+
+    return {
+      ...record,
+      capacityGapPoints:
+        occupancyPeerMedian === null
+          ? 0
+          : Math.round((record.occupancyRate - occupancyPeerMedian) * 100),
+      comparisonBasis: comparisonBasis(record, peers),
+      normalizedPerformanceScore: normalizedPerformanceScore(record, peers),
+      outlierFlags: buildOutlierFlags(record, peers),
+      productivityIndex: scoreAgainstPeerMedian(record.ticket, ticketPeerMedian),
+    };
+  });
+}
+
+const laboratoryRecords: BranchNetworkBaseRecord[] =
   elSalvadorBranchResultTemplates.map((branch, index) => {
     const patients = branch.rowCounts.customerRows;
     const operatingScore = Math.round(
@@ -239,7 +462,7 @@ const laboratoryRecords: BranchNetworkRecord[] =
     };
   });
 
-const physioRecords: BranchNetworkRecord[] = [
+const physioRecords: BranchNetworkBaseRecord[] = [
   {
     id: "physio-centro",
     branch: "Fisioterapia Centro",
@@ -384,7 +607,7 @@ const physioRecords: BranchNetworkRecord[] = [
   },
 ];
 
-const imagingRecords: BranchNetworkRecord[] = [
+const imagingRecords: BranchNetworkBaseRecord[] = [
   {
     id: "img-santa-tecla",
     branch: "Imagenes Santa Tecla",
@@ -529,11 +752,14 @@ const imagingRecords: BranchNetworkRecord[] = [
   },
 ];
 
-export const allBranchNetworkRecords: BranchNetworkRecord[] = [
+const branchNetworkBaseRecords: BranchNetworkBaseRecord[] = [
   ...laboratoryRecords,
   ...physioRecords,
   ...imagingRecords,
 ];
+
+export const allBranchNetworkRecords: BranchNetworkRecord[] =
+  enrichBranchNetworkRecords(branchNetworkBaseRecords);
 
 function scoreMetrics(records: BranchNetworkRecord[]): BranchNetworkMetric[] {
   const active = records.length;
@@ -547,24 +773,27 @@ function scoreMetrics(records: BranchNetworkRecord[]): BranchNetworkMetric[] {
   const saturated = records.filter((record) => record.occupancyRate >= 0.88).length;
   const underused = records.filter((record) => record.occupancyRate <= 0.65).length;
   const dataProblems = records.filter((record) => record.dataQuality < 80).length;
+  const outliers = records.filter((record) => record.outlierFlags.length > 0).length;
   const totalSales = records.reduce((sum, record) => sum + record.netSales, 0);
   const totalPatients = records.reduce((sum, record) => sum + record.patients, 0);
   const averageScore =
-    records.reduce((sum, record) => sum + record.score, 0) / Math.max(active, 1);
+    records.reduce((sum, record) => sum + record.normalizedPerformanceScore, 0) /
+    Math.max(active, 1);
 
   return [
     { label: "Red de sucursales", value: `${active}`, note: "sucursales en la vista", tone: "neutral" },
     { label: "Operacion normal", value: `${normal}`, note: "saludables o sobresalientes", tone: "positive" },
     { label: "Precaucion", value: `${warning}`, note: "requieren seguimiento", tone: "warning" },
     { label: "Criticas", value: `${critical}`, note: "intervencion prioritaria", tone: critical > 0 ? "negative" : "positive" },
-    { label: "Encima de meta", value: `${aboveTarget}`, note: "venta o score sobre meta", tone: "positive" },
+    { label: "Encima de meta", value: `${aboveTarget}`, note: "real sobre meta", tone: "positive" },
     { label: "Perdida operativa", value: `${loss}`, note: "utilidad, margen o brecha", tone: "warning" },
     { label: "Saturadas", value: `${saturated}`, note: "ocupacion alta", tone: "warning" },
     { label: "Subutilizadas", value: `${underused}`, note: "capacidad comercial", tone: "warning" },
+    { label: "Atipicas", value: `${outliers}`, note: "marcadas, no excluidas", tone: outliers > 0 ? "warning" : "positive" },
     { label: "Calidad de datos", value: `${dataProblems}`, note: "debajo de 80 puntos", tone: dataProblems > 0 ? "warning" : "positive" },
     { label: "Venta neta", value: formatCurrency(totalSales), note: "periodo seleccionado", tone: "positive" },
     { label: "Pacientes", value: totalPatients.toLocaleString("en-US"), note: "unicos DEMO", tone: "neutral" },
-    { label: "Score promedio", value: `${Math.round(averageScore)}`, note: "0 a 100 ponderado", tone: averageScore >= 80 ? "positive" : "warning" },
+    { label: "Score comparable", value: `${Math.round(averageScore)}`, note: "normalizado, no volumen", tone: averageScore >= 80 ? "positive" : "warning" },
   ];
 }
 
@@ -619,7 +848,12 @@ function seriesForMetric(
   records: BranchNetworkRecord[],
   metric: keyof Pick<
     BranchNetworkRecord,
-    "netSales" | "patients" | "marginRate" | "occupancyRate" | "slaRate" | "score"
+    | "netSales"
+    | "patients"
+    | "marginRate"
+    | "occupancyRate"
+    | "slaRate"
+    | "normalizedPerformanceScore"
   >,
   formatter: (record: BranchNetworkRecord) => string,
 ): TrendSeries[] {
@@ -653,10 +887,10 @@ export function buildBranchTrendChart(records: BranchNetworkRecord[]): BranchTre
       tone: "neutral",
     },
     {
-      label: "Mayor score",
-      value: `${primaryRecord.city} ${primaryRecord.score}`,
+      label: "Mayor score comparable",
+      value: `${primaryRecord.city} ${primaryRecord.normalizedPerformanceScore}`,
       note: primaryRecord.recommendation,
-      tone: primaryRecord.score >= 80 ? "positive" : "warning",
+      tone: primaryRecord.normalizedPerformanceScore >= 80 ? "positive" : "warning",
     },
     {
       label: "Accion",
@@ -724,11 +958,13 @@ export function buildBranchTrendChart(records: BranchNetworkRecord[]): BranchTre
     },
     {
       id: "score-sucursal",
-      label: "Score integral",
+      label: "Score comparable (Score integral)",
       description:
-        "Score ponderado de sucursal, configurable por linea de negocio.",
+        "Score balanceado por meta, margen, capacidad, SLA, calidad y productividad proxy.",
       yLabel: "Score 0-100",
-      series: seriesForMetric(scopedRecords, "score", (record) => `${record.score}`),
+      series: seriesForMetric(scopedRecords, "normalizedPerformanceScore", (record) =>
+        `${record.normalizedPerformanceScore}`,
+      ),
       insights: baseInsights,
     },
   ];

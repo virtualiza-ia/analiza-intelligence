@@ -654,7 +654,7 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
           Tabla ejecutiva por sucursal
         </h2>
         <p className="text-sm leading-6 text-muted-foreground">
-          Ordenada por riesgo de calidad y cumplimiento, no por ingreso absoluto.
+          Ordenada por riesgo, cumplimiento y score comparable, no por ingreso absoluto.
         </p>
       </div>
       <div className="grid gap-3 md:hidden">
@@ -670,6 +670,10 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
               </div>
             </div>
             <dl className="grid gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between gap-3">
+                <dt>Score comparable</dt>
+                <dd>{row.normalizedPerformanceScore ?? row.qualityScore}</dd>
+              </div>
               <div className="flex items-center justify-between gap-3">
                 <dt>Ingresos</dt>
                 <dd className="font-medium text-foreground">
@@ -695,6 +699,25 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
                 </dd>
               </div>
             </dl>
+            <p className="rounded-lg border bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+              Base: {row.comparisonBasis ?? "Vista ejecutiva filtrada"}
+            </p>
+            {(row.outlierFlags?.length ?? 0) > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {row.outlierFlags?.slice(0, 2).map((flag) => (
+                  <Badge
+                    className={
+                      flag.severity === "critical"
+                        ? "bg-rose-100 text-rose-800 hover:bg-rose-100"
+                        : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                    }
+                    key={`${row.branch}-${flag.metric}`}
+                  >
+                    {flag.metric}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
             <p className="rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
               {row.alert}
             </p>
@@ -702,17 +725,20 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
         ))}
       </div>
       <div className="hidden overflow-x-auto md:block">
-        <table className="data-table w-full min-w-[980px] text-left text-sm">
+        <table className="data-table w-full min-w-[1180px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
               <th className="py-2 pr-4 font-medium">Sucursal</th>
               <th className="py-2 pr-4 font-medium">Empresa</th>
               <th className="py-2 pr-4 font-medium">Gerente</th>
+              <th className="py-2 pr-4 font-medium">Score comparable</th>
               <th className="py-2 pr-4 font-medium">Ingresos</th>
               <th className="py-2 pr-4 font-medium">Meta</th>
               <th className="py-2 pr-4 font-medium">Margen contribucion</th>
               <th className="py-2 pr-4 font-medium">Ocupacion / utilizacion</th>
               <th className="py-2 pr-4 font-medium">Calidad</th>
+              <th className="py-2 pr-4 font-medium">Base</th>
+              <th className="py-2 pr-4 font-medium">Atipicos</th>
               <th className="py-2 pr-4 font-medium">Alerta</th>
             </tr>
           </thead>
@@ -722,6 +748,9 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
                 <td className="py-3 pr-4 font-medium">{row.branch}</td>
                 <td className="py-3 pr-4">{row.company}</td>
                 <td className="py-3 pr-4">{row.manager}</td>
+                <td className="py-3 pr-4">
+                  {row.normalizedPerformanceScore ?? row.qualityScore}
+                </td>
                 <td className="py-3 pr-4">{formatSemanticCurrency(row.revenue)}</td>
                 <td className="py-3 pr-4">{formatSemanticPercent(row.targetFulfillment)}</td>
                 <td className="py-3 pr-4">
@@ -732,6 +761,29 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
                 </td>
                 <td className="py-3 pr-4">
                   {row.qualityLevel} {row.qualityScore}%
+                </td>
+                <td className="max-w-[220px] py-3 pr-4 text-xs text-muted-foreground">
+                  {row.comparisonBasis ?? "Vista ejecutiva filtrada"}
+                </td>
+                <td className="py-3 pr-4">
+                  {(row.outlierFlags?.length ?? 0) > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {row.outlierFlags?.slice(0, 2).map((flag) => (
+                        <Badge
+                          className={
+                            flag.severity === "critical"
+                              ? "bg-rose-100 text-rose-800 hover:bg-rose-100"
+                              : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                          }
+                          key={`${row.branch}-${flag.metric}`}
+                        >
+                          {flag.metric}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Sin alerta</span>
+                  )}
                 </td>
                 <td className="py-3 pr-4 text-muted-foreground">{row.alert}</td>
               </tr>
@@ -751,7 +803,8 @@ function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
           Tabla ejecutiva por gerente
         </h2>
         <p className="text-sm leading-6 text-muted-foreground">
-          Compara responsabilidad, calidad, meta, margen y ocupacion efectiva.
+          Compara responsabilidad, calidad, meta, margen, ocupacion efectiva y
+          score comparable promedio.
         </p>
       </div>
       <div className="grid gap-3 md:hidden">
@@ -767,6 +820,10 @@ function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
               </div>
             </div>
             <dl className="grid gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between gap-3">
+                <dt>Score comparable</dt>
+                <dd>{row.normalizedPerformanceScore ?? row.qualityScore}</dd>
+              </div>
               <div className="flex items-center justify-between gap-3">
                 <dt>Meta promedio</dt>
                 <dd>{formatSemanticPercent(row.targetFulfillment)}</dd>
@@ -793,15 +850,17 @@ function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
         ))}
       </div>
       <div className="hidden overflow-x-auto md:block">
-        <table className="data-table w-full min-w-[920px] text-left text-sm">
+        <table className="data-table w-full min-w-[1040px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
               <th className="py-2 pr-4 font-medium">Gerente</th>
               <th className="py-2 pr-4 font-medium">Sucursales</th>
+              <th className="py-2 pr-4 font-medium">Score comparable</th>
               <th className="py-2 pr-4 font-medium">Meta promedio</th>
               <th className="py-2 pr-4 font-medium">Margen contribucion</th>
               <th className="py-2 pr-4 font-medium">Ocupacion / utilizacion</th>
               <th className="py-2 pr-4 font-medium">Calidad</th>
+              <th className="py-2 pr-4 font-medium">Atipicos</th>
               <th className="py-2 pr-4 font-medium">Accion</th>
             </tr>
           </thead>
@@ -810,6 +869,9 @@ function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
               <tr className="border-b last:border-b-0" key={row.manager}>
                 <td className="py-3 pr-4 font-medium">{row.manager}</td>
                 <td className="py-3 pr-4">{row.branches}</td>
+                <td className="py-3 pr-4">
+                  {row.normalizedPerformanceScore ?? row.qualityScore}
+                </td>
                 <td className="py-3 pr-4">{formatSemanticPercent(row.targetFulfillment)}</td>
                 <td className="py-3 pr-4">
                   {formatSemanticPercent(row.contributionMarginRate)}
@@ -819,6 +881,15 @@ function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
                 </td>
                 <td className="py-3 pr-4">
                   {row.qualityLevel} {row.qualityScore}%
+                </td>
+                <td className="py-3 pr-4">
+                  {(row.outlierFlags?.length ?? 0) > 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                      {row.outlierFlags?.map((flag) => flag.metric).join(", ")}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Sin alerta</span>
+                  )}
                 </td>
                 <td className="py-3 pr-4 text-muted-foreground">{row.action}</td>
               </tr>

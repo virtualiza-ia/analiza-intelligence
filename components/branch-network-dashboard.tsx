@@ -69,6 +69,7 @@ type BranchFilters = {
 };
 
 type SortKey =
+  | "normalizedPerformanceScore"
   | "score"
   | "netSales"
   | "marginRate"
@@ -83,6 +84,12 @@ const heatmapColumns: {
   formatter: (record: BranchNetworkRecord) => string;
   value: (record: BranchNetworkRecord) => number;
 }[] = [
+  {
+    key: "normalizedPerformanceScore",
+    label: "Score comp.",
+    formatter: (record) => `${record.normalizedPerformanceScore}`,
+    value: (record) => record.normalizedPerformanceScore,
+  },
   {
     key: "netSales",
     label: "Venta",
@@ -503,7 +510,7 @@ function BranchRankingTable({
   records: BranchNetworkRecord[];
   selectedId: string | null;
 }) {
-  const [sortKey, setSortKey] = useState<SortKey>("score");
+  const [sortKey, setSortKey] = useState<SortKey>("normalizedPerformanceScore");
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const sortedRecords = useMemo(() => {
     return [...records].sort((a, b) => {
@@ -523,7 +530,12 @@ function BranchRankingTable({
   }
 
   const columns: { key: SortKey; label: string; render: (record: BranchNetworkRecord) => string }[] = [
-    { key: "score", label: "Score", render: (record) => `${record.score}` },
+    {
+      key: "normalizedPerformanceScore",
+      label: "Score comparable",
+      render: (record) => `${record.normalizedPerformanceScore}`,
+    },
+    { key: "score", label: "Score operativo", render: (record) => `${record.score}` },
     { key: "netSales", label: "Venta", render: (record) => formatCurrency(record.netSales) },
     { key: "marginRate", label: "Margen", render: (record) => formatRate(record.marginRate) },
     { key: "patients", label: "Pacientes", render: (record) => record.patients.toLocaleString("en-US") },
@@ -538,7 +550,7 @@ function BranchRankingTable({
         Ranking integral de sucursales
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1060px] text-left text-sm">
+        <table className="w-full min-w-[1240px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
               <th className="py-2 pr-4 font-medium">Sucursal</th>
@@ -554,6 +566,8 @@ function BranchRankingTable({
                   </button>
                 </th>
               ))}
+              <th className="py-2 pr-4 font-medium">Base comparable</th>
+              <th className="py-2 pr-4 font-medium">Atipicos</th>
               <th className="py-2 pr-4 font-medium">Estado</th>
               <th className="py-2 pr-4 font-medium">Accion recomendada</th>
             </tr>
@@ -579,6 +593,29 @@ function BranchRankingTable({
                     {column.render(record)}
                   </td>
                 ))}
+                <td className="max-w-[220px] py-3 pr-4 text-xs text-muted-foreground">
+                  {record.comparisonBasis}
+                </td>
+                <td className="py-3 pr-4">
+                  <div className="flex flex-wrap gap-1">
+                    {record.outlierFlags.length > 0 ? (
+                      record.outlierFlags.slice(0, 2).map((flag) => (
+                        <Badge
+                          className={
+                            flag.severity === "critical"
+                              ? "bg-rose-100 text-rose-800 hover:bg-rose-100"
+                              : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                          }
+                          key={`${record.id}-${flag.metric}`}
+                        >
+                          {flag.metric}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Sin alerta</span>
+                    )}
+                  </div>
+                </td>
                 <td className="py-3 pr-4">
                   <Badge className={getStatusClass(record.status)}>
                     {record.status}
@@ -615,7 +652,9 @@ function BranchMapPanel({
       }, new Map<string, BranchNetworkRecord[]>()),
     )
       .map(([region, groupRecords]) => ({
-        records: groupRecords.sort((a, b) => b.score - a.score),
+        records: groupRecords.sort(
+          (a, b) => b.normalizedPerformanceScore - a.normalizedPerformanceScore,
+        ),
         region,
       }))
       .sort((a, b) => a.region.localeCompare(b.region));
@@ -656,6 +695,7 @@ Venta: ${formatCurrency(record.netSales)}
 Pacientes: ${record.patients.toLocaleString("en-US")}
 Margen: ${formatRate(record.marginRate)}
 Ocupacion: ${formatRate(record.occupancyRate)}
+Score comparable: ${record.normalizedPerformanceScore}
 Linea: ${record.line}
 Alerta: ${record.alerts[0] ?? "Sin alerta critica"}`}
                   type="button"
@@ -668,7 +708,9 @@ Alerta: ${record.alerts[0] ?? "Sin alerta critica"}`}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-semibold">{record.score}</div>
+                      <div className="text-xl font-semibold">
+                        {record.normalizedPerformanceScore}
+                      </div>
                       <Badge className={getStatusClass(record.status)}>
                         {record.status}
                       </Badge>
@@ -677,6 +719,7 @@ Alerta: ${record.alerts[0] ?? "Sin alerta critica"}`}
 
                   <div className="grid gap-2">
                     {[
+                      { label: "Score", value: record.normalizedPerformanceScore, display: `${record.normalizedPerformanceScore}`, color: "bg-slate-700" },
                       { label: "Venta", value: Math.min(100, (record.netSales / 52000) * 100), display: formatCurrency(record.netSales), color: "bg-blue-600" },
                       { label: "Margen", value: record.marginRate * 100, display: formatRate(record.marginRate), color: "bg-emerald-600" },
                       { label: "Ocupacion", value: record.occupancyRate * 100, display: formatRate(record.occupancyRate), color: "bg-amber-500" },
@@ -746,7 +789,7 @@ function BubbleMatrix({
       <div className="mb-4 grid gap-1">
         <div className="text-sm font-medium">Matriz rentabilidad versus operacion</div>
         <p className="text-xs leading-5 text-muted-foreground">
-          Eje X: score operativo. Eje Y: margen. Tamano: pacientes. Pasa
+          Eje X: score comparable. Eje Y: margen. Tamano: pacientes. Pasa
           encima de cada burbuja para ver los datos exactos.
         </p>
       </div>
@@ -837,7 +880,7 @@ function BubbleMatrix({
           </text>
 
           <text fill="#334155" fontSize="12" fontWeight="600" textAnchor="middle" x={padding.left + plotWidth / 2} y={height - 18}>
-            Score operativo
+            Score comparable
           </text>
           <text
             fill="#334155"
@@ -852,7 +895,7 @@ function BubbleMatrix({
           </text>
 
           {records.map((record) => {
-            const x = xScale(record.operatingScore);
+            const x = xScale(record.normalizedPerformanceScore);
             const y = yScale(record.marginRate * 100);
             const radius = Math.max(10, Math.min(28, record.patients / 820));
             return (
@@ -876,7 +919,7 @@ function BubbleMatrix({
                   {record.city.slice(0, 2)}
                 </text>
                 <title>{`${record.branch}
-Score operativo: ${record.operatingScore}
+Score comparable: ${record.normalizedPerformanceScore}
 Margen: ${formatRate(record.marginRate)}
 Pacientes: ${record.patients.toLocaleString("en-US")}
 Venta: ${formatCurrency(record.netSales)}
@@ -892,11 +935,12 @@ Estado: ${record.status}`}</title>
               {hoveredRecord.branch}
             </div>
             <div className="grid gap-1 text-muted-foreground">
-              <span>Score operativo: {hoveredRecord.operatingScore}</span>
+              <span>Score comparable: {hoveredRecord.normalizedPerformanceScore}</span>
               <span>Margen: {formatRate(hoveredRecord.marginRate)}</span>
               <span>Pacientes: {hoveredRecord.patients.toLocaleString("en-US")}</span>
               <span>Venta: {formatCurrency(hoveredRecord.netSales)}</span>
               <span>Estado: {hoveredRecord.status}</span>
+              <span>Base: {hoveredRecord.comparisonBasis}</span>
               <span>Accion: {hoveredRecord.priorityAction}</span>
             </div>
           </div>
@@ -1006,7 +1050,10 @@ function BranchProfile({ record }: { record: BranchNetworkRecord }) {
       <div className="mb-4 grid gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Badge className={getStatusClass(record.status)}>{record.status}</Badge>
-          <Badge variant="outline">Score {record.score}</Badge>
+          <Badge variant="outline">
+            Score comparable {record.normalizedPerformanceScore}
+          </Badge>
+          <Badge variant="outline">Base {record.comparisonBasis}</Badge>
           <Badge variant="outline">
             {record.scoreDelta >= 0 ? "+" : ""}
             {record.scoreDelta} pts
@@ -1014,9 +1061,10 @@ function BranchProfile({ record }: { record: BranchNetworkRecord }) {
         </div>
         <h2 className="text-xl font-semibold tracking-normal">{record.branch}</h2>
         <p className="text-sm leading-6 text-muted-foreground">
-          La sucursal obtuvo {record.score} puntos. Sus fortalezas son{" "}
-          {record.strengths.join(", ")}; pierde puntuacion por{" "}
-          {record.reducers.join(", ")}.
+          La sucursal obtuvo {record.normalizedPerformanceScore} puntos comparables.
+          Sus fortalezas son {record.strengths.join(", ")}; pierde puntuacion por{" "}
+          {record.reducers.join(", ")}. La venta absoluta queda como contexto,
+          no como criterio unico.
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
@@ -1040,7 +1088,25 @@ function BranchProfile({ record }: { record: BranchNetworkRecord }) {
         <span>Ocupacion: {formatRate(record.occupancyRate)}</span>
         <span>SLA: {formatRate(record.slaRate)}</span>
         <span>Meta: {record.targetGap >= 0 ? "+" : ""}{record.targetGap} pts</span>
+        <span>
+          Brecha capacidad: {record.capacityGapPoints >= 0 ? "+" : ""}
+          {record.capacityGapPoints} pts vs pares
+        </span>
+        <span>Productividad proxy: {record.productivityIndex}</span>
       </div>
+      {record.outlierFlags.length > 0 ? (
+        <div className="mt-4 grid gap-2">
+          {record.outlierFlags.map((flag) => (
+            <div
+              className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"
+              key={`${record.id}-${flag.metric}-${flag.value}`}
+            >
+              <span className="font-semibold">{flag.metric}: </span>
+              {flag.value} vs {flag.benchmark}. {flag.explanation}
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
         {record.recommendation}
       </div>
