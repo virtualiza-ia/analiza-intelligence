@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { BranchNetworkDashboard } from "@/components/branch-network-dashboard";
 import { BusinessModuleDashboard } from "@/components/business-module-dashboard";
 import { CapacityOccupancyDashboard } from "@/components/capacity-occupancy-dashboard";
+import { AccountProfileDashboard } from "@/components/account-profile-dashboard";
 import { CrmConnectorsDashboard } from "@/components/crm-connectors-dashboard";
 import { DataQualityAnaliaDashboard } from "@/components/data-quality-analia-dashboard";
 import { ExecutiveOperationDashboard } from "@/components/executive-operation-dashboard";
@@ -124,6 +125,10 @@ export default async function ModulePage({ params }: ModulePageProps) {
 
   if (module === "metas") {
     return <GoalsAdvancesDashboard />;
+  }
+
+  if (module === "configuracion") {
+    return <AccountProfileDashboard />;
   }
 
   if (

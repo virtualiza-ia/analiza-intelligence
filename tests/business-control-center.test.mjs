@@ -94,9 +94,13 @@ for (const requiredQualityText of [
 
 for (const requiredGoalsText of [
   "GoalsAdvancesDashboard",
+  "GoalProjectionChart",
   "useActiveBusinessLine",
   "visibleGoalSuggestions",
   "ROI simulado",
+  "Presupuestado, proyectado y cumplido",
+  "Proyectado",
+  "Presupuestado",
   "Sugerencias cautelosas",
   "Aprobar DEMO",
   "Colocacion de bonos",
@@ -125,7 +129,9 @@ for (const requiredHookText of [
 }
 
 for (const requiredHeaderText of [
-  "Linea de negocio activa",
+  "Linea activa",
+  "Linea asignada",
+  "scopedCompanyAccess",
   "Pais o region",
   "border-2 border-primary/50",
   "handleBusinessLineChange",
@@ -151,9 +157,11 @@ if (!layout.includes("lg:items-start")) {
 }
 
 for (const requiredRouteText of [
+  "AccountProfileDashboard",
   "CrmConnectorsDashboard",
   "DataQualityAnaliaDashboard",
   "GoalsAdvancesDashboard",
+  'module === "configuracion"',
   'module === "conectores"',
   'module === "calidad-datos"',
   'module === "metas"',

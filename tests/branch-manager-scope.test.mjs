@@ -79,9 +79,12 @@ for (const requiredLocalAuthText of [
 assert(
   header.includes("fetchCurrentUserAccess") &&
     header.includes("isBranchManagerScopedAccess") &&
+    header.includes("scopedCompanyAccess") &&
+    header.includes("isLineLocked") &&
     header.includes("Acceso de sucursal") &&
+    header.includes("Linea asignada") &&
     header.includes("setAdvancedFiltersOpen(false)"),
-  "Tenant header must lock branch managers to their assigned branch and hide filters.",
+  "Tenant header must lock real scoped users to their assigned business line and branch when applicable.",
 );
 
 assert(

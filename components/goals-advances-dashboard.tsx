@@ -59,6 +59,109 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
+function GoalProjectionChart({ goal }: { goal: GoalStrategySuggestion }) {
+  const projectedRevenue = Math.round(
+    goal.currentMonthlyRevenue * (1 + goal.conservativeGrowthRate),
+  );
+  const budgetedRevenue = goal.suggestedGoalRevenue;
+  const values = [
+    goal.currentMonthlyRevenue,
+    projectedRevenue,
+    budgetedRevenue,
+  ];
+  const maxValue = Math.max(...values, 1);
+  const y = (value: number) => 100 - (value / maxValue) * 74;
+  const actualY = y(goal.currentMonthlyRevenue);
+  const projectedY = y(projectedRevenue);
+  const budgetedY = y(budgetedRevenue);
+  const complianceRate = goal.currentMonthlyRevenue / budgetedRevenue;
+
+  return (
+    <div className="rounded-md border bg-background p-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-medium">
+            Presupuestado, proyectado y cumplido
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Proyeccion con crecimiento cauteloso ya definido para la meta.
+          </div>
+        </div>
+        <Badge variant="outline">Cumplido {formatRate(complianceRate)}</Badge>
+      </div>
+
+      <svg
+        aria-label="Grafica de meta presupuestada, linea proyectada y avance cumplido"
+        className="h-40 w-full overflow-visible"
+        role="img"
+        viewBox="0 0 320 132"
+      >
+        <line
+          stroke="#e2e8f0"
+          strokeWidth="1"
+          x1="28"
+          x2="304"
+          y1="100"
+          y2="100"
+        />
+        <line
+          stroke="#2563eb"
+          strokeWidth="2"
+          x1="28"
+          x2="304"
+          y1={projectedY}
+          y2={projectedY}
+        />
+        <line
+          stroke="#0f172a"
+          strokeDasharray="5 4"
+          strokeWidth="2"
+          x1="28"
+          x2="304"
+          y1={budgetedY}
+          y2={budgetedY}
+        />
+        <rect
+          fill="#16a34a"
+          height={100 - actualY}
+          rx="6"
+          width="54"
+          x="58"
+          y={actualY}
+        />
+        <circle cx="236" cy={projectedY} fill="#2563eb" r="5" />
+        <circle cx="276" cy={budgetedY} fill="#0f172a" r="5" />
+        <text className="fill-slate-500 text-[9px]" x="58" y="118">
+          Actual
+        </text>
+        <text className="fill-slate-500 text-[9px]" x="204" y="118">
+          Proyectado
+        </text>
+        <text className="fill-slate-500 text-[9px]" x="258" y="118">
+          Presupuesto
+        </text>
+      </svg>
+
+      <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+        <span>
+          <strong className="font-semibold text-foreground">Actual:</strong>{" "}
+          {formatMoney(goal.currentMonthlyRevenue)}
+        </span>
+        <span>
+          <strong className="font-semibold text-foreground">Proyectado:</strong>{" "}
+          {formatMoney(projectedRevenue)}
+        </span>
+        <span>
+          <strong className="font-semibold text-foreground">
+            Presupuestado:
+          </strong>{" "}
+          {formatMoney(budgetedRevenue)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function GoalsAdvancesDashboard() {
   const activeBusinessLine = useActiveBusinessLine();
   const [demoRole, setDemoRole] = useState<string | null>(null);
@@ -228,6 +331,9 @@ export function GoalsAdvancesDashboard() {
                     <div className="mt-1 text-xs text-muted-foreground">
                       Avance base contra meta sugerida: {Math.round(targetProgress)}%
                     </div>
+                  </div>
+                  <div className="mt-4">
+                    <GoalProjectionChart goal={goal} />
                   </div>
                 </div>
 

@@ -177,14 +177,21 @@ export function TenantContextHeader() {
   const scopedBranchAccess = isBranchManagerScopedAccess(currentUserAccess)
     ? currentUserAccess
     : null;
-  const scopedBusinessLine = scopedBranchAccess
+  const scopedCompanyAccess = currentUserAccess?.scope.companyId
+    ? currentUserAccess
+    : null;
+  const scopedAreaAccess =
+    scopedCompanyAccess?.scope.operationalAreaId && !scopedBranchAccess
+      ? scopedCompanyAccess
+      : null;
+  const scopedBusinessLine = scopedCompanyAccess
     ? findBusinessLineByCompanyScope(
-        scopedBranchAccess.scope.companyId,
-        scopedBranchAccess.scope.companyName,
+        scopedCompanyAccess.scope.companyId,
+        scopedCompanyAccess.scope.companyName,
       )
     : null;
   const demoScopedBusinessLine =
-    demoBusinessLineCode && !scopedBranchAccess
+    demoBusinessLineCode && !scopedCompanyAccess
       ? demoBusinessLineOptions.find(
           (line) =>
             line.code === demoBusinessLineCode && !line.isConsolidated,
@@ -300,7 +307,7 @@ export function TenantContextHeader() {
   }, []);
 
   useEffect(() => {
-    if (scopedBranchAccess) {
+    if (scopedCompanyAccess) {
       return;
     }
 
@@ -310,7 +317,7 @@ export function TenantContextHeader() {
         ? currentCompanyId
         : nextCompanyId,
     );
-  }, [companies, scopedBranchAccess]);
+  }, [companies, scopedCompanyAccess]);
 
   useEffect(() => {
     if (scopedBranchAccess) {
@@ -358,6 +365,26 @@ export function TenantContextHeader() {
     scopedBranchAccess,
     scopedBusinessLine?.companyId,
     scopedBusinessLine?.id,
+  ]);
+
+  useEffect(() => {
+    if (!scopedCompanyAccess || scopedBranchAccess) {
+      return;
+    }
+
+    setBusinessLineId(scopedBusinessLine?.id ?? demoBusinessLineOptions[0]?.id ?? "");
+    setCompanyId(scopedCompanyAccess.scope.companyId ?? scopedBusinessLine?.companyId ?? "");
+    setCountryId(scopedCompanyAccess.scope.countryId ?? getInitialCountryId());
+    setOperationalAreaId(
+      scopedAreaAccess?.scope.operationalAreaId ?? allOperationalAreasValue,
+    );
+    setBranchId(allBranchesValue);
+  }, [
+    scopedAreaAccess?.scope.operationalAreaId,
+    scopedBranchAccess,
+    scopedBusinessLine?.companyId,
+    scopedBusinessLine?.id,
+    scopedCompanyAccess,
   ]);
 
   useEffect(() => {
@@ -412,9 +439,9 @@ export function TenantContextHeader() {
       scopedBranchAccess?.scope.branchName ??
       branchId;
     const contextCountryId =
-      scopedBranchAccess?.scope.countryId ?? country?.id ?? getInitialCountryId();
+      scopedCompanyAccess?.scope.countryId ?? country?.id ?? getInitialCountryId();
     const contextCompanyId =
-      scopedBranchAccess?.scope.companyId ?? company?.id ?? "";
+      scopedCompanyAccess?.scope.companyId ?? company?.id ?? "";
     const context = resolveGlobalFilterContext({
       branchId: contextBranchId,
       branchName,
@@ -423,25 +450,25 @@ export function TenantContextHeader() {
       businessLineName: businessLine.name,
       companyId: contextCompanyId,
       companyName:
-        scopedBranchAccess?.scope.companyName ??
+        scopedCompanyAccess?.scope.companyName ??
         company?.name ??
         businessLine.name,
       countryId: contextCountryId,
       countryName:
-        scopedBranchAccess?.scope.countryName ?? country?.name ?? "Pais asignado",
+        scopedCompanyAccess?.scope.countryName ?? country?.name ?? "Pais asignado",
       dateFrom: periodStart,
       dateTo: periodEnd,
-      isDemo: !scopedBranchAccess,
+      isDemo: !currentUserAccess,
       managerId: scopedBranchAccess ? allManagersValue : managerId,
       managerName: scopedBranchAccess
         ? scopedBranchAccess.scope.branchName
         : selectedManager.name,
       operationalAreaId: scopedBranchAccess
         ? allOperationalAreasValue
-        : operationalAreaId,
+        : scopedAreaAccess?.scope.operationalAreaId ?? operationalAreaId,
       operationalAreaName: scopedBranchAccess
         ? undefined
-        : operationalArea?.name,
+        : scopedAreaAccess?.scope.operationalAreaName ?? operationalArea?.name,
       payerId,
       periodStart,
       periodEnd,
@@ -472,8 +499,11 @@ export function TenantContextHeader() {
     periodEnd,
     periodStart,
     professionalId,
+    currentUserAccess,
     scopedBranchAccess,
     scopedBusinessLine,
+    scopedAreaAccess,
+    scopedCompanyAccess,
     selectedManager.name,
     serviceId,
   ]);
@@ -501,14 +531,18 @@ export function TenantContextHeader() {
     demoBusinessLineOptions.find((line) => line.id === businessLineId)?.name ??
     "Linea asignada";
   const companyLabel =
-    scopedBranchAccess?.scope.companyName ??
+    scopedCompanyAccess?.scope.companyName ??
     selectedCompany?.name ??
     lineLabel;
   const countryLabel =
-    scopedBranchAccess?.scope.countryName ??
+    scopedCompanyAccess?.scope.countryName ??
     selectedCountry?.name ??
     "Pais asignado";
-  const areaLabel = selectedOperationalArea?.name ?? "Todas las areas";
+  const areaLabel =
+    scopedAreaAccess?.scope.operationalAreaName ??
+    selectedOperationalArea?.name ??
+    "Todas las areas";
+  const isLineLocked = Boolean(scopedCompanyAccess);
 
   if (scopedBranchAccess) {
     return (
@@ -550,20 +584,26 @@ export function TenantContextHeader() {
           <BriefcaseBusiness className="size-4 shrink-0 text-primary" />
           <span className="grid min-w-0 flex-1 gap-0.5">
             <span className="font-semibold uppercase text-primary">
-              Linea activa
+              {isLineLocked ? "Linea asignada" : "Linea activa"}
             </span>
-            <select
-              aria-label="Linea de negocio activa"
-              className="min-w-0 bg-transparent text-base font-semibold text-accent-foreground outline-none"
-              value={businessLineId}
-              onChange={(event) => handleBusinessLineChange(event.target.value)}
-            >
-              {demoBusinessLineOptions.map((line) => (
-                <option key={line.id} value={line.id}>
-                  {line.name}
-                </option>
-              ))}
-            </select>
+            {isLineLocked ? (
+              <span className="truncate text-base font-semibold text-accent-foreground">
+                {lineLabel}
+              </span>
+            ) : (
+              <select
+                aria-label="Linea de negocio activa"
+                className="min-w-0 bg-transparent text-base font-semibold text-accent-foreground outline-none"
+                value={businessLineId}
+                onChange={(event) => handleBusinessLineChange(event.target.value)}
+              >
+                {demoBusinessLineOptions.map((line) => (
+                  <option key={line.id} value={line.id}>
+                    {line.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </span>
         </label>
 
@@ -573,6 +613,7 @@ export function TenantContextHeader() {
             <select
               aria-label="Pais o region"
               className="min-w-0 flex-1 bg-transparent outline-none"
+              disabled={Boolean(scopedCompanyAccess?.scope.countryId)}
               value={countryId}
               onChange={(event) => setCountryId(event.target.value)}
             >

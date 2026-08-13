@@ -16,6 +16,11 @@ const navigation = read("lib/navigation.ts");
 const modulePage = read("app/protected/[module]/page.tsx");
 const executiveDashboard = read("components/executive-dashboard.tsx");
 const managerDashboard = read("components/manager-bonus-dashboard.tsx");
+const accountProfile = read("components/account-profile-dashboard.tsx");
+const accountProfileRoute = read("app/api/account/profile/route.ts");
+const accountProfileMigration = read(
+  "supabase/migrations/20260813000100_user_profile_details.sql",
+);
 const importsDashboard = read("components/import-operations-dashboard.tsx");
 const connectorsDashboard = read("components/crm-connectors-dashboard.tsx");
 const physioDashboard = read("components/physiotherapy-presentation-dashboard.tsx");
@@ -42,6 +47,12 @@ assert(
 assert(
   modulePage.includes('module === "conectores" || module === "apis"'),
   "Dynamic module route must resolve /protected/apis to connectors.",
+);
+
+assert(
+  modulePage.includes("AccountProfileDashboard") &&
+    modulePage.includes('module === "configuracion"'),
+  "Dynamic module route must resolve /protected/configuracion to Mi cuenta.",
 );
 
 for (const requiredText of [
@@ -86,6 +97,47 @@ for (const requiredManagerText of [
   assert(
     managerDashboard.includes(requiredManagerText),
     `Manager dashboard is missing: ${requiredManagerText}`,
+  );
+}
+
+for (const requiredAccountText of [
+  "Perfil de usuario",
+  "URL de foto",
+  "Nombre preferido",
+  "Telefono",
+  "Cargo",
+  "/api/account/profile",
+]) {
+  assert(
+    accountProfile.includes(requiredAccountText),
+    `Account profile dashboard is missing: ${requiredAccountText}`,
+  );
+}
+
+for (const requiredAccountRouteText of [
+  "getCurrentAuthorizationActor",
+  "account_profile.updated",
+  "https:",
+  "photo_url",
+  "preferred_name",
+  "job_title",
+  "Este perfil no es editable en modo DEMO",
+]) {
+  assert(
+    accountProfileRoute.includes(requiredAccountRouteText),
+    `Account profile API is missing: ${requiredAccountRouteText}`,
+  );
+}
+
+for (const requiredAccountMigrationText of [
+  "preferred_name",
+  "phone",
+  "job_title",
+  "photo_url",
+]) {
+  assert(
+    accountProfileMigration.includes(requiredAccountMigrationText),
+    `Account profile migration is missing: ${requiredAccountMigrationText}`,
   );
 }
 
