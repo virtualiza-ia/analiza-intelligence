@@ -14,18 +14,18 @@ async function ProtectedShell({
   const access = await requireProtectedAccess();
 
   return (
-    <main className="min-h-screen bg-muted/30">
+    <main className="executive-shell min-h-screen">
       <div className="flex min-h-screen w-full">
         <AppSidebar
           allowDemoRoleSwitch={access.allowDemoRoleSwitch}
           roleKey={access.roleKey}
         />
         <div className="flex min-w-0 flex-1 flex-col">
-          <nav className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
-            <div className="flex min-h-16 w-full flex-col gap-3 px-4 py-3 text-sm lg:flex-row lg:items-start lg:justify-between lg:px-5">
+          <nav className="sticky top-0 z-20 border-b border-border/70 bg-background/90 shadow-[0_12px_32px_-30px_rgba(15,23,42,0.45)] backdrop-blur-xl">
+            <div className="flex min-h-16 w-full flex-col gap-3 px-4 py-3 text-sm lg:flex-row lg:items-start lg:justify-between lg:px-6">
               <Link
                 href="/protected"
-                className="font-semibold lg:hidden"
+                className="font-semibold text-primary lg:hidden"
               >
                 Analiza Intelligence
               </Link>

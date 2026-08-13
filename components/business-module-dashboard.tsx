@@ -345,7 +345,7 @@ function priorityClass(priority: ModuleInsight["priority"]) {
 
 function MetricCard({ metric }: { metric: ModuleMetric }) {
   return (
-    <article className="flex min-h-32 flex-col justify-between rounded-md border bg-card p-4">
+    <article className="metric-card flex min-h-32 flex-col justify-between rounded-lg border p-4">
       <div className="grid gap-1">
         <h2 className="text-sm font-medium text-muted-foreground">
           {metric.label}
@@ -356,7 +356,7 @@ function MetricCard({ metric }: { metric: ModuleMetric }) {
       </div>
       <span
         className={cn(
-          "w-fit rounded-md border px-2 py-1 text-xs font-medium",
+          "w-fit rounded-full border px-2.5 py-1 text-xs font-medium",
           metricToneClass(metric.tone),
         )}
       >
@@ -402,7 +402,7 @@ function ScopeCard({ context }: { context: StoredContext | null }) {
       : "Rango pendiente");
 
   return (
-    <aside className="rounded-md border bg-card p-4 text-sm">
+    <aside className="rounded-lg border bg-card p-4 text-sm shadow-sm">
       <div className="mb-2 flex items-center gap-2 font-medium">
         <CheckCircle2 className="size-4 text-primary" />
         Filtro aplicado
@@ -419,14 +419,14 @@ function ScopeCard({ context }: { context: StoredContext | null }) {
 
 function BusinessHealthSection() {
   return (
-    <section className="rounded-md border bg-card p-4">
+    <section className="executive-panel rounded-lg border p-4">
       <div className="mb-4 flex items-center gap-2 text-sm font-medium">
         <LineChart className="size-4 text-primary" />
         Salud financiera y operativa por negocio
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         {businessHealth.map((item) => (
-          <article className="grid gap-3 rounded-md border p-3" key={item.business}>
+          <article className="grid gap-3 rounded-lg border bg-background/80 p-3" key={item.business}>
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-sm font-semibold">{item.business}</h3>
               <Badge variant="outline">Meta {item.target}%</Badge>
@@ -444,7 +444,7 @@ function BusinessHealthSection() {
 
 function ModuleInsights({ config }: { config: ModuleConfig }) {
   return (
-    <section className="rounded-md border bg-card p-4">
+    <section className="executive-panel rounded-lg border p-4">
       <div className="mb-4 flex items-center gap-2 text-sm font-medium">
         <AlertTriangle className="size-4 text-primary" />
         Insights y acciones sugeridas
@@ -452,7 +452,7 @@ function ModuleInsights({ config }: { config: ModuleConfig }) {
       <div className="grid gap-3">
         {config.insights.map((insight) => (
           <article
-            className="grid gap-2 border-t py-3 first:border-t-0 first:pt-0 last:pb-0"
+            className="insight-card grid gap-2 rounded-lg border bg-background p-3"
             key={insight.title}
           >
             <div className="flex flex-wrap items-center gap-2">
@@ -474,13 +474,13 @@ function ModuleInsights({ config }: { config: ModuleConfig }) {
 
 function ModuleRows({ config }: { config: ModuleConfig }) {
   return (
-    <section className="rounded-md border bg-card p-4">
+    <section className="executive-panel rounded-lg border p-4">
       <div className="mb-4 flex items-center gap-2 text-sm font-medium">
         <ClipboardList className="size-4 text-primary" />
         Detalle operativo
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="data-table w-full min-w-[720px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
               <th className="py-2 pr-4 font-medium">Concepto</th>
@@ -1312,7 +1312,7 @@ export function BusinessModuleDashboard({
 
   return (
     <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
-      <div className="grid gap-4 xl:grid-cols-[1fr_360px] xl:items-end">
+      <div className="executive-panel grid gap-4 rounded-lg border p-5 xl:grid-cols-[1fr_360px] xl:items-end">
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
@@ -1354,7 +1354,7 @@ export function BusinessModuleDashboard({
       ) : null}
 
       {config.explanation && module !== "usuarios-permisos" ? (
-        <section className="rounded-md border bg-card p-4">
+        <section className="executive-panel rounded-lg border p-4">
           <div className="mb-2 flex items-center gap-2 text-sm font-medium">
             <BarChart3 className="size-4 text-primary" />
             Que significa

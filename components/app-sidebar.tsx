@@ -71,20 +71,21 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
   return (
     <aside
       className={cn(
-        "hidden border-r bg-background lg:flex lg:flex-col",
+        "hidden border-r border-white/10 bg-[#07172d] text-white shadow-[18px_0_55px_-44px_rgba(7,23,45,0.78)] lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col",
         collapsed ? "lg:w-[72px]" : "lg:w-72",
       )}
     >
-      <div className="flex h-16 items-center justify-between border-b px-4">
+      <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
         <span
           className={cn(
-            "text-sm font-semibold",
+            "text-sm font-semibold tracking-normal",
             collapsed && "sr-only",
           )}
         >
           Analiza Intelligence
         </span>
         <Button
+          className="text-white/70 hover:bg-white/10 hover:text-white"
           aria-label={collapsed ? "Expandir menu" : "Colapsar menu"}
           onClick={toggleCollapsed}
           size="icon"
@@ -103,9 +104,9 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
         <div className="grid gap-4">
           <Link
             className={cn(
-              "flex h-10 items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+              "flex h-10 items-center gap-3 rounded-lg px-3 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white",
               pathname === "/protected" &&
-                "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                "bg-[#2878ff] text-white shadow-[0_12px_24px_-18px_rgba(40,120,255,0.9)] hover:bg-[#2878ff] hover:text-white",
               collapsed && "justify-center px-0",
             )}
             href="/protected"
@@ -121,7 +122,7 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
             <section className="grid gap-1" key={group.key}>
               <div
                 className={cn(
-                  "px-3 text-[0.68rem] font-semibold uppercase tracking-normal text-muted-foreground",
+                  "px-3 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-white/40",
                   collapsed && "sr-only",
                 )}
               >
@@ -134,9 +135,9 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
                 return (
                   <Link
                     className={cn(
-                      "flex h-10 items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+                      "flex h-10 items-center gap-3 rounded-lg px-3 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white",
                       active &&
-                        "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                        "bg-white text-[#07172d] shadow-[0_14px_30px_-22px_rgba(255,255,255,0.65)] hover:bg-white hover:text-[#07172d]",
                       collapsed && "justify-center px-0",
                     )}
                     href={item.href}
@@ -155,41 +156,41 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
         </div>
       </nav>
 
-      <div className="border-t p-3">
+      <div className="border-t border-white/10 p-3">
         <div className={cn("grid gap-2", collapsed && "sr-only")}>
           {!allowDemoRoleSwitch ? (
-            <div className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
-              <div className="font-medium text-foreground">
+            <div className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs leading-5 text-white/60">
+              <div className="font-medium text-white">
                 {roleProfile.label}
               </div>
               <div>{roleProfile.accessSummary}</div>
-              <div className="mt-1">
+              <div className="mt-1 text-white/50">
                 {visibleItems.length} de {navigationItems.length} modulos visibles
               </div>
             </div>
           ) : (
             <>
-          <label className="grid gap-1 text-xs">
-            <span className="font-medium text-foreground">Rol DEMO</span>
-            <select
-              className="h-9 rounded-md border bg-background px-2 text-xs outline-none"
-              value={activeRole}
-              onChange={(event) => changeRole(event.target.value as RoleKey)}
-            >
-              {roleKeys.map((role) => (
-                <option key={role} value={role}>
-                  {demoRoleProfiles[role].label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
-            <div className="font-medium text-foreground">{roleProfile.label}</div>
-            <div>{roleProfile.accessSummary}</div>
-            <div className="mt-1">
-              {visibleItems.length} de {navigationItems.length} modulos visibles
-            </div>
-          </div>
+              <label className="grid gap-1 text-xs">
+                <span className="font-medium text-white">Rol DEMO</span>
+                <select
+                  className="h-9 rounded-lg border border-white/10 bg-white px-2 text-xs text-slate-950 outline-none"
+                  value={activeRole}
+                  onChange={(event) => changeRole(event.target.value as RoleKey)}
+                >
+                  {roleKeys.map((role) => (
+                    <option key={role} value={role}>
+                      {demoRoleProfiles[role].label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs leading-5 text-white/60">
+                <div className="font-medium text-white">{roleProfile.label}</div>
+                <div>{roleProfile.accessSummary}</div>
+                <div className="mt-1 text-white/50">
+                  {visibleItems.length} de {navigationItems.length} modulos visibles
+                </div>
+              </div>
             </>
           )}
         </div>

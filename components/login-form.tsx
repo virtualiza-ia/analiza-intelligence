@@ -199,11 +199,11 @@ export function LoginForm({
       {...props}
     >
       <div className="flex min-h-svh w-full items-stretch justify-center p-0 sm:p-6 xl:p-8">
-        <section className="flex w-full max-w-[1350px] flex-col overflow-hidden bg-white shadow-[0_44px_90px_-46px_rgba(7,23,45,0.30),0_2px_10px_rgba(16,24,40,0.04)] sm:min-h-[calc(100svh-3rem)] sm:rounded-[30px] lg:min-h-[min(816px,calc(100svh-4rem))] lg:flex-row">
+        <section className="flex w-full max-w-[1350px] flex-col overflow-hidden bg-white shadow-[0_44px_90px_-46px_rgba(7,23,45,0.30),0_2px_10px_rgba(16,24,40,0.04)] sm:min-h-[calc(100svh-3rem)] sm:rounded-lg lg:min-h-[min(816px,calc(100svh-4rem))] lg:flex-row">
           <aside className="relative hidden flex-[0_0_54%] overflow-hidden bg-[#07172d] px-11 py-11 text-white lg:flex xl:px-14 xl:py-14">
             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.035)_1px,transparent_1px)] bg-[size:46px_46px] [mask-image:radial-gradient(circle_at_32%_18%,#000_0%,transparent_74%)]" />
-            <div className="absolute -right-24 -top-36 h-[520px] w-[520px] rounded-full bg-[#2878ff]/25 blur-2xl" />
-            <div className="absolute -bottom-44 -left-36 h-[500px] w-[500px] rounded-full bg-[#174b7a]/35 blur-xl" />
+            <div className="absolute right-0 top-0 h-40 w-full bg-[linear-gradient(90deg,transparent,rgba(40,120,255,.22),transparent)] blur-2xl" />
+            <div className="absolute bottom-0 left-0 h-36 w-full bg-[linear-gradient(90deg,rgba(23,75,122,.20),transparent)] blur-xl" />
             <svg
               aria-hidden="true"
               className="absolute inset-0 h-full w-full opacity-50"
@@ -245,7 +245,7 @@ export function LoginForm({
                 </div>
               </div>
 
-              <div className="mt-6 inline-flex w-fit items-center rounded-xl bg-white/95 px-4 py-2 shadow-[0_10px_30px_-14px_rgba(0,0,0,.6)]">
+              <div className="mt-6 inline-flex w-fit items-center rounded-lg bg-white/95 px-4 py-2 shadow-[0_10px_30px_-14px_rgba(0,0,0,.6)]">
                 <Image
                   alt="Fisioterapia, Laboratorios, Imagenes"
                   className="h-5 w-auto"
@@ -293,7 +293,7 @@ export function LoginForm({
                 {intelligenceSignals.map((signal, index) => (
                   <div
                     className={cn(
-                      "absolute rounded-[15px] border border-white/10 bg-white/[0.06] p-4 shadow-[0_20px_40px_-24px_rgba(0,0,0,.6)] backdrop-blur-md",
+                      "absolute rounded-lg border border-white/10 bg-white/[0.06] p-4 shadow-[0_20px_40px_-24px_rgba(0,0,0,.6)] backdrop-blur-md",
                       index === 0 && "left-0 top-0 w-[214px]",
                       index === 1 && "right-0 top-16 w-[222px]",
                       index === 2 && "left-0 top-[146px] w-[230px]",
@@ -371,7 +371,7 @@ export function LoginForm({
                 </div>
               </div>
 
-              <div className="mt-8 rounded-2xl border border-slate-200 bg-[#07172d] p-5 text-white shadow-[0_18px_50px_-34px_rgba(7,23,45,.75)] lg:hidden">
+              <div className="mt-8 rounded-lg border border-slate-200 bg-[#07172d] p-5 text-white shadow-[0_18px_50px_-34px_rgba(7,23,45,.75)] lg:hidden">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8fa6c4]">
                   Analiza Intelligence
                 </p>
@@ -393,7 +393,7 @@ export function LoginForm({
               </div>
 
               {enableLocalDemoLogin && (
-                <div className="mt-7 grid gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                <div className="mt-7 grid gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
                   <div>
                     <div className="font-semibold">Entorno DEMO local</div>
                     <p className="mt-1 text-xs leading-5 text-amber-900">
@@ -403,7 +403,7 @@ export function LoginForm({
                   </div>
                   <Label htmlFor="demo-role">Perfil de prueba autorizado</Label>
                   <select
-                    className="h-11 rounded-[10px] border border-amber-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-[#2878ff] focus:ring-4 focus:ring-[#2878ff]/10"
+                    className="h-11 rounded-lg border border-amber-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-[#2878ff] focus:ring-4 focus:ring-[#2878ff]/10"
                     id="demo-role"
                     value={activeDemoRole}
                     onChange={(event) =>
@@ -420,7 +420,7 @@ export function LoginForm({
                   </select>
                   <Label htmlFor="demo-business-line">Unidad demo</Label>
                   <select
-                    className="h-11 rounded-[10px] border border-amber-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-[#2878ff] focus:ring-4 focus:ring-[#2878ff]/10"
+                    className="h-11 rounded-lg border border-amber-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-[#2878ff] focus:ring-4 focus:ring-[#2878ff]/10"
                     id="demo-business-line"
                     value={activeDemoBusinessLine}
                     onChange={(event) =>
@@ -436,7 +436,7 @@ export function LoginForm({
                     ))}
                   </select>
                   <Button
-                    className="h-11 w-full rounded-[10px]"
+                    className="h-11 w-full rounded-lg"
                     disabled={isLoading}
                     onClick={handleDemoLogin}
                     type="button"
@@ -458,7 +458,7 @@ export function LoginForm({
                     </Label>
                     <Input
                       autoComplete="username"
-                      className="h-12 rounded-[10px] border-slate-200 bg-white px-3.5 text-[15px] shadow-none transition focus-visible:border-[#2878ff] focus-visible:ring-4 focus-visible:ring-[#2878ff]/10"
+                      className="h-12 rounded-lg border-slate-200 bg-white px-3.5 text-[15px] shadow-none transition focus-visible:border-[#2878ff] focus-visible:ring-4 focus-visible:ring-[#2878ff]/10"
                       id="email"
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="nombre@analiza.com"
@@ -486,7 +486,7 @@ export function LoginForm({
                     <div className="relative">
                       <Input
                         autoComplete="current-password"
-                        className="h-12 rounded-[10px] border-slate-200 bg-white px-3.5 pr-12 text-[15px] shadow-none transition focus-visible:border-[#2878ff] focus-visible:ring-4 focus-visible:ring-[#2878ff]/10"
+                        className="h-12 rounded-lg border-slate-200 bg-white px-3.5 pr-12 text-[15px] shadow-none transition focus-visible:border-[#2878ff] focus-visible:ring-4 focus-visible:ring-[#2878ff]/10"
                         id="password"
                         onChange={(e) => setPassword(e.target.value)}
                         required
@@ -519,7 +519,7 @@ export function LoginForm({
                   </div>
 
                   {error && (
-                    <div className="flex items-start gap-2 rounded-[10px] border border-red-200 bg-red-50 p-3 text-sm leading-5 text-red-700">
+                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm leading-5 text-red-700">
                       <AlertCircle
                         aria-hidden="true"
                         className="mt-0.5 h-4 w-4 flex-none"
@@ -529,7 +529,7 @@ export function LoginForm({
                   )}
 
                   <Button
-                    className="h-[50px] w-full rounded-[10px] bg-[#07172d] text-[15px] font-semibold text-white shadow-[0_12px_26px_-14px_rgba(23,75,122,.65)] transition hover:bg-[#12345e]"
+                    className="h-[50px] w-full rounded-lg bg-[#07172d] text-[15px] font-semibold text-white shadow-[0_12px_26px_-14px_rgba(23,75,122,.65)] transition hover:bg-[#12345e]"
                     disabled={isLoading}
                     type="submit"
                   >
@@ -562,7 +562,7 @@ export function LoginForm({
                   </Link>
                 </div>
 
-                <div className="mt-5 rounded-[10px] border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-500">
+                <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-500">
                   Acceso protegido por credenciales asignadas y permisos por
                   rol. Cada sesion se valida antes de abrir la plataforma.
                 </div>

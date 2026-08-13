@@ -47,11 +47,11 @@ type AnalyticsComparisonChartProps = {
 };
 
 const seriesColors: Record<TrendSeries["color"], string> = {
-  blue: "#2563eb",
+  blue: "#2878ff",
   green: "#16a34a",
-  orange: "#f97316",
-  rose: "#e11d48",
-  slate: "#475569",
+  orange: "#d97706",
+  rose: "#dc2626",
+  slate: "#64748b",
   teal: "#0891b2",
 };
 
@@ -369,11 +369,11 @@ export function AnalyticsComparisonChart({
   }, [comparisonMode, primaryFrom, primaryTo]);
 
   return (
-    <section className="min-w-0 rounded-md border bg-card p-4">
+    <section className="executive-panel min-w-0 rounded-lg border p-4">
       <div className="mb-4 grid gap-3">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div className="grid gap-1">
-            <h2 className="text-base font-semibold tracking-normal">{title}</h2>
+            <h2 className="text-lg font-semibold tracking-normal">{title}</h2>
             <p className="text-xs leading-5 text-muted-foreground">
               {activeDescription}
             </p>
@@ -381,13 +381,13 @@ export function AnalyticsComparisonChart({
           <Badge variant="outline">{activeYLabel}</Badge>
         </div>
 
-        <div className="grid gap-2 rounded-md border bg-background p-3 xl:grid-cols-[1.2fr_1fr_1fr_1fr_1fr]">
+        <div className="grid gap-2 rounded-lg border bg-background/75 p-3 shadow-inner xl:grid-cols-[1.2fr_1fr_1fr_1fr_1fr]">
           <label className="grid gap-1 text-xs">
             <span className="font-medium text-muted-foreground">
               KPI a comparar
             </span>
             <select
-              className="h-9 rounded-md border bg-card px-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-9 rounded-lg border bg-card px-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
               onChange={(event) => setSelectedMetricId(event.target.value)}
               value={selectedMetricId}
             >
@@ -408,7 +408,7 @@ export function AnalyticsComparisonChart({
               Fecha desde
             </span>
             <input
-              className="h-9 rounded-md border bg-card px-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-9 rounded-lg border bg-card px-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
               onChange={(event) => setPrimaryFrom(event.target.value)}
               type="date"
               value={primaryFrom}
@@ -420,7 +420,7 @@ export function AnalyticsComparisonChart({
               Fecha hasta
             </span>
             <input
-              className="h-9 rounded-md border bg-card px-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-9 rounded-lg border bg-card px-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
               onChange={(event) => setPrimaryTo(event.target.value)}
               type="date"
               value={primaryTo}
@@ -432,7 +432,7 @@ export function AnalyticsComparisonChart({
               Comparar contra
             </span>
             <select
-              className="h-9 rounded-md border bg-card px-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-9 rounded-lg border bg-card px-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
               onChange={(event) => setComparisonMode(event.target.value)}
               value={comparisonMode}
             >
@@ -449,14 +449,14 @@ export function AnalyticsComparisonChart({
             </span>
             <div className="grid grid-cols-2 gap-1">
               <input
-                className="h-9 rounded-md border bg-card px-2 text-xs outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                className="h-9 rounded-lg border bg-card px-2 text-xs outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                 disabled={comparisonMode !== "custom"}
                 onChange={(event) => setComparisonFrom(event.target.value)}
                 type="date"
                 value={comparisonFrom}
               />
               <input
-                className="h-9 rounded-md border bg-card px-2 text-xs outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                className="h-9 rounded-lg border bg-card px-2 text-xs outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                 disabled={comparisonMode !== "custom"}
                 onChange={(event) => setComparisonTo(event.target.value)}
                 type="date"
@@ -467,7 +467,7 @@ export function AnalyticsComparisonChart({
         </div>
 
         {enableSeriesSelection ? (
-          <div className="grid gap-3 rounded-md border bg-background p-3">
+          <div className="grid gap-3 rounded-lg border bg-background/75 p-3">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-xs font-medium text-muted-foreground">
@@ -491,7 +491,7 @@ export function AnalyticsComparisonChart({
                 return (
                   <label
                     className={cn(
-                      "flex h-9 cursor-pointer items-center gap-2 rounded-md border bg-card px-3 text-xs transition hover:bg-muted",
+                      "flex h-9 cursor-pointer items-center gap-2 rounded-lg border bg-card px-3 text-xs transition hover:bg-muted",
                       isChecked ? "border-primary ring-1 ring-primary" : "",
                       isDisabled ? "cursor-not-allowed opacity-50" : "",
                     )}
@@ -517,12 +517,12 @@ export function AnalyticsComparisonChart({
         ) : null}
 
         <div className="flex flex-wrap gap-2">
-          <div className="flex h-8 items-center rounded-md border bg-background px-3 text-xs font-medium">
+          <div className="flex h-8 items-center rounded-full border bg-primary px-3 text-xs font-semibold text-primary-foreground">
             Comparaciones activas
           </div>
           {visibleSeries.map((item) => (
             <div
-              className="flex h-8 items-center gap-2 rounded-md border bg-background px-3 text-xs"
+              className="flex h-8 items-center gap-2 rounded-full border bg-background px-3 text-xs"
               key={item.label}
             >
               <span
@@ -532,17 +532,17 @@ export function AnalyticsComparisonChart({
               <span className="text-muted-foreground">{item.value}</span>
             </div>
           ))}
-          <div className="flex h-8 items-center rounded-md border border-dashed px-3 text-xs text-muted-foreground">
+          <div className="flex h-8 items-center rounded-full border border-dashed px-3 text-xs text-muted-foreground">
             {primaryFrom} a {primaryTo}
           </div>
-          <div className="flex h-8 items-center rounded-md border border-dashed px-3 text-xs text-muted-foreground">
+          <div className="flex h-8 items-center rounded-full border border-dashed px-3 text-xs text-muted-foreground">
             {comparisonMode === "target"
               ? "Contra meta / presupuesto"
               : `Contra ${comparisonFrom} a ${comparisonTo}`}
           </div>
         </div>
 
-        <div className="grid gap-2 rounded-md border bg-muted/40 p-3 text-xs leading-5 text-muted-foreground sm:grid-cols-2">
+        <div className="grid gap-2 rounded-lg border bg-muted/40 p-3 text-xs leading-5 text-muted-foreground sm:grid-cols-2">
           <div className="font-medium text-foreground sm:col-span-2">
             Como leer esta grafica
           </div>
@@ -569,7 +569,7 @@ export function AnalyticsComparisonChart({
         <div className="max-w-full overflow-hidden">
           <svg
             aria-label={`${title}: ${selectedMetric?.label ?? "KPI principal"}`}
-            className="h-72 w-full min-w-0 overflow-visible"
+            className="h-72 w-full min-w-0 overflow-visible rounded-lg bg-white"
             onPointerLeave={() => setHoverIndex(null)}
             onPointerMove={handlePointerMove}
             role="img"
@@ -580,7 +580,7 @@ export function AnalyticsComparisonChart({
               return (
                 <g key={tick}>
                   <line
-                    stroke="#e2e8f0"
+                  stroke="#e5ebf2"
                     strokeDasharray={tick === 0 ? "0" : "4 4"}
                     x1={0}
                     x2={width}
@@ -611,7 +611,7 @@ export function AnalyticsComparisonChart({
                     stroke={seriesColors[item.color]}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth="3"
+                  strokeWidth="3.2"
                   />
                   <circle
                     cx={lastPoint.x}
@@ -652,7 +652,7 @@ export function AnalyticsComparisonChart({
                 <rect
                   fill="#ffffff"
                   height={46 + visibleSeries.length * 18}
-                  rx="6"
+                  rx="8"
                   stroke="#cbd5e1"
                   width="210"
                   x={tooltipX}
@@ -705,7 +705,7 @@ export function AnalyticsComparisonChart({
 
             return (
               <article
-                className={cn("rounded-md border p-3", insightClass(insight.tone))}
+                className={cn("rounded-lg border p-3", insightClass(insight.tone))}
                 key={insight.label}
               >
                 <div className="mb-2 flex items-center gap-2 text-xs font-medium">

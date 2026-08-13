@@ -548,7 +548,7 @@ export function TenantContextHeader() {
     return (
       <div className="grid min-w-0 flex-1 gap-2">
         <div className="flex min-w-0 flex-col gap-2 2xl:flex-row 2xl:items-center">
-          <div className="flex min-h-12 min-w-0 items-center gap-3 rounded-md border-2 border-primary/50 bg-accent px-3 py-2 text-xs shadow-sm 2xl:min-w-[310px]">
+          <div className="flex min-h-12 min-w-0 items-center gap-3 rounded-lg border-2 border-primary/50 bg-accent/90 px-3 py-2 text-xs shadow-sm 2xl:min-w-[310px]">
             <BriefcaseBusiness className="size-4 shrink-0 text-primary" />
             <span className="grid min-w-0 flex-1 gap-0.5">
               <span className="font-semibold uppercase text-primary">
@@ -560,8 +560,8 @@ export function TenantContextHeader() {
             </span>
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 rounded-md border bg-background p-2">
-            <div className="flex h-9 min-w-44 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 rounded-lg border border-border/80 bg-background/90 p-2 shadow-sm">
+            <div className="flex h-9 min-w-44 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
               <LockKeyhole className="size-3.5 shrink-0 text-primary" />
               <span className="font-medium">Acceso de sucursal</span>
             </div>
@@ -580,7 +580,7 @@ export function TenantContextHeader() {
   return (
     <div className="grid min-w-0 flex-1 gap-2">
       <div className="flex min-w-0 flex-col gap-2 2xl:flex-row 2xl:items-center">
-        <label className="flex min-h-12 min-w-0 items-center gap-3 rounded-md border-2 border-primary/50 bg-accent px-3 py-2 text-xs shadow-sm 2xl:min-w-[310px]">
+        <label className="flex min-h-12 min-w-0 items-center gap-3 rounded-lg border-2 border-primary/50 bg-accent/90 px-3 py-2 text-xs shadow-sm 2xl:min-w-[310px]">
           <BriefcaseBusiness className="size-4 shrink-0 text-primary" />
           <span className="grid min-w-0 flex-1 gap-0.5">
             <span className="font-semibold uppercase text-primary">
@@ -607,8 +607,8 @@ export function TenantContextHeader() {
           </span>
         </label>
 
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 rounded-md border bg-background p-2">
-          <label className="flex h-9 min-w-44 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-background/90 p-2 shadow-sm">
+          <label className="flex h-9 min-w-44 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <Globe2 className="size-3.5 shrink-0 text-muted-foreground" />
             <select
               aria-label="Pais o region"
@@ -635,7 +635,7 @@ export function TenantContextHeader() {
           </div>
 
           <button
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border bg-background px-3 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-accent"
             onClick={() => setAdvancedFiltersOpen((isOpen) => !isOpen)}
             type="button"
           >
@@ -644,7 +644,7 @@ export function TenantContextHeader() {
           </button>
 
           <span
-            className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
+            className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
             title={`${selectedProfessional.name} · ${selectedPayer.name} · ${selectedChannel.name}`}
           >
             {selectedManager.name} · {selectedService.name} · DEMO
@@ -653,11 +653,11 @@ export function TenantContextHeader() {
       </div>
 
       {advancedFiltersOpen ? (
-        <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-md border bg-background p-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-background/95 p-2 shadow-sm">
           <div className="px-2 text-xs font-semibold text-muted-foreground">
             Filtros avanzados
           </div>
-          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+          <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
             <select
               className="min-w-48 bg-transparent outline-none"
@@ -672,7 +672,7 @@ export function TenantContextHeader() {
               ))}
             </select>
           </label>
-          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+          <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <MapPin className="size-3.5 text-muted-foreground" />
             <select
               className="min-w-44 bg-transparent outline-none"
@@ -692,7 +692,7 @@ export function TenantContextHeader() {
             </select>
           </label>
 
-          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+          <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <UsersRound className="size-3.5 text-muted-foreground" />
             <select
               className="min-w-40 bg-transparent outline-none"
@@ -707,7 +707,7 @@ export function TenantContextHeader() {
             </select>
           </label>
 
-          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+          <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <UsersRound className="size-3.5 text-muted-foreground" />
             <select
               className="min-w-44 bg-transparent outline-none"
@@ -722,7 +722,7 @@ export function TenantContextHeader() {
             </select>
           </label>
 
-          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+          <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
             <select
               className="min-w-44 bg-transparent outline-none"
@@ -737,7 +737,7 @@ export function TenantContextHeader() {
             </select>
           </label>
 
-          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+          <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
             <select
               className="min-w-40 bg-transparent outline-none"
@@ -752,7 +752,7 @@ export function TenantContextHeader() {
             </select>
           </label>
 
-          <label className="flex h-10 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs">
+          <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
             <select
               className="min-w-40 bg-transparent outline-none"

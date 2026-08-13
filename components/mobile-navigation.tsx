@@ -29,7 +29,7 @@ export function MobileNavigation({ roleKey }: MobileNavigationProps) {
       <span className="sr-only">Navegacion principal</span>
       <select
         aria-label="Navegacion principal"
-        className="h-10 w-full rounded-md border bg-background px-3 text-sm text-foreground outline-none"
+        className="h-11 w-full rounded-lg border border-border/80 bg-background/95 px-3 text-sm font-medium text-foreground shadow-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
         value={activeHref}
         onChange={(event) => router.push(event.target.value)}
       >

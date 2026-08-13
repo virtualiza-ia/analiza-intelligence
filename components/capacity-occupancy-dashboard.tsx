@@ -765,8 +765,11 @@ export function CapacityOccupancyDashboard() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {screen.primaryMetrics.map((metric) => (
-          <CapacityMetricCard key={`${screen.slug}-${metric.label}`} metric={metric} />
+        {screen.primaryMetrics.map((metric, index) => (
+          <CapacityMetricCard
+            key={`${screen.slug}-${metric.label}-${index}`}
+            metric={metric}
+          />
         ))}
       </div>
 

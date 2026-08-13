@@ -770,7 +770,7 @@ function InsightsList({ insights }: { insights: LaboratoryInsight[] }) {
   return (
     <section className="grid gap-4">
       {insights.map((insight) => (
-        <article className="rounded-md border bg-card p-4" key={insight.id}>
+        <article className="insight-card rounded-lg border bg-card p-4" key={insight.id}>
           <div className="flex flex-wrap items-center gap-2">
             <Badge className={priorityClass(insight.priority)}>
               {insight.priority}
@@ -782,24 +782,24 @@ function InsightsList({ insights }: { insights: LaboratoryInsight[] }) {
             {insight.title}
           </h3>
           <div className="mt-3 grid gap-3 text-sm leading-6 text-muted-foreground md:grid-cols-2 xl:grid-cols-4">
-            <p>
-              <span className="font-medium text-foreground">Que ocurrio: </span>
+            <p className="rounded-lg bg-muted/50 p-3">
+              <span className="block text-xs font-semibold uppercase text-foreground">Que ocurrio</span>
               {insight.whatHappened}
             </p>
-            <p>
-              <span className="font-medium text-foreground">Cuanto: </span>
+            <p className="rounded-lg bg-muted/50 p-3">
+              <span className="block text-xs font-semibold uppercase text-foreground">Cuanto</span>
               {insight.comparison}
             </p>
-            <p>
-              <span className="font-medium text-foreground">Impacto: </span>
+            <p className="rounded-lg bg-muted/50 p-3">
+              <span className="block text-xs font-semibold uppercase text-foreground">Impacto</span>
               {insight.impact}
             </p>
-            <p>
-              <span className="font-medium text-foreground">Accion: </span>
+            <p className="rounded-lg bg-muted/50 p-3">
+              <span className="block text-xs font-semibold uppercase text-foreground">Accion</span>
               {insight.recommendation}
             </p>
           </div>
-          <p className="mt-3 rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+          <p className="mt-3 rounded-lg border bg-muted/60 px-3 py-2 text-xs leading-5 text-muted-foreground">
             Evidencia: {insight.evidence}
           </p>
         </article>

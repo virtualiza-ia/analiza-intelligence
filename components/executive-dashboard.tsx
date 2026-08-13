@@ -506,17 +506,17 @@ function BarList({
       {data.map((item) => (
         <div className="grid gap-1" key={item.label}>
           <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="truncate text-muted-foreground">
+            <span className="truncate font-medium text-muted-foreground">
               {item.label}
             </span>
-            <span className="font-medium">
+            <span className="font-semibold text-foreground">
               {item.value.toLocaleString("en-US")}
               {suffix}
             </span>
           </div>
-          <div className="h-2 rounded-full bg-muted">
+          <div className="h-2.5 rounded-full bg-muted shadow-inner">
             <div
-              className="h-2 rounded-full bg-primary"
+              className="h-2.5 rounded-full bg-primary shadow-[0_0_18px_rgba(37,99,235,0.22)]"
               style={{ width: `${Math.max((item.value / maxValue) * 100, 4)}%` }}
             />
           </div>
@@ -528,7 +528,7 @@ function BarList({
 
 function NoDataState({ reason }: { reason: string }) {
   return (
-    <section className="rounded-md border border-dashed bg-card p-6 text-sm leading-6 text-muted-foreground">
+    <section className="executive-panel rounded-lg border border-dashed p-6 text-sm leading-6 text-muted-foreground">
       <div className="mb-2 font-semibold text-foreground">
         Sin datos disponibles para este filtro
       </div>
@@ -573,30 +573,30 @@ function ExecutiveKpiGrid({ metrics }: { metrics: CommandCenterMetric[] }) {
   return (
     <section
       aria-label="Tarjetas principales del Executive Command Center"
-      className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+      className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5"
     >
       {metrics.map((metric) => (
         <article
-          className="grid min-h-40 gap-3 rounded-md border bg-card p-4"
+          className="metric-card grid min-h-44 gap-3 rounded-lg border p-4"
           key={metric.label}
           title={`${metric.formula}. Fuente: ${metric.source}`}
         >
           <div className="flex items-start justify-between gap-2">
-            <div className="text-sm font-medium text-muted-foreground">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">
               {metric.label}
             </div>
             <Badge className={stateClass(metric.state)}>
               {stateLabel(metric.state)}
             </Badge>
           </div>
-          <div className="text-2xl font-semibold tracking-normal">
+          <div className="text-3xl font-semibold tracking-normal text-foreground">
             {metric.value}
           </div>
           <div className="grid gap-1 text-xs leading-5 text-muted-foreground">
             {metric.target ? <span>Meta: {metric.target}</span> : null}
             {metric.variation ? <span>Tendencia: {metric.variation}</span> : null}
             <span>{metric.detail}</span>
-            <span className="font-medium text-foreground">
+            <span className="rounded-md bg-muted/70 px-2 py-1 font-medium text-foreground">
               Formula: {metric.formula}
             </span>
           </div>
@@ -608,7 +608,7 @@ function ExecutiveKpiGrid({ metrics }: { metrics: CommandCenterMetric[] }) {
 
 function AttentionCards({ items }: { items: AttentionItem[] }) {
   return (
-    <section className="grid gap-4 rounded-md border bg-card p-4">
+    <section className="executive-panel grid gap-4 rounded-lg border p-4">
       <div className="grid gap-1">
         <h2 className="text-lg font-semibold tracking-normal">
           Requiere su atencion
@@ -621,7 +621,7 @@ function AttentionCards({ items }: { items: AttentionItem[] }) {
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {items.map((item) => (
           <article
-            className="grid min-h-44 gap-3 rounded-md border bg-background p-4"
+            className="insight-card grid min-h-44 gap-3 rounded-lg border bg-background p-4"
             key={`${item.category}-${item.lineName}`}
           >
             <div className="flex items-start justify-between gap-3">
@@ -636,7 +636,7 @@ function AttentionCards({ items }: { items: AttentionItem[] }) {
                 Impacto: {item.impact}
               </p>
             </div>
-            <p className="text-sm leading-6 text-muted-foreground">
+            <p className="rounded-md bg-muted/60 px-3 py-2 text-sm leading-6 text-muted-foreground">
               Accion: {item.action}
             </p>
           </article>
@@ -648,7 +648,7 @@ function AttentionCards({ items }: { items: AttentionItem[] }) {
 
 function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
   return (
-    <section className="rounded-md border bg-card p-4">
+    <section className="executive-panel rounded-lg border p-4">
       <div className="mb-4 grid gap-1">
         <h2 className="text-lg font-semibold tracking-normal">
           Tabla ejecutiva por sucursal
@@ -660,7 +660,7 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
       <div className="grid gap-3 md:hidden">
         {rows.map((row) => (
           <article
-            className="grid gap-3 rounded-md border bg-background p-3 text-sm"
+            className="grid gap-3 rounded-lg border bg-background p-3 text-sm"
             key={`${row.company}-${row.branch}-mobile`}
           >
             <div>
@@ -695,14 +695,14 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
                 </dd>
               </div>
             </dl>
-            <p className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+            <p className="rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
               {row.alert}
             </p>
           </article>
         ))}
       </div>
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[980px] text-left text-sm">
+        <table className="data-table w-full min-w-[980px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
               <th className="py-2 pr-4 font-medium">Sucursal</th>
@@ -745,7 +745,7 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
 
 function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
   return (
-    <section className="rounded-md border bg-card p-4">
+    <section className="executive-panel rounded-lg border p-4">
       <div className="mb-4 grid gap-1">
         <h2 className="text-lg font-semibold tracking-normal">
           Tabla ejecutiva por gerente
@@ -757,7 +757,7 @@ function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
       <div className="grid gap-3 md:hidden">
         {rows.map((row) => (
           <article
-            className="grid gap-3 rounded-md border bg-background p-3 text-sm"
+            className="grid gap-3 rounded-lg border bg-background p-3 text-sm"
             key={`${row.manager}-mobile`}
           >
             <div>
@@ -786,14 +786,14 @@ function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
                 </dd>
               </div>
             </dl>
-            <p className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+            <p className="rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
               {row.action}
             </p>
           </article>
         ))}
       </div>
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[920px] text-left text-sm">
+        <table className="data-table w-full min-w-[920px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
               <th className="py-2 pr-4 font-medium">Gerente</th>
@@ -842,7 +842,7 @@ function ExecutiveStatusTable({ lines }: { lines: BusinessLineDashboard[] }) {
   });
 
   return (
-    <section className="grid gap-4 rounded-md border bg-card p-4">
+    <section className="executive-panel grid gap-4 rounded-lg border p-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold tracking-normal">
           Estado general de las lineas
@@ -856,7 +856,7 @@ function ExecutiveStatusTable({ lines }: { lines: BusinessLineDashboard[] }) {
       <div className="grid gap-3 md:hidden">
         {orderedLines.map((line) => (
           <article
-            className="grid gap-3 rounded-md border bg-background p-3 text-sm"
+            className="grid gap-3 rounded-lg border bg-background p-3 text-sm"
             key={`${line.key}-mobile`}
           >
             <div className="flex items-start justify-between gap-3">
@@ -894,14 +894,14 @@ function ExecutiveStatusTable({ lines }: { lines: BusinessLineDashboard[] }) {
                 <dd>{line.patientCount.toLocaleString("en-US")}</dd>
               </div>
             </dl>
-            <p className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+            <p className="rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
               {line.executiveInterpretation}
             </p>
           </article>
         ))}
       </div>
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[860px] text-left text-sm">
+        <table className="data-table w-full min-w-[860px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
               <th className="py-2 pr-4 font-medium">Linea</th>
@@ -949,7 +949,7 @@ function ExecutiveStatusTable({ lines }: { lines: BusinessLineDashboard[] }) {
       <div className="grid gap-2">
         {orderedLines.map((line) => (
           <p
-            className="rounded-md bg-muted px-3 py-2 text-sm leading-6 text-muted-foreground"
+            className="rounded-lg bg-muted/70 px-3 py-2 text-sm leading-6 text-muted-foreground"
             key={`${line.key}-interpretation`}
           >
             <span className="font-medium text-foreground">{line.shortName}: </span>
@@ -970,8 +970,11 @@ function HealthBar({ label, value }: { label: string; value: number }) {
         <span className="text-muted-foreground">{label}</span>
         <span className="font-medium">{value}%</span>
       </div>
-      <div className="h-2 rounded-full bg-muted">
-        <div className="h-2 rounded-full bg-primary" style={{ width: `${safeWidth}%` }} />
+      <div className="h-2.5 rounded-full bg-muted shadow-inner">
+        <div
+          className="h-2.5 rounded-full bg-primary shadow-[0_0_18px_rgba(37,99,235,0.2)]"
+          style={{ width: `${safeWidth}%` }}
+        />
       </div>
     </div>
   );
@@ -985,7 +988,7 @@ function BusinessLineSummaryCard({ line }: { line: BusinessLineDashboard }) {
       : 0;
 
   return (
-    <article className="grid min-h-72 gap-4 rounded-md border bg-card p-4">
+    <article className="metric-card grid min-h-72 gap-4 rounded-lg border p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="grid gap-1">
           <h2 className="text-base font-semibold">{line.companyName}</h2>
@@ -1036,7 +1039,7 @@ function BusinessLineSummaryCard({ line }: { line: BusinessLineDashboard }) {
         </div>
       </div>
 
-      <p className="rounded-md bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+      <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
         {line.alert}
       </p>
     </article>
@@ -1066,14 +1069,14 @@ function BusinessLineSummary({ lines }: { lines: BusinessLineDashboard[] }) {
 
 function FinancialHealthByLine({ lines }: { lines: BusinessLineDashboard[] }) {
   return (
-    <section className="rounded-md border bg-card p-4">
+    <section className="executive-panel rounded-lg border p-4">
       <div className="mb-4 flex items-center gap-2 text-sm font-medium">
         <CircleDollarSign className="size-4 text-primary" />
         Salud financiera de las lineas del negocio
       </div>
       <div className="grid gap-4 xl:grid-cols-3">
         {lines.map((line) => (
-          <article className="grid gap-3 rounded-md border p-3" key={line.companyName}>
+          <article className="grid gap-3 rounded-lg border bg-background/70 p-3" key={line.companyName}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold">{line.shortName}</h3>
@@ -1346,31 +1349,37 @@ export function ExecutiveDashboard() {
 
   return (
     <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
-            Entorno DEMO
-          </Badge>
-          <Badge variant="outline">Completitud {demoDashboardMeta.completeness}%</Badge>
-          <Badge variant="outline">{demoDashboardMeta.dataCoverage}</Badge>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-end">
-          <div className="grid gap-2">
-            <h1 className="text-3xl font-semibold tracking-normal">
-              Executive Command Center
-            </h1>
-            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Resumen ejecutivo DEMO para entender en menos de 30 segundos como
-              va el negocio, donde falta meta, donde hay capacidad ociosa y que
-              dato no es suficientemente confiable.
-            </p>
+      <div className="executive-panel-strong overflow-hidden rounded-lg border p-5 sm:p-6">
+        <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-end">
+          <div className="grid gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="bg-amber-300/20 text-amber-100 hover:bg-amber-300/20">
+                Entorno DEMO
+              </Badge>
+              <Badge className="border-white/15 bg-white/10 text-white hover:bg-white/10">
+                Completitud {demoDashboardMeta.completeness}%
+              </Badge>
+              <Badge className="border-white/15 bg-white/10 text-white hover:bg-white/10">
+                {demoDashboardMeta.dataCoverage}
+              </Badge>
+            </div>
+            <div className="grid gap-2">
+              <h1 className="text-3xl font-semibold tracking-normal text-white sm:text-4xl">
+                Executive Command Center
+              </h1>
+              <p className="max-w-3xl text-sm leading-6 text-white/70">
+                Resumen ejecutivo DEMO para entender en menos de 30 segundos como
+                va el negocio, donde falta meta, donde hay capacidad ociosa y que
+                dato no es suficientemente confiable.
+              </p>
+            </div>
           </div>
-          <div className="rounded-md border bg-card p-4 text-sm">
-            <div className="mb-2 flex items-center gap-2 font-medium">
-              <CheckCircle2 className="size-4 text-primary" />
+          <div className="rounded-lg border border-white/10 bg-white/[0.08] p-4 text-sm shadow-[0_18px_42px_-36px_rgba(0,0,0,0.7)]">
+            <div className="mb-3 flex items-center gap-2 font-medium text-white">
+              <CheckCircle2 className="size-4 text-[#6ee7b7]" />
               Vista ejecutiva activa
             </div>
-            <div className="grid gap-1 text-muted-foreground">
+            <div className="grid gap-1.5 text-white/70">
               <span>
                 {context?.countryName ?? "Pais pendiente"} /{" "}
                 {context?.companyName ?? "Empresa pendiente"} /{" "}
@@ -1379,7 +1388,7 @@ export function ExecutiveDashboard() {
               <span>{context?.branchName ?? "Sucursal pendiente"}</span>
               <span>Periodo: {selectedPeriod}</span>
               <span>Ultima actualizacion: {demoDashboardMeta.lastUpdated}</span>
-              <span>
+              <span className="font-medium text-white">
                 Calidad del dato: {formatQualityLevel(averageQualityScore)}{" "}
                 {averageQualityScore}%
               </span>
@@ -1400,7 +1409,7 @@ export function ExecutiveDashboard() {
           <FinancialHealthByLine lines={lines} />
 
           <div className="grid gap-4 xl:grid-cols-2">
-            <section className="rounded-md border bg-card p-4">
+            <section className="executive-panel rounded-lg border p-4">
               <div className="mb-4 flex items-center gap-2 text-sm font-medium">
                 <BarChart3 className="size-4 text-primary" />
                 Participacion por empresa
@@ -1408,7 +1417,7 @@ export function ExecutiveDashboard() {
               <BarList data={revenueShare} suffix="%" />
             </section>
 
-            <section className="rounded-md border bg-card p-4">
+            <section className="executive-panel rounded-lg border p-4">
               <div className="mb-4 flex items-center gap-2 text-sm font-medium">
                 <Target className="size-4 text-primary" />
                 Metas vs resultados por empresa
@@ -1426,7 +1435,7 @@ export function ExecutiveDashboard() {
           />
 
           <div className="grid gap-4 xl:grid-cols-3">
-            <section className="rounded-md border bg-card p-4">
+            <section className="executive-panel rounded-lg border p-4">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <LineChart className="size-4 text-primary" />
@@ -1439,7 +1448,7 @@ export function ExecutiveDashboard() {
               <BarList data={appointmentStatus} />
             </section>
 
-            <section className="rounded-md border bg-card p-4">
+            <section className="executive-panel rounded-lg border p-4">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Database className="size-4 text-primary" />
@@ -1452,7 +1461,7 @@ export function ExecutiveDashboard() {
               <BarList data={selectedOccupancy} suffix="%" />
             </section>
 
-            <section className="rounded-md border bg-card p-4">
+            <section className="executive-panel rounded-lg border p-4">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <AlertTriangle className="size-4 text-primary" />
@@ -1474,12 +1483,12 @@ export function ExecutiveDashboard() {
           <ExecutiveManagerTable rows={managerRows} />
 
           <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
-            <section className="rounded-md border bg-card p-4">
-              <div className="mb-4 text-sm font-medium">Insights DEMO</div>
+            <section className="executive-panel rounded-lg border p-4">
+              <div className="mb-4 text-sm font-semibold">Insights DEMO</div>
               <div className="grid gap-3">
                 {insightPreviews.map((insight) => (
                   <article
-                    className="grid gap-2 border-t py-3 first:border-t-0 first:pt-0 last:pb-0"
+                    className="insight-card grid gap-2 rounded-lg border bg-background p-3"
                     key={insight.title}
                   >
                     <div className="flex flex-wrap items-center gap-2">
@@ -1500,7 +1509,7 @@ export function ExecutiveDashboard() {
                     <p className="text-xs text-muted-foreground">
                       Indicador: {insight.affectedIndicator}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm leading-6 text-muted-foreground">
                       {insight.recommendation}
                     </p>
                   </article>
@@ -1508,8 +1517,8 @@ export function ExecutiveDashboard() {
               </div>
             </section>
 
-            <section className="rounded-md border bg-card p-4">
-              <div className="mb-4 text-sm font-medium">Fuentes utilizadas</div>
+            <section className="executive-panel rounded-lg border p-4">
+              <div className="mb-4 text-sm font-semibold">Fuentes utilizadas</div>
               <ul className="grid gap-3 text-sm text-muted-foreground">
                 {demoDashboardMeta.sources.map((source) => (
                   <li className="flex items-center gap-2" key={source}>
@@ -1518,7 +1527,7 @@ export function ExecutiveDashboard() {
                   </li>
                 ))}
               </ul>
-              <div className="mt-4 rounded-md bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
                 Las metricas son DEMO. No usar como informacion operativa,
                 financiera o clinica real.
               </div>

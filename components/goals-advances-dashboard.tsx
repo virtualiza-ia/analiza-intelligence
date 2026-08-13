@@ -50,9 +50,9 @@ function formatRate(value: number) {
 
 function ProgressBar({ value }: { value: number }) {
   return (
-    <div className="h-2 rounded-full bg-muted">
+    <div className="h-2.5 rounded-full bg-muted shadow-inner">
       <div
-        className="h-2 rounded-full bg-primary"
+        className="h-2.5 rounded-full bg-primary shadow-[0_0_18px_rgba(37,99,235,0.18)]"
         style={{ width: `${Math.max(6, Math.min(value, 100))}%` }}
       />
     </div>
@@ -77,10 +77,10 @@ function GoalProjectionChart({ goal }: { goal: GoalStrategySuggestion }) {
   const complianceRate = goal.currentMonthlyRevenue / budgetedRevenue;
 
   return (
-    <div className="rounded-md border bg-background p-3">
+    <div className="rounded-lg border bg-background/80 p-3 shadow-inner">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-sm font-medium">
+          <div className="text-sm font-semibold">
             Presupuestado, proyectado y cumplido
           </div>
           <div className="text-xs text-muted-foreground">
@@ -97,7 +97,7 @@ function GoalProjectionChart({ goal }: { goal: GoalStrategySuggestion }) {
         viewBox="0 0 320 132"
       >
         <line
-          stroke="#e2e8f0"
+          stroke="#e5ebf2"
           strokeWidth="1"
           x1="28"
           x2="304"
@@ -236,7 +236,7 @@ export function GoalsAdvancesDashboard() {
 
   return (
     <section className="flex w-full min-w-0 flex-col gap-6 px-4 py-6 lg:px-6">
-      <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
+      <div className="executive-panel grid gap-4 rounded-lg border p-5 xl:grid-cols-[1fr_380px]">
         <div className="grid gap-3">
           <div className="flex flex-wrap gap-2">
             <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
@@ -246,7 +246,7 @@ export function GoalsAdvancesDashboard() {
             <Badge variant="outline">Filtro: {activeBusinessLine.line}</Badge>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-md border bg-card">
+            <div className="flex size-11 items-center justify-center rounded-lg border bg-card shadow-sm">
               <Goal className="size-5 text-primary" />
             </div>
             <div>
@@ -262,7 +262,7 @@ export function GoalsAdvancesDashboard() {
           </div>
         </div>
 
-        <aside className="rounded-md border bg-card p-4 text-sm">
+        <aside className="rounded-lg border bg-background/80 p-4 text-sm shadow-inner">
           <div className="mb-2 flex items-center gap-2 font-medium">
             <ShieldCheck className="size-4 text-primary" />
             Regla de cautela
@@ -285,7 +285,7 @@ export function GoalsAdvancesDashboard() {
           const Icon = metric.icon;
 
           return (
-            <article className="rounded-md border bg-card p-4" key={metric.label}>
+            <article className="metric-card rounded-lg border p-4" key={metric.label}>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Icon className="size-4 text-primary" />
                 {metric.label}
@@ -303,7 +303,7 @@ export function GoalsAdvancesDashboard() {
             (goal.currentMonthlyRevenue / goal.suggestedGoalRevenue) * 100;
 
           return (
-            <article className="rounded-md border bg-card p-4" key={goal.id}>
+            <article className="executive-panel rounded-lg border p-4" key={goal.id}>
               <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -337,7 +337,7 @@ export function GoalsAdvancesDashboard() {
                   </div>
                 </div>
 
-                <div className="rounded-md border bg-background p-3">
+                <div className="rounded-lg border bg-background/80 p-3 shadow-inner">
                   <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                     <LineChart className="size-4 text-primary" />
                     ROI simulado si se ejecuta bien
@@ -353,7 +353,7 @@ export function GoalsAdvancesDashboard() {
               </div>
 
               <div className="mt-4 grid gap-3 xl:grid-cols-3">
-                <div className="rounded-md border bg-background p-3">
+                <div className="rounded-lg border bg-background/80 p-3">
                   <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                     <Sparkles className="size-4 text-primary" />
                     Estrategia sugerida
@@ -363,7 +363,7 @@ export function GoalsAdvancesDashboard() {
                   </p>
                 </div>
 
-                <div className="rounded-md border bg-background p-3">
+                <div className="rounded-lg border bg-background/80 p-3">
                   <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                     <BadgeDollarSign className="size-4 text-primary" />
                     Colocacion de bonos
@@ -376,7 +376,7 @@ export function GoalsAdvancesDashboard() {
                   </p>
                 </div>
 
-                <div className="rounded-md border bg-background p-3">
+                <div className="rounded-lg border bg-background/80 p-3">
                   <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                     <ShieldCheck className="size-4 text-primary" />
                     Condicion para aprobar
@@ -388,7 +388,7 @@ export function GoalsAdvancesDashboard() {
               </div>
 
               <div className="mt-4 grid gap-3 xl:grid-cols-[1fr_180px] xl:items-center">
-                <div className="rounded-md border bg-muted/60 p-3">
+                <div className="rounded-lg border bg-muted/60 p-3">
                   <div className="mb-2 text-sm font-medium">Supuestos visibles</div>
                   <div className="grid gap-1 text-sm text-muted-foreground">
                     {goal.assumptions.map((assumption) => (
@@ -407,7 +407,7 @@ export function GoalsAdvancesDashboard() {
           );
         })}
         {visibleGoalSuggestions.length === 0 ? (
-          <article className="rounded-md border bg-card p-6 text-sm text-muted-foreground">
+          <article className="executive-panel rounded-lg border p-6 text-sm text-muted-foreground">
             No hay metas sugeridas para el filtro superior actual. Selecciona
             otra linea de negocio o carga plantillas suficientes para generar
             sugerencias cautelosas.

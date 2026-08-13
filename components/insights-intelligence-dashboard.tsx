@@ -889,7 +889,7 @@ function EarlyWarningCard({
   warning: EarlyWarningIndicator;
 }) {
   return (
-    <article className="rounded-md border bg-card p-4">
+    <article className="insight-card rounded-lg border bg-card p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
@@ -916,15 +916,15 @@ function EarlyWarningCard({
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_160px]">
-        <div className="rounded-md border bg-background p-3">
+        <div className="rounded-lg border bg-background/80 p-3">
           <div className="text-xs text-muted-foreground">Resultado actual</div>
           <div className="mt-1 text-sm font-semibold">{warning.current}</div>
         </div>
-        <div className="rounded-md border bg-background p-3">
+        <div className="rounded-lg border bg-background/80 p-3">
           <div className="text-xs text-muted-foreground">Meta</div>
           <div className="mt-1 text-sm font-semibold">{warning.target}</div>
         </div>
-        <div className="rounded-md border bg-background p-3">
+        <div className="rounded-lg border bg-background/80 p-3">
           <div className="text-xs text-muted-foreground">Responsable</div>
           <div className="mt-1 text-sm font-semibold">{warning.owner}</div>
         </div>
@@ -1198,7 +1198,7 @@ function InsightCard({
       </div>
 
       {assignment ? (
-        <div className="mt-3 rounded-md border bg-blue-50 p-3 text-xs text-blue-900">
+        <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
           Responsable asignado en esta sesion: {assignment}
         </div>
       ) : null}
@@ -1306,7 +1306,7 @@ function ImpactUrgencyMatrix({
   const points = buildImpactUrgencyMatrix(insights);
 
   return (
-    <section className="min-w-0 rounded-md border bg-card p-4">
+    <section className="executive-panel min-w-0 rounded-lg border p-4">
       <div className="mb-4">
         <div className="flex items-center gap-2 text-sm font-medium">
           <GitBranch className="size-4 text-primary" />
@@ -1317,7 +1317,7 @@ function ImpactUrgencyMatrix({
           financiero. Cada punto permite abrir el detalle.
         </p>
       </div>
-      <div className="relative h-[330px] overflow-hidden rounded-md border bg-background p-4">
+      <div className="relative h-[330px] overflow-hidden rounded-lg border bg-background p-4 shadow-inner">
         <div className="absolute inset-x-4 top-1/2 border-t border-dashed" />
         <div className="absolute inset-y-4 left-1/2 border-l border-dashed" />
         <div className="absolute left-5 top-5 text-xs font-medium text-red-800">
@@ -3064,13 +3064,13 @@ export function InsightsIntelligenceDashboard() {
 
   return (
     <section className="flex w-full min-w-0 flex-col gap-6 px-4 py-6 lg:px-6">
-      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+      <div className="executive-panel grid gap-4 rounded-lg border p-5 xl:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-3">
           <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
             Entorno DEMO
           </Badge>
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-md border bg-card">
+            <div className="flex size-11 items-center justify-center rounded-lg border bg-card shadow-sm">
               <BrainCircuit className="size-5 text-primary" />
             </div>
             <div>
@@ -3084,7 +3084,7 @@ export function InsightsIntelligenceDashboard() {
             </div>
           </div>
         </div>
-        <aside className="rounded-md border bg-card p-4 text-sm">
+        <aside className="rounded-lg border bg-background/80 p-4 text-sm shadow-inner">
           <div className="mb-2 flex items-center gap-2 font-medium">
             <CheckCircle2 className="size-4 text-primary" />
             Contexto activo de AnaliA
@@ -3100,7 +3100,7 @@ export function InsightsIntelligenceDashboard() {
       </div>
 
       {notice ? (
-        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
           {notice}
         </div>
       ) : null}
