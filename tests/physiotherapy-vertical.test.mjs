@@ -418,11 +418,12 @@ assert.deepEqual(
     "/protected/cierres/nuevo",
     "/protected/cierres",
     "/protected/resultados",
+    "/protected/gerentes",
     "/protected/insights",
     "/protected/metas",
     "/protected/configuracion",
   ],
-  "Branch manager navigation must stay focused on the physiotherapy closure flow.",
+  "Branch manager navigation must stay focused on closure flow plus own bonus review.",
 );
 
 const loginForm = readWorkspaceFile("components/login-form.tsx");

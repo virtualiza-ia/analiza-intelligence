@@ -221,7 +221,13 @@ export const navigationItems: NavigationItem[] = [
     href: "/protected/gerentes",
     icon: UsersRound,
     group: "gestion",
-    allowedRoles: ["gerente_area"],
+    allowedRoles: [
+      ...adminRoles,
+      "ceo",
+      "gerente_operaciones",
+      "gerente_area",
+      "gerente_sucursal",
+    ],
   },
   {
     title: "Profesionales",

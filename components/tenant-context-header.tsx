@@ -419,6 +419,10 @@ export function TenantContextHeader() {
     const businessLine =
       scopedBusinessLine ??
       demoBusinessLineOptions.find((item) => item.id === businessLineId);
+    const businessLineCompany =
+      businessLine?.companyId
+        ? demoCompanyOptions.find((item) => item.id === businessLine.companyId)
+        : company;
     const branch = demoBranches.find((item) => item.id === branchId);
     const operationalArea = demoOperationalAreas.find(
       (item) => item.id === operationalAreaId,
@@ -441,7 +445,7 @@ export function TenantContextHeader() {
     const contextCountryId =
       scopedCompanyAccess?.scope.countryId ?? country?.id ?? getInitialCountryId();
     const contextCompanyId =
-      scopedCompanyAccess?.scope.companyId ?? company?.id ?? "";
+      scopedCompanyAccess?.scope.companyId ?? businessLineCompany?.id ?? "";
     const context = resolveGlobalFilterContext({
       branchId: contextBranchId,
       branchName,
@@ -451,7 +455,7 @@ export function TenantContextHeader() {
       companyId: contextCompanyId,
       companyName:
         scopedCompanyAccess?.scope.companyName ??
-        company?.name ??
+        businessLineCompany?.name ??
         businessLine.name,
       countryId: contextCountryId,
       countryName:
@@ -510,9 +514,29 @@ export function TenantContextHeader() {
 
   function handleBusinessLineChange(nextBusinessLineId: string) {
     const nextCompany = getCompanyForBusinessLine(nextBusinessLineId);
+    function syncLineSearchParams() {
+      const searchParams = new URLSearchParams(window.location.search);
+
+      searchParams.set("line", nextBusinessLineId);
+      searchParams.set("company", nextCompany.id);
+      searchParams.set("branch", allBranchesValue);
+      searchParams.set("area", allOperationalAreasValue);
+      searchParams.set("manager", allManagersValue);
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}?${searchParams.toString()}`,
+      );
+    }
+
     setBusinessLineId(nextBusinessLineId);
     setCompanyId(nextCompany.id);
     setBranchId(allBranchesValue);
+    setOperationalAreaId(allOperationalAreasValue);
+    setManagerId(allManagersValue);
+    syncLineSearchParams();
+    window.setTimeout(syncLineSearchParams, 0);
+    window.setTimeout(syncLineSearchParams, 250);
   }
 
   const selectedBranch = demoBranches.find((item) => item.id === branchId);

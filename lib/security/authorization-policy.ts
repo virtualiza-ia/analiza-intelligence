@@ -25,6 +25,9 @@ export type AuthorizationActor = {
 };
 
 export type AuthorizationAction =
+  | "bonuses.adjust"
+  | "bonuses.approve"
+  | "bonuses.reject"
   | "branches.assign_area"
   | "branches.create"
   | "connectors.manage"
@@ -47,6 +50,7 @@ export type AuthorizationTarget = {
   pathname?: string;
   roleKey?: RoleKey;
   scope?: ScopeBoundary;
+  targetUserId?: string;
 };
 
 const protectedBasePaths = new Set(["/protected", "/protected/context"]);
@@ -149,6 +153,38 @@ export function canPerformAction(
         connectorMutationRoles.includes(actor.roleKey) &&
         canAccessRecord(toDelegationActor(actor), target.scope),
     );
+  }
+
+  if (
+    action === "bonuses.approve" ||
+    action === "bonuses.reject" ||
+    action === "bonuses.adjust"
+  ) {
+    if (
+      !target.scope ||
+      !target.roleKey ||
+      !canAccessRecord(toDelegationActor(actor), target.scope)
+    ) {
+      return false;
+    }
+
+    if (target.targetUserId && target.targetUserId === actor.userId) {
+      return false;
+    }
+
+    if (isSuperAdministrator(actor.roleKey)) {
+      return true;
+    }
+
+    if (actor.roleKey === "gerente_operaciones") {
+      return target.roleKey === "gerente_area" || target.roleKey === "gerente_sucursal";
+    }
+
+    if (actor.roleKey === "gerente_area") {
+      return target.roleKey === "gerente_sucursal";
+    }
+
+    return false;
   }
 
   if (action === "users.invite") {

@@ -9,6 +9,7 @@ function read(path) {
 const proposal = read("docs/bonuses/bonus-model-proposal.md");
 const analytics = read("lib/analytics/manager-bonuses.ts");
 const dashboard = read("components/manager-bonus-dashboard.tsx");
+const navigation = read("lib/navigation.ts");
 const packageJson = read("package.json");
 
 for (const requiredProposalText of [
@@ -78,11 +79,15 @@ for (const requiredDashboardText of [
   "BONUS STATUS",
   "Rol evaluado",
   "Bono recomendado",
-  "Bono propuesto",
+  "Bono final",
   "Por que recibo este bono",
   "Backtest de politica de bonos",
   "SYSTEM RECOMMENDS",
   "APPROVED, REJECTED o ADJUSTED WITH REASON",
+  "Workflow auditable de bono",
+  "Aprobar",
+  "Ajustar",
+  "Rechazar",
   "No ejecuta pagos",
 ]) {
   assert.ok(
@@ -94,6 +99,30 @@ for (const requiredDashboardText of [
 assert.ok(
   packageJson.includes("tests/bonus-incentive-model.test.mjs"),
   "Bonus test must be part of npm test.",
+);
+
+const managerBonusNavigation = navigation.match(
+  /title: "Gerentes y bonos"[\s\S]*?allowedRoles: \[([\s\S]*?)\]/,
+)?.[1];
+
+assert.ok(managerBonusNavigation, "Manager bonus navigation entry is missing.");
+
+for (const requiredRole of [
+  "...adminRoles",
+  '"ceo"',
+  '"gerente_operaciones"',
+  '"gerente_area"',
+  '"gerente_sucursal"',
+]) {
+  assert.ok(
+    managerBonusNavigation.includes(requiredRole),
+    `Manager bonus navigation is missing read access for ${requiredRole}.`,
+  );
+}
+
+assert.ok(
+  packageJson.includes("tests/bonus-workflow.test.mjs"),
+  "Bonus workflow test must be part of npm test.",
 );
 
 console.log("Bonus incentive model checks passed.");

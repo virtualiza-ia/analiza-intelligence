@@ -212,6 +212,7 @@ for (const executiveLinePath of [
   "/protected/fisioterapia",
   "/protected/laboratorio",
   "/protected/imagenes",
+  "/protected/gerentes",
 ]) {
   assert.equal(
     canAccessProtectedPath(ceo, executiveLinePath),
@@ -233,7 +234,6 @@ for (const sensitiveCeoPath of [
   "/protected/conectores",
   "/protected/apis",
   "/protected/calidad-datos",
-  "/protected/gerentes",
 ]) {
   assert.equal(
     canAccessProtectedPath(ceo, sensitiveCeoPath),

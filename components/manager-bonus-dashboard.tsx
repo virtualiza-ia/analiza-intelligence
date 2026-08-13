@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   BadgeDollarSign,
@@ -10,10 +10,13 @@ import {
   Filter,
   GitBranch,
   LineChart,
+  Loader2,
+  Pencil,
   Scale,
   Target,
   TrendingUp,
   UsersRound,
+  XCircle,
 } from "lucide-react";
 
 import { AnalyticsComparisonChart } from "@/components/analytics-comparison-chart";
@@ -62,6 +65,57 @@ type ManagerFilters = {
   managerRole: string;
   managerType: string;
   status: string;
+};
+
+type BonusWorkflowStatus =
+  | "SYSTEM_RECOMMENDED"
+  | "APPROVED"
+  | "REJECTED"
+  | "ADJUSTED";
+
+type BonusWorkflowItem = {
+  auditEvents: {
+    action: "approve" | "reject" | "adjust";
+    decidedAt: string;
+    finalAmount: number;
+    reason: string | null;
+    status: BonusWorkflowStatus;
+    userEmail: string;
+  }[];
+  bonusRecommendationId: string;
+  businessLine: string;
+  canAdjust: boolean;
+  canApprove: boolean;
+  canReject: boolean;
+  decidedAt: string;
+  finalAmount: number;
+  manager: string;
+  period: string;
+  reason: string | null;
+  recommendedAmount: number;
+  scoreOriginal: number;
+  status: BonusWorkflowStatus;
+  userEmail: string;
+};
+
+type BonusWorkflowResponse = {
+  items?: BonusWorkflowItem[];
+  ok?: boolean;
+  roleKey?: string;
+};
+
+type BonusDecisionResponse = {
+  error?: string;
+  item?: BonusWorkflowItem;
+  ok?: boolean;
+};
+
+type BonusDecisionAction = "approve" | "reject" | "adjust";
+
+type BonusDecisionModalState = {
+  action: Extract<BonusDecisionAction, "reject" | "adjust">;
+  amount: string;
+  reason: string;
 };
 
 type SortKey =
@@ -176,6 +230,54 @@ function bonusStateClass(state: BonusState) {
   }
 
   return "bg-blue-100 text-blue-800 hover:bg-blue-100";
+}
+
+function workflowStatusLabel(status: BonusWorkflowStatus) {
+  if (status === "SYSTEM_RECOMMENDED") {
+    return "SYSTEM RECOMMENDED";
+  }
+
+  if (status === "ADJUSTED") {
+    return "ADJUSTED";
+  }
+
+  return status;
+}
+
+function workflowStatusClass(status: BonusWorkflowStatus) {
+  if (status === "APPROVED") {
+    return "bg-emerald-100 text-emerald-800 hover:bg-emerald-100";
+  }
+
+  if (status === "REJECTED") {
+    return "bg-red-100 text-red-800 hover:bg-red-100";
+  }
+
+  if (status === "ADJUSTED") {
+    return "bg-blue-100 text-blue-800 hover:bg-blue-100";
+  }
+
+  return "bg-amber-100 text-amber-800 hover:bg-amber-100";
+}
+
+function defaultWorkflowItem(record: ManagerBonusRecord): BonusWorkflowItem {
+  return {
+    auditEvents: [],
+    bonusRecommendationId: record.id,
+    businessLine: record.line,
+    canAdjust: false,
+    canApprove: false,
+    canReject: false,
+    decidedAt: "",
+    finalAmount: record.bonusRecommended,
+    manager: record.manager,
+    period: record.period,
+    reason: null,
+    recommendedAmount: record.bonusRecommended,
+    scoreOriginal: record.score,
+    status: "SYSTEM_RECOMMENDED",
+    userEmail: "",
+  };
 }
 
 function ProgressBar({
@@ -615,10 +717,12 @@ function ManagerRankingTable({
   onSelect,
   records,
   selectedId,
+  workflowById,
 }: {
   onSelect: (id: string) => void;
   records: ManagerBonusRecord[];
   selectedId: string | null;
+  workflowById: Map<string, BonusWorkflowItem>;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
@@ -702,44 +806,54 @@ function ManagerRankingTable({
             </tr>
           </thead>
           <tbody>
-            {sortedRecords.map((record) => (
-              <tr
-                className={cn(
-                  "cursor-pointer border-b last:border-b-0 hover:bg-muted/50",
-                  selectedId === record.id ? "bg-muted" : "",
-                )}
-                key={record.id}
-                onClick={() => onSelect(record.id)}
-              >
-                <td className="py-3 pr-4 font-medium">{record.manager}</td>
-                <td className="py-3 pr-4">{record.managerRole}</td>
-                <td className="py-3 pr-4">
-                  <div>{record.branch}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {record.managerType}
-                  </div>
-                </td>
-                <td className="py-3 pr-4">{record.line}</td>
-                {columns.map((column) => (
-                  <td className="py-3 pr-4" key={`${record.id}-${column.key}`}>
-                    {column.render(record)}
+            {sortedRecords.map((record) => {
+              const workflow =
+                workflowById.get(record.id) ?? defaultWorkflowItem(record);
+
+              return (
+                <tr
+                  className={cn(
+                    "cursor-pointer border-b last:border-b-0 hover:bg-muted/50",
+                    selectedId === record.id ? "bg-muted" : "",
+                  )}
+                  key={record.id}
+                  onClick={() => onSelect(record.id)}
+                >
+                  <td className="py-3 pr-4 font-medium">{record.manager}</td>
+                  <td className="py-3 pr-4">{record.managerRole}</td>
+                  <td className="py-3 pr-4">
+                    <div>{record.branch}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {record.managerType}
+                    </div>
                   </td>
-                ))}
-                <td className="py-3 pr-4">
-                  <Badge className={statusClass(record.status)}>
-                    {record.status}
-                  </Badge>
-                </td>
-                <td className="py-3 pr-4">
-                  <Badge className={bonusStateClass(record.bonusState)}>
-                    {record.bonusState}
-                  </Badge>
-                </td>
-                <td className="max-w-[260px] py-3 pr-4 text-muted-foreground">
-                  {record.approvalStatus}: {record.recommendedAction}
-                </td>
-              </tr>
-            ))}
+                  <td className="py-3 pr-4">{record.line}</td>
+                  {columns.map((column) => (
+                    <td className="py-3 pr-4" key={`${record.id}-${column.key}`}>
+                      {column.render(record)}
+                    </td>
+                  ))}
+                  <td className="py-3 pr-4">
+                    <Badge className={statusClass(record.status)}>
+                      {record.status}
+                    </Badge>
+                  </td>
+                  <td className="py-3 pr-4">
+                    <Badge className={bonusStateClass(record.bonusState)}>
+                      {record.bonusState}
+                    </Badge>
+                  </td>
+                  <td className="max-w-[260px] py-3 pr-4 text-muted-foreground">
+                    <Badge className={workflowStatusClass(workflow.status)}>
+                      {workflowStatusLabel(workflow.status)}
+                    </Badge>
+                    <div className="mt-1">
+                      Final: {formatCurrency(workflow.finalAmount)}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1452,7 +1566,13 @@ Estado: ${record.status}`}</title>
   );
 }
 
-function ManagerProfile({ record }: { record: ManagerBonusRecord }) {
+function ManagerProfile({
+  record,
+  workflow,
+}: {
+  record: ManagerBonusRecord;
+  workflow: BonusWorkflowItem;
+}) {
   return (
     <section className="rounded-md border bg-card p-4">
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -1469,7 +1589,9 @@ function ManagerProfile({ record }: { record: ManagerBonusRecord }) {
           <Badge className={bonusStateClass(record.bonusState)}>
             {record.bonusState}
           </Badge>
-          <Badge variant="outline">{record.approvalStatus}</Badge>
+          <Badge className={workflowStatusClass(workflow.status)}>
+            {workflowStatusLabel(workflow.status)}
+          </Badge>
         </div>
       </div>
 
@@ -1478,8 +1600,8 @@ function ManagerProfile({ record }: { record: ManagerBonusRecord }) {
           { label: "Score total", value: `${record.score}`, note: `${record.scoreDelta >= 0 ? "+" : ""}${record.scoreDelta} pts vs periodo anterior` },
           { label: "Rol evaluado", value: record.managerRole, note: `${record.branchesInScope.length} sucursal(es) en alcance` },
           { label: "Cumplimiento", value: formatRate(record.targetCompletionRate), note: "meta aprobada del periodo" },
-          { label: "Bono propuesto", value: formatCurrency(record.bonusRecommended), note: `${record.bonusBand} / ${record.bonusState}` },
-          { label: "Bono aprobado", value: record.bonusApproved > 0 ? formatCurrency(record.bonusApproved) : "Pendiente", note: record.approvalStatus },
+          { label: "Bono recomendado", value: formatCurrency(workflow.recommendedAmount), note: `${record.bonusBand} / monto original preservado` },
+          { label: "Bono final", value: workflow.status === "SYSTEM_RECOMMENDED" ? "Pendiente" : formatCurrency(workflow.finalAmount), note: workflowStatusLabel(workflow.status) },
           { label: "Bloqueos", value: `${record.blockingConditions.length}`, note: record.principalGap },
           { label: "Fortaleza", value: record.principalStrength, note: "dimension principal" },
           { label: "Accion", value: record.goalType, note: record.recommendedAction },
@@ -1497,7 +1619,7 @@ function ManagerProfile({ record }: { record: ManagerBonusRecord }) {
         <p className="mt-1">{record.whyBonus}</p>
         <p className="mt-1 text-xs">
           Periodo {record.period}. Cierre {record.closingStatus}. Formula{" "}
-          {record.formulaVersion}. {record.approvalReason}
+          {record.formulaVersion}. {workflow.reason ?? record.approvalReason}
         </p>
       </div>
 
@@ -1555,6 +1677,317 @@ function ManagerProfile({ record }: { record: ManagerBonusRecord }) {
           </div>
         </div>
       </div>
+    </section>
+  );
+}
+
+function BonusDecisionWorkflow({
+  onDecision,
+  pending,
+  record,
+  workflow,
+}: {
+  onDecision: (
+    record: ManagerBonusRecord,
+    action: BonusDecisionAction,
+    payload?: { finalAmount?: number; reason?: string },
+  ) => Promise<void>;
+  pending: boolean;
+  record: ManagerBonusRecord;
+  workflow: BonusWorkflowItem;
+}) {
+  const [modal, setModal] = useState<BonusDecisionModalState | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const canDecide =
+    workflow.status === "SYSTEM_RECOMMENDED" &&
+    (workflow.canApprove || workflow.canReject || workflow.canAdjust);
+
+  async function approve() {
+    setLocalError(null);
+    try {
+      await onDecision(record, "approve");
+    } catch (error) {
+      setLocalError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo aprobar el bono.",
+      );
+    }
+  }
+
+  async function submitModal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!modal) {
+      return;
+    }
+
+    const reason = modal.reason.trim();
+
+    if (!reason) {
+      setLocalError("El motivo es obligatorio para esta decision.");
+      return;
+    }
+
+    const finalAmount =
+      modal.action === "adjust" ? Number(modal.amount) : undefined;
+
+    setLocalError(null);
+
+    try {
+      await onDecision(record, modal.action, {
+        finalAmount,
+        reason,
+      });
+      setModal(null);
+    } catch (error) {
+      setLocalError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo registrar la decision.",
+      );
+    }
+  }
+
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="grid gap-1">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <BadgeDollarSign className="size-4 text-primary" />
+            Workflow auditable de bono
+          </div>
+          <p className="text-xs leading-5 text-muted-foreground">
+            La decision se registra server-side. El score original, monto
+            recomendado y desglose no se modifican despues de decidir.
+          </p>
+        </div>
+        <Badge className={workflowStatusClass(workflow.status)}>
+          {workflowStatusLabel(workflow.status)}
+        </Badge>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+        {[
+          {
+            label: "BONO RECOMENDADO",
+            note: "monto calculado por el sistema",
+            value: formatCurrency(workflow.recommendedAmount),
+          },
+          {
+            label: "BONO FINAL",
+            note:
+              workflow.status === "SYSTEM_RECOMMENDED"
+                ? "pendiente de decision"
+                : workflowStatusLabel(workflow.status),
+            value:
+              workflow.status === "SYSTEM_RECOMMENDED"
+                ? "Pendiente"
+                : formatCurrency(workflow.finalAmount),
+          },
+          {
+            label: "SCORE",
+            note: "score original preservado",
+            value: `${workflow.scoreOriginal}/100`,
+          },
+          {
+            label: "Gerente",
+            note: record.managerRole,
+            value: record.manager,
+          },
+          {
+            label: "Periodo",
+            note: record.line,
+            value: workflow.period,
+          },
+        ].map((item) => (
+          <article className="rounded-md border bg-background p-3" key={item.label}>
+            <div className="text-xs font-medium text-muted-foreground">
+              {item.label}
+            </div>
+            <div className="mt-1 text-lg font-semibold tracking-normal">
+              {item.value}
+            </div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {item.note}
+            </p>
+          </article>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_320px]">
+        <div className="rounded-md border bg-background p-3">
+          <div className="mb-3 text-sm font-medium">Desglose original</div>
+          <div className="grid gap-2">
+            {record.dimensions.map((dimension) => (
+              <div
+                className="grid gap-1 rounded-md border bg-card p-2 text-xs"
+                key={`${record.id}-${dimension.id}-workflow`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium">{dimension.label}</span>
+                  <span className="text-muted-foreground">
+                    {dimension.score}/100 · {dimension.points} pts
+                  </span>
+                </div>
+                <ProgressBar value={dimension.score} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-3 rounded-md border bg-background p-3">
+          <div className="text-sm font-medium">Decision</div>
+          {workflow.status !== "SYSTEM_RECOMMENDED" ? (
+            <div className="rounded-md border bg-card p-3 text-xs leading-5 text-muted-foreground">
+              <div className="font-medium text-foreground">
+                {workflowStatusLabel(workflow.status)}
+              </div>
+              <div>Usuario: {workflow.userEmail || "Auditoria interna"}</div>
+              <div>Fecha: {workflow.decidedAt || "Pendiente"}</div>
+              {workflow.reason ? <div>Motivo: {workflow.reason}</div> : null}
+            </div>
+          ) : canDecide ? (
+            <div className="grid gap-2">
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pending || !workflow.canApprove}
+                onClick={approve}
+                type="button"
+              >
+                {pending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4" />
+                )}
+                Aprobar
+              </button>
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pending || !workflow.canAdjust}
+                onClick={() =>
+                  setModal({
+                    action: "adjust",
+                    amount: String(workflow.recommendedAmount),
+                    reason: "",
+                  })
+                }
+                type="button"
+              >
+                <Pencil className="size-4" />
+                Ajustar
+              </button>
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pending || !workflow.canReject}
+                onClick={() =>
+                  setModal({
+                    action: "reject",
+                    amount: "0",
+                    reason: "",
+                  })
+                }
+                type="button"
+              >
+                <XCircle className="size-4" />
+                Rechazar
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-md border bg-card p-3 text-xs leading-5 text-muted-foreground">
+              Tu rol puede consultar este bono, pero no aprobarlo,
+              modificarlo ni rechazarlo.
+            </div>
+          )}
+
+          {localError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-800">
+              {localError}
+            </div>
+          ) : null}
+
+          <div className="rounded-md border bg-card p-3 text-xs leading-5 text-muted-foreground">
+            Auditoria: {workflow.auditEvents.length} evento(s). No ejecuta
+            pagos ni envia datos a nomina.
+          </div>
+        </div>
+      </div>
+
+      {modal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <form
+            className="grid w-full max-w-lg gap-4 rounded-md border bg-background p-5 shadow-xl"
+            onSubmit={submitModal}
+          >
+            <div className="grid gap-1">
+              <h3 className="text-lg font-semibold tracking-normal">
+                {modal.action === "adjust" ? "Ajustar bono" : "Rechazar bono"}
+              </h3>
+              <p className="text-sm leading-6 text-muted-foreground">
+                El motivo queda registrado en auditoria junto con usuario,
+                fecha, monto recomendado y monto final.
+              </p>
+            </div>
+            <div className="grid gap-3 rounded-md border bg-muted/40 p-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span>Monto recomendado</span>
+                <span className="font-medium">
+                  {formatCurrency(workflow.recommendedAmount)}
+                </span>
+              </div>
+              {modal.action === "adjust" ? (
+                <label className="grid gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Monto nuevo
+                  </span>
+                  <input
+                    className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    max="200"
+                    min="100"
+                    onChange={(event) =>
+                      setModal({ ...modal, amount: event.target.value })
+                    }
+                    step="1"
+                    type="number"
+                    value={modal.amount}
+                  />
+                </label>
+              ) : null}
+              <label className="grid gap-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Motivo obligatorio
+                </span>
+                <textarea
+                  className="min-h-28 rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onChange={(event) =>
+                    setModal({ ...modal, reason: event.target.value })
+                  }
+                  placeholder="Explica la razon de negocio y evidencia usada."
+                  value={modal.reason}
+                />
+              </label>
+            </div>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                className="h-10 rounded-md border px-4 text-sm font-medium hover:bg-muted"
+                disabled={pending}
+                onClick={() => setModal(null)}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pending}
+                type="submit"
+              >
+                {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+                Registrar decision
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1685,8 +2118,79 @@ function BonusSimulator({ record }: { record: ManagerBonusRecord }) {
 
 export function ManagerBonusDashboard() {
   const [context, setContext] = useState<StoredContext | null>(null);
+  const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
   const [filters, setFilters] = useState(createDefaultFilters);
+  const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [workflowItems, setWorkflowItems] = useState<BonusWorkflowItem[]>([]);
+  const [workflowLoaded, setWorkflowLoaded] = useState(false);
+
+  const refreshBonusWorkflow = useCallback(async () => {
+    setWorkflowError(null);
+
+    try {
+      const response = await fetch("/api/bonuses/decisions", {
+        cache: "no-store",
+      });
+      const payload = (await response.json().catch(() => ({}))) as BonusWorkflowResponse;
+
+      if (!response.ok || payload.ok !== true || !Array.isArray(payload.items)) {
+        throw new Error("No se pudo cargar el workflow de bonos.");
+      }
+
+      setWorkflowItems(payload.items);
+      setWorkflowLoaded(true);
+    } catch (error) {
+      setWorkflowItems([]);
+      setWorkflowLoaded(true);
+      setWorkflowError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo cargar el workflow de bonos.",
+      );
+    }
+  }, []);
+
+  async function submitBonusDecision(
+    record: ManagerBonusRecord,
+    action: BonusDecisionAction,
+    payload: { finalAmount?: number; reason?: string } = {},
+  ) {
+    setDecisionNotice(null);
+    setPendingDecisionId(record.id);
+
+    try {
+      const response = await fetch("/api/bonuses/decisions", {
+        body: JSON.stringify({
+          action,
+          bonusRecommendationId: record.id,
+          finalAmount: payload.finalAmount,
+          reason: payload.reason,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      const result = (await response.json().catch(() => ({}))) as BonusDecisionResponse;
+
+      if (!response.ok || result.ok !== true || !result.item) {
+        throw new Error(result.error ?? "No se pudo registrar la decision.");
+      }
+
+      setWorkflowItems((currentItems) =>
+        currentItems.map((item) =>
+          item.bonusRecommendationId === record.id ? result.item! : item,
+        ),
+      );
+      setDecisionNotice(
+        `${workflowStatusLabel(result.item.status)} registrado para ${record.manager}.`,
+      );
+    } finally {
+      setPendingDecisionId(null);
+    }
+  }
 
   useEffect(() => {
     function refreshContext() {
@@ -1703,10 +2207,25 @@ export function ManagerBonusDashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    void refreshBonusWorkflow();
+  }, [refreshBonusWorkflow]);
+
   const lineSlug = useMemo(() => resolveContextLine(context), [context]);
   const screen = useMemo(() => getManagerBonusScreen(lineSlug), [lineSlug]);
+  const workflowById = useMemo(
+    () =>
+      new Map(
+        workflowItems.map((item) => [item.bonusRecommendationId, item]),
+      ),
+    [workflowItems],
+  );
   const contextRecords = useMemo(() => {
-    let records = screen.records;
+    if (!workflowLoaded) {
+      return [];
+    }
+
+    let records = screen.records.filter((record) => workflowById.has(record.id));
     const branchName = context?.branchName;
     const managerName = context?.managerName;
 
@@ -1724,7 +2243,13 @@ export function ManagerBonusDashboard() {
     }
 
     return records;
-  }, [context?.branchName, context?.managerName, screen.records]);
+  }, [
+    context?.branchName,
+    context?.managerName,
+    screen.records,
+    workflowById,
+    workflowLoaded,
+  ]);
   const filteredRecords = useMemo(
     () =>
       contextRecords.filter(
@@ -1753,6 +2278,9 @@ export function ManagerBonusDashboard() {
     filteredRecords.find((record) => record.id === selectedId) ??
     filteredRecords[0] ??
     null;
+  const selectedWorkflow = selectedRecord
+    ? (workflowById.get(selectedRecord.id) ?? defaultWorkflowItem(selectedRecord))
+    : null;
   const chart = useMemo(
     () => buildManagerBonusTrendChart(filteredRecords),
     [filteredRecords],
@@ -1786,6 +2314,25 @@ export function ManagerBonusDashboard() {
         </div>
         <ScopeCard context={context} lineSlug={lineSlug} />
       </div>
+
+      {!workflowLoaded ? (
+        <section className="flex items-center gap-2 rounded-md border bg-card p-4 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin text-primary" />
+          Cargando permisos y auditoria de bonos...
+        </section>
+      ) : null}
+
+      {workflowError ? (
+        <section className="rounded-md border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
+          {workflowError}
+        </section>
+      ) : null}
+
+      {decisionNotice ? (
+        <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
+          {decisionNotice}
+        </section>
+      ) : null}
 
       <ManagerFiltersPanel
         filters={filters}
@@ -1837,6 +2384,7 @@ export function ManagerBonusDashboard() {
                     onSelect={setSelectedId}
                     records={filteredRecords}
                     selectedId={selectedRecord.id}
+                    workflowById={workflowById}
                   />
                   <div className="grid gap-4 xl:grid-cols-2">
                     <ScoreDimensionBars record={selectedRecord} />
@@ -1892,9 +2440,18 @@ export function ManagerBonusDashboard() {
             label: "Detalle y simulacion",
             description: "Perfil, causa y cambio posible del bono.",
             children:
-              filteredRecords.length > 0 && selectedRecord ? (
+              filteredRecords.length > 0 && selectedRecord && selectedWorkflow ? (
                 <>
-                  <ManagerProfile record={selectedRecord} />
+                  <ManagerProfile
+                    record={selectedRecord}
+                    workflow={selectedWorkflow}
+                  />
+                  <BonusDecisionWorkflow
+                    onDecision={submitBonusDecision}
+                    pending={pendingDecisionId === selectedRecord.id}
+                    record={selectedRecord}
+                    workflow={selectedWorkflow}
+                  />
                   <BonusSimulator record={selectedRecord} />
                   <section className="rounded-md border bg-muted p-4 text-sm leading-6 text-muted-foreground">
                     <div className="mb-2 flex items-center gap-2 font-medium text-foreground">
