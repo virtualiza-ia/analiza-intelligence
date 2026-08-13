@@ -25,8 +25,10 @@ import {
 } from "@/lib/analytics/business-line-operations";
 import {
   buildManagerBonusTrendChart,
+  getManagerBonusBacktest,
   getManagerBonusScreen,
   type BonusState,
+  type BonusBacktestSummary,
   type ManagerBonusMetric,
   type ManagerBonusRecord,
   type ManagerBonusStatus,
@@ -57,6 +59,7 @@ type StoredContext = {
 type ManagerFilters = {
   bonusState: string;
   goalType: string;
+  managerRole: string;
   managerType: string;
   status: string;
 };
@@ -68,7 +71,7 @@ type SortKey =
   | "utility"
   | "occupancyRate"
   | "dataQuality"
-  | "bonusProjected"
+  | "bonusRecommended"
   | "blockers";
 
 function readStoredContext() {
@@ -117,6 +120,7 @@ function createDefaultFilters(): ManagerFilters {
   return {
     bonusState: allOption,
     goalType: allOption,
+    managerRole: allOption,
     managerType: allOption,
     status: allOption,
   };
@@ -159,19 +163,15 @@ function statusClass(status: ManagerBonusStatus) {
 }
 
 function bonusStateClass(state: BonusState) {
-  if (state === "Aprobado" || state === "Pagado") {
+  if (state === "ELIGIBLE") {
     return "bg-emerald-100 text-emerald-800 hover:bg-emerald-100";
   }
 
-  if (state === "Bloqueado") {
+  if (state === "NOT ELIGIBLE") {
     return "bg-red-100 text-red-800 hover:bg-red-100";
   }
 
-  if (
-    state === "Retenido" ||
-    state === "Observado" ||
-    state === "Pendiente de datos"
-  ) {
+  if (state === "REVIEW REQUIRED") {
     return "bg-amber-100 text-amber-800 hover:bg-amber-100";
   }
 
@@ -268,8 +268,13 @@ function ManagerFiltersPanel({
   }[] = [
     {
       key: "bonusState",
-      label: "Estado del bono",
+      label: "BONUS STATUS",
       options: uniqueOptions(records.map((record) => record.bonusState)),
+    },
+    {
+      key: "managerRole",
+      label: "Rol evaluado",
+      options: uniqueOptions(records.map((record) => record.managerRole)),
     },
     {
       key: "goalType",
@@ -401,6 +406,55 @@ function WeightModel({
           },
         ]}
       />
+    </section>
+  );
+}
+
+function BonusBacktestPanel({ backtest }: { backtest: BonusBacktestSummary }) {
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <div className="mb-4 grid gap-1">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Scale className="size-4 text-primary" />
+          Backtest de politica de bonos
+        </div>
+        <p className="text-xs leading-5 text-muted-foreground">
+          Prueba con datos DEMO existentes antes de aprobar formula real. No ejecuta pagos.
+        </p>
+      </div>
+      <div className="mb-4 grid gap-3 md:grid-cols-4">
+        {[
+          { label: "Registros", value: `${backtest.records}`, note: "sucursal + area" },
+          { label: "ELIGIBLE", value: `${backtest.eligible}`, note: "sin bloqueo activo" },
+          { label: "REVIEW REQUIRED", value: `${backtest.reviewRequired}`, note: "requiere evidencia" },
+          { label: "Promedio", value: formatCurrency(backtest.averageRecommendedBonus), note: "con bono recomendado" },
+        ].map((item) => (
+          <article className="rounded-md border bg-background p-3" key={item.label}>
+            <div className="text-xs text-muted-foreground">{item.label}</div>
+            <div className="mt-1 text-lg font-semibold tracking-normal">{item.value}</div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.note}</p>
+          </article>
+        ))}
+      </div>
+      <div className="grid gap-2">
+        {backtest.findings.map((finding) => (
+          <div className="flex flex-col gap-2 rounded-md border bg-background p-3 text-xs sm:flex-row sm:items-start sm:justify-between" key={finding.check}>
+            <div>
+              <div className="font-medium">{finding.check}</div>
+              <p className="mt-1 leading-5 text-muted-foreground">{finding.result}</p>
+            </div>
+            <Badge
+              className={
+                finding.status === "PASS"
+                  ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
+                  : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+              }
+            >
+              {finding.status}
+            </Badge>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -606,9 +660,9 @@ function ManagerRankingTable({
     },
     { key: "dataQuality", label: "Datos", render: (record) => `${record.dataQuality}` },
     {
-      key: "bonusProjected",
-      label: "Bono",
-      render: (record) => formatCurrency(record.bonusProjected),
+      key: "bonusRecommended",
+      label: "Bono recomendado",
+      render: (record) => formatCurrency(record.bonusRecommended),
     },
     {
       key: "blockers",
@@ -628,6 +682,7 @@ function ManagerRankingTable({
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
               <th className="py-2 pr-4 font-medium">Gerente</th>
+              <th className="py-2 pr-4 font-medium">Rol</th>
               <th className="py-2 pr-4 font-medium">Sucursal</th>
               <th className="py-2 pr-4 font-medium">Linea</th>
               {columns.map((column) => (
@@ -657,6 +712,7 @@ function ManagerRankingTable({
                 onClick={() => onSelect(record.id)}
               >
                 <td className="py-3 pr-4 font-medium">{record.manager}</td>
+                <td className="py-3 pr-4">{record.managerRole}</td>
                 <td className="py-3 pr-4">
                   <div>{record.branch}</div>
                   <div className="text-xs text-muted-foreground">
@@ -680,7 +736,7 @@ function ManagerRankingTable({
                   </Badge>
                 </td>
                 <td className="max-w-[260px] py-3 pr-4 text-muted-foreground">
-                  {record.recommendedAction}
+                  {record.approvalStatus}: {record.recommendedAction}
                 </td>
               </tr>
             ))}
@@ -763,7 +819,7 @@ function ComplianceBonusChart({ records }: { records: ManagerBonusRecord[] }) {
   const padding = { bottom: 54, left: 48, right: 56, top: 20 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
-  const maxBonus = Math.max(...chartRecords.map((record) => record.bonusProjected), 1);
+  const maxBonus = Math.max(...chartRecords.map((record) => record.bonusRecommended), 1);
   const bonusCeiling = Math.ceil(maxBonus / 100) * 100;
   const bonusTicks = [0, bonusCeiling * 0.5, bonusCeiling];
   const yMax = 120;
@@ -779,7 +835,7 @@ function ComplianceBonusChart({ records }: { records: ManagerBonusRecord[] }) {
   const linePoints = chartRecords
     .map((record, index) => {
       const x = padding.left + (index + 0.5) * (plotWidth / Math.max(chartRecords.length, 1));
-      return `${x.toFixed(2)},${bonusY(record.bonusProjected).toFixed(2)}`;
+      return `${x.toFixed(2)},${bonusY(record.bonusRecommended).toFixed(2)}`;
     })
     .join(" ");
 
@@ -788,16 +844,16 @@ function ComplianceBonusChart({ records }: { records: ManagerBonusRecord[] }) {
       <div className="mb-4 grid gap-1">
         <div className="flex items-center gap-2 text-sm font-medium">
           <LineChart className="size-4 text-primary" />
-          Cumplimiento versus bono proyectado
+          Cumplimiento versus bono recomendado
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
-          Barras: cumplimiento de meta. Linea: bono proyectado. La linea punteada
+          Barras: cumplimiento de meta. Linea: bono recomendado. La linea punteada
           marca 100% de meta.
         </p>
       </div>
       <div className="overflow-x-auto">
         <svg
-          aria-label="Cumplimiento versus bono proyectado"
+          aria-label="Cumplimiento versus bono recomendado"
           className="h-80 min-w-[760px]"
           role="img"
           viewBox={`0 0 ${width} ${height}`}
@@ -855,7 +911,7 @@ function ComplianceBonusChart({ records }: { records: ManagerBonusRecord[] }) {
                 >
                   <title>{`${record.manager}
 Cumplimiento: ${formatRate(record.targetCompletionRate)}
-Bono proyectado: ${formatCurrency(record.bonusProjected)}
+Bono recomendado: ${formatCurrency(record.bonusRecommended)}
 Estado: ${record.bonusState}`}</title>
                 </rect>
                 <text fill="#64748b" fontSize="10" textAnchor="middle" x={x + barWidth / 2} y={height - 18}>
@@ -875,10 +931,10 @@ Estado: ${record.bonusState}`}</title>
           />
           {chartRecords.map((record, index) => {
             const x = padding.left + (index + 0.5) * (plotWidth / Math.max(chartRecords.length, 1));
-            const y = bonusY(record.bonusProjected);
+            const y = bonusY(record.bonusRecommended);
             return (
               <circle cx={x} cy={y} fill="#2563eb" key={`${record.id}-bonus`} r="5">
-                <title>{`${record.manager}: ${formatCurrency(record.bonusProjected)}`}</title>
+                <title>{`${record.manager}: ${formatCurrency(record.bonusRecommended)}`}</title>
               </circle>
             );
           })}
@@ -906,7 +962,7 @@ Estado: ${record.bonusState}`}</title>
           {
             color: "bg-blue-600",
             label: "Linea azul",
-            text: "bono proyectado en dolares; se lee con el eje derecho azul, no con el porcentaje.",
+            text: "bono recomendado en dolares; se lee con el eje derecho azul, no con el porcentaje.",
           },
           {
             color: "bg-emerald-600",
@@ -1037,7 +1093,7 @@ function ProfitabilityPerformanceMatrix({
                 <circle
                   cx={x}
                   cy={y}
-                  fill={record.bonusState === "Bloqueado" ? "#dc2626" : record.bonusState === "Retenido" ? "#f59e0b" : "#2563eb"}
+                  fill={record.bonusState === "NOT ELIGIBLE" ? "#dc2626" : record.bonusState === "REVIEW REQUIRED" ? "#f59e0b" : "#2563eb"}
                   opacity="0.84"
                   r={radius}
                   stroke="#ffffff"
@@ -1051,7 +1107,7 @@ Sucursal: ${record.branch}
 Score: ${record.score}
 Utilidad: ${formatCurrency(record.utility)}
 Venta: ${formatCurrency(record.netSales)}
-Bono: ${formatCurrency(record.bonusProjected)}
+Bono: ${formatCurrency(record.bonusRecommended)}
 Estado: ${record.bonusState}`}</title>
               </g>
             );
@@ -1088,17 +1144,17 @@ Estado: ${record.bonusState}`}</title>
           {
             color: "bg-blue-600",
             label: "Azul",
-            text: "bono proyectado o en revision sin bloqueo activo.",
+            text: "bono recomendado elegible para revision humana.",
           },
           {
             color: "bg-amber-500",
             label: "Naranja",
-            text: "bono retenido; requiere evidencia o validacion antes de aprobar.",
+            text: "requiere evidencia o validacion antes de aprobar.",
           },
           {
             color: "bg-red-600",
             label: "Rojo",
-            text: "bono bloqueado por una condicion critica.",
+            text: "no elegible por una condicion critica.",
           },
           {
             color: "bg-slate-500",
@@ -1126,7 +1182,7 @@ function BonusWaterfall({ record }: { record: ManagerBonusRecord }) {
           Composicion del bono
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
-          Bono potencial, ajustes, penalizaciones y bono proyectado.
+          Tope de politica, banda, elegibilidad y bono recomendado.
         </p>
       </div>
       <div className="grid gap-3">
@@ -1176,7 +1232,7 @@ function BonusWaterfall({ record }: { record: ManagerBonusRecord }) {
           {
             color: "bg-blue-600",
             label: "Azul",
-            text: "bono final proyectado antes de aprobacion.",
+            text: "bono recomendado antes de aprobacion.",
           },
           {
             color: "bg-slate-500",
@@ -1413,16 +1469,17 @@ function ManagerProfile({ record }: { record: ManagerBonusRecord }) {
           <Badge className={bonusStateClass(record.bonusState)}>
             {record.bonusState}
           </Badge>
+          <Badge variant="outline">{record.approvalStatus}</Badge>
         </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {[
           { label: "Score total", value: `${record.score}`, note: `${record.scoreDelta >= 0 ? "+" : ""}${record.scoreDelta} pts vs periodo anterior` },
+          { label: "Rol evaluado", value: record.managerRole, note: `${record.branchesInScope.length} sucursal(es) en alcance` },
           { label: "Cumplimiento", value: formatRate(record.targetCompletionRate), note: "meta aprobada del periodo" },
-          { label: "Bono potencial", value: formatCurrency(record.bonusPotential), note: `multiplicador ${(record.scoreMultiplier * 100).toFixed(0)}%` },
-          { label: "Bono proyectado", value: formatCurrency(record.bonusProjected), note: record.bonusState },
-          { label: "Bono aprobado", value: record.bonusApproved > 0 ? formatCurrency(record.bonusApproved) : "Pendiente", note: "requiere validacion final" },
+          { label: "Bono propuesto", value: formatCurrency(record.bonusRecommended), note: `${record.bonusBand} / ${record.bonusState}` },
+          { label: "Bono aprobado", value: record.bonusApproved > 0 ? formatCurrency(record.bonusApproved) : "Pendiente", note: record.approvalStatus },
           { label: "Bloqueos", value: `${record.blockingConditions.length}`, note: record.principalGap },
           { label: "Fortaleza", value: record.principalStrength, note: "dimension principal" },
           { label: "Accion", value: record.goalType, note: record.recommendedAction },
@@ -1433,6 +1490,15 @@ function ManagerProfile({ record }: { record: ManagerBonusRecord }) {
             <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.note}</p>
           </article>
         ))}
+      </div>
+
+      <div className="mt-4 rounded-md border bg-blue-50 p-3 text-sm leading-6 text-blue-950">
+        <div className="font-medium">Por que recibo este bono</div>
+        <p className="mt-1">{record.whyBonus}</p>
+        <p className="mt-1 text-xs">
+          Periodo {record.period}. Cierre {record.closingStatus}. Formula{" "}
+          {record.formulaVersion}. {record.approvalReason}
+        </p>
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
@@ -1472,12 +1538,12 @@ function ManagerProfile({ record }: { record: ManagerBonusRecord }) {
           <div className="mb-3 text-sm font-medium">Flujo de aprobacion</div>
           <div className="grid gap-2 text-xs">
             {[
+              "SYSTEM RECOMMENDS: sistema calcula score y bono sugerido",
               "Gerente visualiza calculo y agrega evidencia",
-              "Direccion revisa resultados de gestion",
-              "Finanzas valida utilidad, margen y cierres",
-              "Recursos Humanos aprueba pago",
-              "Auditoria consulta cambios y trazabilidad",
-              "Administrador configura reglas y pesos",
+              "Gerente de Operaciones o autoridad revisa",
+              "APPROVED, REJECTED o ADJUSTED WITH REASON",
+              "Auditoria consulta cambios, usuario, razon y evidencia",
+              "Nomina externa solo recibe resultado aprobado, no automatico",
             ].map((step, index) => (
               <div className="flex items-center gap-3 rounded-md border bg-card p-2" key={step}>
                 <div className="flex size-6 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
@@ -1504,31 +1570,37 @@ function BonusSimulator({ record }: { record: ManagerBonusRecord }) {
     setDataLift(4);
   }, [record.id]);
 
-  function multiplier(score: number) {
-    if (score < 70) {
-      return 0;
+  function recommendedBonus(score: number) {
+    if (score >= 95) {
+      return 200;
     }
 
-    if (score < 80) {
-      return 0.5;
+    if (score >= 89) {
+      return 175;
     }
 
-    if (score < 90) {
-      return 0.8;
+    if (score >= 82) {
+      return 150;
     }
 
-    return 1;
+    if (score >= 75) {
+      return 125;
+    }
+
+    if (score >= 70) {
+      return 100;
+    }
+
+    return 0;
   }
 
   const simulatedScore = Math.round(
     Math.min(100, record.score + occupancyLift * 0.35 + marginLift * 0.75 + dataLift * 0.25),
   );
-  const simulatedBonus = Math.round(
-    record.bonusPotential *
-      multiplier(simulatedScore) *
-      Math.min(1.1, record.fulfillmentFactor + marginLift / 100) *
-      Math.min(1.05, record.qualityFactor + dataLift / 180),
-  );
+  const simulatedBonus =
+    record.bonusState === "NOT ELIGIBLE" && record.dataQuality + dataLift < 70
+      ? 0
+      : recommendedBonus(simulatedScore);
 
   return (
     <section className="rounded-md border bg-card p-4">
@@ -1596,14 +1668,14 @@ function BonusSimulator({ record }: { record: ManagerBonusRecord }) {
             </div>
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">Bono proyectado</div>
+            <div className="text-xs text-muted-foreground">Bono recomendado</div>
             <div className="text-2xl font-semibold">
               {formatCurrency(simulatedBonus)}
             </div>
           </div>
           <p className="text-xs leading-5 text-muted-foreground">
             Si se corrigen estas brechas, el bono podria cambiar de{" "}
-            {formatCurrency(record.bonusProjected)} a {formatCurrency(simulatedBonus)}.
+            {formatCurrency(record.bonusRecommended)} a {formatCurrency(simulatedBonus)}.
           </p>
         </div>
       </div>
@@ -1659,6 +1731,7 @@ export function ManagerBonusDashboard() {
         (record) =>
           (filters.bonusState === allOption || record.bonusState === filters.bonusState) &&
           (filters.goalType === allOption || record.goalType === filters.goalType) &&
+          (filters.managerRole === allOption || record.managerRole === filters.managerRole) &&
           (filters.managerType === allOption || record.managerType === filters.managerType) &&
           (filters.status === allOption || record.status === filters.status),
       ),
@@ -1683,6 +1756,10 @@ export function ManagerBonusDashboard() {
   const chart = useMemo(
     () => buildManagerBonusTrendChart(filteredRecords),
     [filteredRecords],
+  );
+  const backtest = useMemo(
+    () => getManagerBonusBacktest(contextRecords),
+    [contextRecords],
   );
 
   return (
@@ -1726,6 +1803,7 @@ export function ManagerBonusDashboard() {
               <>
                 <ExecutiveManagerPerformanceTable records={filteredRecords} />
                 <GroupedMetrics metrics={screen.metrics} />
+                <BonusBacktestPanel backtest={backtest} />
                 <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
                   <WeightModel weights={screen.weights} />
                   <section className="rounded-md border bg-card p-4">
@@ -1751,7 +1829,7 @@ export function ManagerBonusDashboard() {
           {
             id: "bonos-gerentes",
             label: "Elegibilidad y bono",
-            description: "Ranking, dimensiones y bono proyectado.",
+            description: "Ranking, dimensiones, elegibilidad y bono recomendado.",
             children:
               filteredRecords.length > 0 && selectedRecord ? (
                 <>
@@ -1825,7 +1903,7 @@ export function ManagerBonusDashboard() {
                     </div>
                     <p>
                       Resultado de sucursal, desempeno del gerente, bono
-                      proyectado, bono aprobado, bloqueos, evidencia y
+                      recomendado, bono aprobado, bloqueos, evidencia y
                       trazabilidad se muestran por separado para que el calculo
                       no sea una caja negra.
                     </p>

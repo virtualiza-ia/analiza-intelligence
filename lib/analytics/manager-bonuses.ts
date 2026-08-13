@@ -21,15 +21,25 @@ export type ManagerBonusStatus =
   | "Sin datos suficientes";
 
 export type BonusState =
-  | "En calculo"
-  | "Pendiente de datos"
-  | "Proyectado"
-  | "En revision"
-  | "Observado"
-  | "Aprobado"
-  | "Retenido"
-  | "Bloqueado"
-  | "Pagado";
+  | "ELIGIBLE"
+  | "REVIEW REQUIRED"
+  | "NOT ELIGIBLE";
+
+export type BonusApprovalStatus =
+  | "SYSTEM RECOMMENDS"
+  | "APPROVED"
+  | "REJECTED"
+  | "ADJUSTED WITH REASON";
+
+export type BonusBand =
+  | "No bonus"
+  | "Satisfactory"
+  | "Strong"
+  | "High"
+  | "Outstanding"
+  | "Exceptional";
+
+export type ManagerRole = "Gerente de Sucursal" | "Gerente de Area";
 
 export type ManagerType =
   | "Gerente activo"
@@ -77,8 +87,12 @@ export type BonusWaterfallStep = {
 export type ManagerBonusRecord = {
   id: string;
   manager: string;
+  managerRole: ManagerRole;
   branch: string;
   branchCode: string;
+  period: string;
+  closingStatus: "PUBLISHED" | "INCOMPLETE" | "NOT PUBLISHED";
+  formulaVersion: string;
   line: "Laboratorio" | "Fisioterapia" | "Imagenes" | "Multiservicio";
   lineSlug: BusinessLineSlug;
   country: string;
@@ -102,11 +116,17 @@ export type ManagerBonusRecord = {
   criticalIncidents: number;
   bonusPotential: number;
   bonusProjected: number;
+  bonusRecommended: number;
   bonusApproved: number;
   bonusRetained: number;
   bonusBlocked: number;
   bonusPaid: number;
   bonusState: BonusState;
+  bonusBand: BonusBand;
+  approvalStatus: BonusApprovalStatus;
+  approvalReason: string;
+  whyBonus: string;
+  branchesInScope: string[];
   scoreMultiplier: number;
   fulfillmentFactor: number;
   qualityFactor: number;
@@ -147,6 +167,23 @@ export type ManagerBonusScreen = {
   executiveInsights: string[];
 };
 
+export type BonusBacktestFinding = {
+  check: string;
+  result: string;
+  status: "PASS" | "REVIEW";
+};
+
+export type BonusBacktestSummary = {
+  records: number;
+  eligible: number;
+  reviewRequired: number;
+  notEligible: number;
+  exceptional: number;
+  satisfactory: number;
+  averageRecommendedBonus: number;
+  findings: BonusBacktestFinding[];
+};
+
 const exactDateLabels = [
   "01/07/2026",
   "05/07/2026",
@@ -170,39 +207,32 @@ export const managerBonusWeightsByLine: Record<
   { dimension: string; weight: number }[]
 > = {
   consolidado: [
-    { dimension: "Resultado financiero", weight: 30 },
-    { dimension: "Operacion y productividad", weight: 20 },
-    { dimension: "Capacidad y ocupacion", weight: 15 },
-    { dimension: "Pacientes y crecimiento", weight: 10 },
-    { dimension: "Calidad y SLA", weight: 10 },
-    { dimension: "Gestion de personas", weight: 10 },
-    { dimension: "Calidad de datos y cumplimiento", weight: 5 },
+    { dimension: "Finanzas", weight: 30 },
+    { dimension: "Operacion", weight: 25 },
+    { dimension: "Metas", weight: 20 },
+    { dimension: "Eficiencia/calidad", weight: 15 },
+    { dimension: "Calidad dato", weight: 10 },
   ],
   laboratorio: [
     { dimension: "Finanzas", weight: 30 },
-    { dimension: "Operacion y SLA", weight: 25 },
-    { dimension: "Pacientes y canal medico", weight: 15 },
-    { dimension: "Inventario", weight: 15 },
-    { dimension: "Personas", weight: 10 },
-    { dimension: "Datos y cumplimiento", weight: 5 },
+    { dimension: "Operacion", weight: 25 },
+    { dimension: "Metas", weight: 20 },
+    { dimension: "Eficiencia/calidad", weight: 15 },
+    { dimension: "Calidad dato", weight: 10 },
   ],
   fisioterapia: [
     { dimension: "Finanzas", weight: 25 },
-    { dimension: "Ocupacion efectiva", weight: 20 },
-    { dimension: "Continuidad terapeutica", weight: 20 },
-    { dimension: "Pacientes y crecimiento", weight: 10 },
-    { dimension: "Calidad y experiencia", weight: 10 },
-    { dimension: "Gestion de personas", weight: 10 },
-    { dimension: "Datos", weight: 5 },
+    { dimension: "Operacion", weight: 30 },
+    { dimension: "Metas", weight: 20 },
+    { dimension: "Eficiencia/calidad", weight: 15 },
+    { dimension: "Calidad dato", weight: 10 },
   ],
   imagenes: [
-    { dimension: "Finanzas", weight: 25 },
-    { dimension: "Utilizacion y produccion", weight: 20 },
-    { dimension: "Disponibilidad tecnica", weight: 15 },
-    { dimension: "Informes y SLA", weight: 20 },
-    { dimension: "Calidad y experiencia", weight: 10 },
-    { dimension: "Personas", weight: 5 },
-    { dimension: "Datos", weight: 5 },
+    { dimension: "Finanzas", weight: 28 },
+    { dimension: "Operacion", weight: 27 },
+    { dimension: "Metas", weight: 20 },
+    { dimension: "Eficiencia/calidad", weight: 15 },
+    { dimension: "Calidad dato", weight: 10 },
   ],
 };
 
@@ -287,7 +317,7 @@ function buildBlockingConditions(
     });
   }
 
-  if (record.marginRate < 0.84) {
+  if (record.marginRate < 0.35) {
     conditions.push({
       category: "Financiero",
       reason: "Margen por debajo del minimo definido",
@@ -383,91 +413,67 @@ function buildBlockingConditions(
 
 function buildDimensions(
   record: BranchNetworkRecord,
-  index: number,
 ): ManagerScoreDimension[] {
   const financialScore = Math.round(
     clamp(
-      record.revenueShare > 0
-        ? record.targetGap + 100 + (record.marginRate - 0.84) * 80
-        : record.targetGap + 90,
+      record.targetGap + 92 + (record.marginRate - 0.35) * 120,
       48,
-      108,
+      100,
     ),
   );
   const operationalScore = Math.round(
-    clamp(record.operatingScore + (record.slaRate - 0.84) * 18, 45, 102),
+    clamp(
+      record.normalizedPerformanceScore * 0.45 +
+        record.occupancyRate * 45 +
+        record.productivityIndex * 0.2,
+      45,
+      100,
+    ),
   );
-  const occupancyScore = Math.round(clamp(record.occupancyRate * 100, 45, 100));
-  const patientScore = Math.round(
-    clamp(82 + record.growthRate * 110 + (record.recurrenceRate - 0.5) * 32, 48, 108),
+  const targetScore = Math.round(clamp(100 + record.targetGap, 45, 100));
+  const efficiencyQualityScore = Math.round(
+    clamp(record.slaRate * 55 + record.occupancyRate * 25 + record.recurrenceRate * 20, 45, 100),
   );
-  const qualityScore = Math.round(
-    clamp(record.slaRate * 72 + record.dataQuality * 0.28, 45, 100),
-  );
-  const peopleScore = Math.round(
-    clamp(87 - index * 2 - (record.scoreDelta < 0 ? 6 : 0), 54, 96),
-  );
-  const dataScore = Math.round(clamp(record.dataQuality, 45, 100));
-  const inventoryScore = Math.round(
-    clamp(92 - record.incidenceShare * 0.9 - (record.dataQuality < 80 ? 8 : 0), 48, 98),
-  );
-  const continuityScore = Math.round(
-    clamp(record.recurrenceRate * 82 + record.occupancyRate * 28, 48, 100),
-  );
-  const equipmentScore = Math.round(
-    clamp(record.occupancyRate * 72 + record.slaRate * 26, 48, 100),
+  const dataScore = Math.round(
+    clamp(record.dataQuality - record.outlierFlags.length * 2, 45, 100),
   );
 
   const source: Record<BusinessLineSlug, Omit<ManagerScoreDimension, "points">[]> = {
     consolidado: [
       {
         id: "financial",
-        label: "Resultado financiero",
+        label: "Finanzas",
         score: financialScore,
         weight: 30,
-        insight: "Venta, utilidad, margen y cumplimiento de meta.",
+        insight: "Margen, utilidad y cumplimiento financiero sin premiar venta absoluta.",
       },
       {
         id: "operation",
-        label: "Operacion y productividad",
+        label: "Operacion",
         score: operationalScore,
+        weight: 25,
+        insight: "Productividad, utilizacion y resultado normalizado.",
+      },
+      {
+        id: "targets",
+        label: "Metas",
+        score: targetScore,
         weight: 20,
-        insight: "Volumen, productividad y proceso operativo.",
+        insight: "Cumplimiento contra meta aprobada del periodo.",
       },
       {
-        id: "occupancy",
-        label: "Capacidad y ocupacion",
-        score: occupancyScore,
+        id: "efficiency",
+        label: "Eficiencia/calidad",
+        score: efficiencyQualityScore,
         weight: 15,
-        insight: "Uso efectivo de recursos disponibles.",
-      },
-      {
-        id: "patients",
-        label: "Pacientes y crecimiento",
-        score: patientScore,
-        weight: 10,
-        insight: "Crecimiento, recurrencia y flujo de pacientes.",
-      },
-      {
-        id: "quality",
-        label: "Calidad y SLA",
-        score: qualityScore,
-        weight: 10,
-        insight: "SLA, experiencia y reclamos.",
-      },
-      {
-        id: "people",
-        label: "Gestion de personas",
-        score: peopleScore,
-        weight: 10,
-        insight: "Rotacion, ausentismo, cobertura y equipo.",
+        insight: "SLA, ocupacion, continuidad y calidad operativa.",
       },
       {
         id: "data",
-        label: "Calidad de datos y cumplimiento",
+        label: "Calidad dato",
         score: dataScore,
-        weight: 5,
-        insight: "Plantillas, evidencia, auditoria y cierre.",
+        weight: 10,
+        insight: "Cierre publicado, completitud, consistencia y puntualidad.",
       },
     ],
     laboratorio: [
@@ -476,42 +482,35 @@ function buildDimensions(
         label: "Finanzas",
         score: financialScore,
         weight: 30,
-        insight: "Venta, margen, costo por orden, utilidad y compras urgentes.",
+        insight: "Facturacion contra meta, margen y utilidad sin premiar volumen puro.",
       },
       {
         id: "operation",
-        label: "Operacion y SLA",
+        label: "Operacion",
         score: operationalScore,
         weight: 25,
-        insight: "Ordenes, muestras, resultados, pendientes y SLA.",
+        insight: "Pruebas, productividad, throughput disponible y operacion diaria.",
       },
       {
-        id: "patients",
-        label: "Pacientes y canal medico",
-        score: patientScore,
+        id: "targets",
+        label: "Metas",
+        score: targetScore,
+        weight: 20,
+        insight: "Cumplimiento contra meta aprobada de laboratorio.",
+      },
+      {
+        id: "efficiency",
+        label: "Eficiencia/calidad",
+        score: efficiencyQualityScore,
         weight: 15,
-        insight: "Pacientes, medicos activos, ticket y conversion.",
-      },
-      {
-        id: "inventory",
-        label: "Inventario",
-        score: inventoryScore,
-        weight: 15,
-        insight: "Reactivos, vencimientos, diferencias y rendimiento esperado.",
-      },
-      {
-        id: "people",
-        label: "Personas",
-        score: peopleScore,
-        weight: 10,
-        insight: "Cobertura tecnica, rotacion, ausentismo y turnos.",
+        insight: "SLA, calidad, TAT cuando exista y estabilidad operativa.",
       },
       {
         id: "data",
-        label: "Datos y cumplimiento",
+        label: "Calidad dato",
         score: dataScore,
-        weight: 5,
-        insight: "Plantillas, auditoria, protocolos y evidencia.",
+        weight: 10,
+        insight: "Cierre, trazabilidad, calidad y puntualidad del dato.",
       },
     ],
     fisioterapia: [
@@ -523,46 +522,32 @@ function buildDimensions(
         insight: "Venta, margen por sesion, utilidad y no-show monetizado.",
       },
       {
-        id: "occupancy",
-        label: "Ocupacion efectiva",
-        score: occupancyScore,
+        id: "operation",
+        label: "Operacion",
+        score: operationalScore,
+        weight: 30,
+        insight: "Ocupacion efectiva, sesiones atendidas y productividad disponible.",
+      },
+      {
+        id: "targets",
+        label: "Metas",
+        score: targetScore,
         weight: 20,
-        insight: "Horas atendidas contra horas disponibles.",
+        insight: "Cumplimiento contra meta aprobada de fisioterapia.",
       },
       {
-        id: "continuity",
-        label: "Continuidad terapeutica",
-        score: continuityScore,
-        weight: 20,
-        insight: "Planes iniciados, completados, abandono y recurrencia.",
-      },
-      {
-        id: "patients",
-        label: "Pacientes y crecimiento",
-        score: patientScore,
-        weight: 10,
-        insight: "Pacientes nuevos, recurrentes y frecuencia.",
-      },
-      {
-        id: "quality",
-        label: "Calidad y experiencia",
-        score: qualityScore,
-        weight: 10,
-        insight: "Satisfaccion, reclamos y tiempo de espera.",
-      },
-      {
-        id: "people",
-        label: "Gestion de personas",
-        score: peopleScore,
-        weight: 10,
-        insight: "Productividad por fisioterapeuta, rotacion y carga.",
+        id: "efficiency",
+        label: "Eficiencia/calidad",
+        score: efficiencyQualityScore,
+        weight: 15,
+        insight: "No-show proxy, cancelacion, continuidad y calidad de atencion.",
       },
       {
         id: "data",
-        label: "Datos",
+        label: "Calidad dato",
         score: dataScore,
-        weight: 5,
-        insight: "Estados de citas, evidencia y cargas a tiempo.",
+        weight: 10,
+        insight: "Cierre, agenda, evidencia y cargas a tiempo.",
       },
     ],
     imagenes: [
@@ -570,55 +555,126 @@ function buildDimensions(
         id: "financial",
         label: "Finanzas",
         score: financialScore,
-        weight: 25,
+        weight: 28,
         insight: "Venta, margen por modalidad, utilidad y estudios sin facturar.",
       },
       {
         id: "operation",
-        label: "Utilizacion y produccion",
+        label: "Operacion",
         score: operationalScore,
-        weight: 20,
-        insight: "Estudios realizados, productividad y repeticiones.",
+        weight: 27,
+        insight: "Estudios, productividad y utilizacion de capacidad disponible.",
       },
       {
-        id: "equipment",
-        label: "Disponibilidad tecnica",
-        score: equipmentScore,
+        id: "targets",
+        label: "Metas",
+        score: targetScore,
+        weight: 20,
+        insight: "Cumplimiento contra meta aprobada de imagenes.",
+      },
+      {
+        id: "efficiency",
+        label: "Eficiencia/calidad",
+        score: efficiencyQualityScore,
         weight: 15,
-        insight: "Disponibilidad de equipo, mantenimiento y tiempo muerto.",
-      },
-      {
-        id: "quality",
-        label: "Informes y SLA",
-        score: qualityScore,
-        weight: 20,
-        insight: "Informes pendientes, entregados y dentro de SLA.",
-      },
-      {
-        id: "experience",
-        label: "Calidad y experiencia",
-        score: Math.round(clamp((qualityScore + patientScore) / 2, 45, 100)),
-        weight: 10,
-        insight: "Reclamos, preparacion, espera y entrega.",
-      },
-      {
-        id: "people",
-        label: "Personas",
-        score: peopleScore,
-        weight: 5,
-        insight: "Tecnicos, lectura, ausentismo y cobertura de turnos.",
+        insight: "Informes, SLA, TAT cuando exista y disponibilidad tecnica.",
       },
       {
         id: "data",
-        label: "Datos",
+        label: "Calidad dato",
         score: dataScore,
-        weight: 5,
+        weight: 10,
         insight: "RIS/PACS, evidencia y trazabilidad.",
       },
     ],
   };
 
   return source[record.lineSlug].map((dimension) => ({
+    ...dimension,
+    points: Number(((dimension.score * dimension.weight) / 100).toFixed(1)),
+  }));
+}
+
+function buildAreaDimensions(
+  records: BranchNetworkRecord[],
+): ManagerScoreDimension[] {
+  const branchCount = Math.max(records.length, 1);
+  const branchesOnTarget =
+    records.filter((record) => record.targetGap >= 0).length / branchCount;
+  const consolidatedScore =
+    records.reduce((sum, record) => sum + record.normalizedPerformanceScore, 0) /
+    branchCount;
+  const laggingRecords = records.filter((record) => record.normalizedPerformanceScore < 78);
+  const laggingImprovement =
+    laggingRecords.length === 0
+      ? 92
+      : clamp(
+          76 +
+            (laggingRecords.reduce((sum, record) => sum + record.scoreDelta, 0) /
+              laggingRecords.length) *
+              3,
+          45,
+          100,
+        );
+  const efficiencyMargin = Math.round(
+    clamp(
+      records.reduce(
+        (sum, record) =>
+          sum + record.marginRate * 45 + record.occupancyRate * 35 + record.slaRate * 20,
+        0,
+      ) / branchCount,
+      45,
+      100,
+    ),
+  );
+  const closingQuality = Math.round(
+    clamp(
+      records.reduce((sum, record) => sum + record.dataQuality, 0) / branchCount -
+        records.filter((record) => record.outlierFlags.length > 0).length * 2,
+      45,
+      100,
+    ),
+  );
+
+  const dimensions: Omit<ManagerScoreDimension, "points">[] = [
+    {
+      id: "area-targets",
+      label: "Sucursales en meta",
+      score: Math.round(clamp(branchesOnTarget * 100, 45, 100)),
+      weight: 25,
+      insight: "Porcentaje de sucursales del area que cumplen metas aprobadas.",
+    },
+    {
+      id: "area-consolidated",
+      label: "Resultado consolidado",
+      score: Math.round(clamp(consolidatedScore, 45, 100)),
+      weight: 20,
+      insight: "Resultado promedio normalizado, no suma simple de venta.",
+    },
+    {
+      id: "area-lagging",
+      label: "Mejora de rezagadas",
+      score: Math.round(laggingImprovement),
+      weight: 20,
+      insight: "Avance de sucursales con brecha o score bajo.",
+    },
+    {
+      id: "area-efficiency",
+      label: "Eficiencia y margen",
+      score: efficiencyMargin,
+      weight: 15,
+      insight: "Margen, productividad y capacidad sin depender de volumen.",
+    },
+    {
+      id: "area-data",
+      label: "Puntualidad/calidad cierres",
+      score: closingQuality,
+      weight: 20,
+      insight: "Cierres publicados, datos completos e inconsistencias resueltas.",
+    },
+  ];
+
+  return dimensions.map((dimension) => ({
     ...dimension,
     points: Number(((dimension.score * dimension.weight) / 100).toFixed(1)),
   }));
@@ -680,84 +736,92 @@ function getBonusState(
   score: number,
   dataQuality: number,
   conditions: BonusBlockingCondition[],
+  record: BranchNetworkRecord,
 ): BonusState {
-  if (dataQuality < 72) {
-    return "Pendiente de datos";
+  if (
+    dataQuality < 70 ||
+    score < 70 ||
+    conditions.some((condition) => condition.state === "Bloquea")
+  ) {
+    return "NOT ELIGIBLE";
   }
 
-  if (score < 70 || conditions.some((condition) => condition.state === "Bloquea")) {
-    return "Bloqueado";
+  if (
+    dataQuality < 82 ||
+    conditions.length > 0 ||
+    record.outlierFlags.some((flag) => flag.severity === "critical")
+  ) {
+    return "REVIEW REQUIRED";
   }
 
-  if (conditions.some((condition) => condition.state === "Retiene")) {
-    return "Retenido";
-  }
-
-  if (conditions.some((condition) => condition.state === "Pendiente")) {
-    return "Observado";
-  }
-
-  if (score >= 92) {
-    return "Aprobado";
-  }
-
-  if (score >= 86) {
-    return "En revision";
-  }
-
-  return "Proyectado";
+  return "ELIGIBLE";
 }
 
-function buildWaterfall(
-  bonusPotential: number,
-  scoreMultiplier: number,
-  fulfillmentFactor: number,
-  qualityFactor: number,
-  penalties: number,
-) {
-  const scoreAdjusted = Math.round(bonusPotential * scoreMultiplier);
-  const fulfillmentAdjusted = Math.round(scoreAdjusted * fulfillmentFactor);
-  const qualityAdjusted = Math.round(fulfillmentAdjusted * qualityFactor);
-  const projected = Math.max(0, qualityAdjusted - penalties);
+function getBonusBand(score: number): { amount: number; band: BonusBand } {
+  if (score >= 95) {
+    return { amount: 200, band: "Exceptional" };
+  }
+
+  if (score >= 89) {
+    return { amount: 175, band: "Outstanding" };
+  }
+
+  if (score >= 82) {
+    return { amount: 150, band: "High" };
+  }
+
+  if (score >= 75) {
+    return { amount: 125, band: "Strong" };
+  }
+
+  if (score >= 70) {
+    return { amount: 100, band: "Satisfactory" };
+  }
+
+  return { amount: 0, band: "No bonus" };
+}
+
+function buildWaterfall({
+  band,
+  bonusCap,
+  bonusRecommended,
+  eligibilityStatus,
+}: {
+  band: BonusBand;
+  bonusCap: number;
+  bonusRecommended: number;
+  eligibilityStatus: BonusState;
+}) {
+  const scoreBandAmount = eligibilityStatus === "NOT ELIGIBLE" ? 0 : bonusRecommended;
+  const eligibilityAdjustment =
+    eligibilityStatus === "NOT ELIGIBLE" ? -scoreBandAmount : 0;
 
   return {
-    projected,
+    projected: bonusRecommended,
     waterfall: [
       {
-        label: "Bono potencial",
-        amount: bonusPotential,
+        label: "Rango maximo",
+        amount: bonusCap,
         kind: "base" as const,
-        note: "Monto base segun nivel y sucursal.",
+        note: "Tope mensual aprobado para recomendacion.",
       },
       {
-        label: "Multiplicador score",
-        amount: scoreAdjusted - bonusPotential,
+        label: `Banda ${band}`,
+        amount: scoreBandAmount - bonusCap,
         kind: "adjustment" as const,
-        note: `Multiplicador ${(scoreMultiplier * 100).toFixed(0)}%.`,
+        note: "Monto discreto segun score transparente.",
       },
       {
-        label: "Cumplimiento",
-        amount: fulfillmentAdjusted - scoreAdjusted,
+        label: "Elegibilidad",
+        amount: eligibilityAdjustment,
         kind: "adjustment" as const,
-        note: `Factor ${(fulfillmentFactor * 100).toFixed(0)}%.`,
+        note: `BONUS STATUS: ${eligibilityStatus}.`,
       },
       {
-        label: "Calidad y datos",
-        amount: qualityAdjusted - fulfillmentAdjusted,
-        kind: "adjustment" as const,
-        note: `Factor ${(qualityFactor * 100).toFixed(0)}%.`,
-      },
-      {
-        label: "Penalizaciones",
-        amount: -penalties,
-        kind: "adjustment" as const,
-        note: "Bloqueos, retenciones y reducciones.",
-      },
-      {
-        label: "Bono proyectado",
-        amount: projected,
+        label: "Bono recomendado",
+        amount: bonusRecommended,
         kind: "final" as const,
-        note: "Resultado antes de aprobacion final.",
+        note: "Requiere revision humana antes de nomina.",
       },
     ],
   };
@@ -771,22 +835,22 @@ function buildReductionCauses(
   const causes = [
     {
       cause: "Utilidad bajo meta",
-      amount: Math.max(0, Math.round((1 - (1 + record.targetGap / 100)) * 600)),
+      amount: Math.max(0, Math.round((1 - (1 + record.targetGap / 100)) * 100)),
       count: record.targetGap < 0 ? 1 : 0,
     },
     {
       cause: "Margen bajo",
-      amount: Math.max(0, Math.round((0.86 - record.marginRate) * 1400)),
-      count: record.marginRate < 0.86 ? 1 : 0,
+      amount: Math.max(0, Math.round((0.42 - record.marginRate) * 180)),
+      count: record.marginRate < 0.42 ? 1 : 0,
     },
     {
       cause: "SLA",
-      amount: Math.max(0, Math.round((0.9 - record.slaRate) * 900)),
+      amount: Math.max(0, Math.round((0.9 - record.slaRate) * 140)),
       count: record.slaRate < 0.9 ? 1 : 0,
     },
     {
       cause: "Calidad de datos",
-      amount: Math.max(0, Math.round((85 - record.dataQuality) * 18)),
+      amount: Math.max(0, Math.round((85 - record.dataQuality) * 2)),
       count: record.dataQuality < 85 ? 1 : 0,
     },
     {
@@ -796,7 +860,7 @@ function buildReductionCauses(
     },
     {
       cause: "Rotacion",
-      amount: conditions.some((condition) => condition.category === "Personas") ? 120 : 0,
+      amount: conditions.some((condition) => condition.category === "Personas") ? 25 : 0,
       count: conditions.some((condition) => condition.category === "Personas") ? 1 : 0,
     },
   ];
@@ -825,8 +889,13 @@ function getLineSpecificExplanation(record: BranchNetworkRecord) {
 function buildManagerBonusRecord(
   record: BranchNetworkRecord,
   index: number,
+  managerRole: ManagerRole = "Gerente de Sucursal",
+  scopeRecords: BranchNetworkRecord[] = [record],
 ): ManagerBonusRecord {
-  const dimensions = buildDimensions(record, index);
+  const dimensions =
+    managerRole === "Gerente de Area"
+      ? buildAreaDimensions(scopeRecords)
+      : buildDimensions(record);
   const score = Math.round(
     dimensions.reduce((sum, dimension) => sum + dimension.points, 0),
   );
@@ -835,34 +904,32 @@ function buildManagerBonusRecord(
   const targetCompletionRate = clamp(1 + record.targetGap / 100, 0.5, 1.2);
   const fulfillmentFactor = clamp(targetCompletionRate, 0.72, 1.08);
   const qualityFactor = clamp(record.dataQuality / 100 + (record.slaRate >= 0.9 ? 0.08 : 0), 0.72, 1.05);
-  const bonusPotential = Math.round(
-    (record.size === "Grande" ? 1250 : record.size === "Mediana" ? 950 : 750) +
-      record.netSales * 0.004,
-  );
+  const bonusPotential = 200;
   const penalties =
-    conditions.filter((condition) => condition.state === "Bloquea").length * 240 +
-    conditions.filter((condition) => condition.state === "Retiene").length * 160 +
-    conditions.filter((condition) => condition.state === "Reduce").length * 90 +
-    conditions.filter((condition) => condition.state === "Pendiente").length * 70;
-  const { projected, waterfall } = buildWaterfall(
-    bonusPotential,
-    scoreMultiplier,
-    fulfillmentFactor,
-    qualityFactor,
-    penalties,
+    conditions.filter((condition) => condition.state === "Bloquea").length * 100 +
+    conditions.filter((condition) => condition.state === "Retiene").length * 50 +
+    conditions.filter((condition) => condition.state === "Reduce").length * 25 +
+    conditions.filter((condition) => condition.state === "Pendiente").length * 15;
+  const bonusState = getBonusState(score, record.dataQuality, conditions, record);
+  const band = getBonusBand(score);
+  const bonusRecommended = bonusState === "NOT ELIGIBLE" ? 0 : band.amount;
+  const { projected, waterfall } = buildWaterfall({
+    band: band.band,
+    bonusCap: bonusPotential,
+    bonusRecommended,
+    eligibilityStatus: bonusState,
+  });
+  const bonusApproved = 0;
+  const bonusPaid = 0;
+  const financialScore = getDimensionByLabel(
+    dimensions,
+    /Finanzas|Resultado consolidado/,
   );
-  const bonusState = getBonusState(score, record.dataQuality, conditions);
-  const bonusApproved =
-    bonusState === "Aprobado" || bonusState === "Pagado"
-      ? Math.round(projected * 0.98)
-      : 0;
-  const bonusPaid = bonusState === "Pagado" ? bonusApproved : 0;
-  const financialScore = getDimensionByLabel(dimensions, /Finanzas|Resultado financiero/);
   const operationalScore = getDimensionByLabel(
     dimensions,
-    /Operacion|Productividad|Utilizacion/,
+    /Operacion|Productividad|Utilizacion|Sucursales en meta|Mejora/,
   );
-  const qualityScore = getDimensionByLabel(dimensions, /Calidad|SLA|Informes/);
+  const qualityScore = getDimensionByLabel(dimensions, /Calidad|SLA|Informes|Puntualidad/);
   const lowestDimension = dimensions.reduce((lowest, dimension) =>
     dimension.score < lowest.score ? dimension : lowest,
   );
@@ -871,16 +938,21 @@ function buildManagerBonusRecord(
   );
 
   return {
-    id: `manager-${record.id}`,
+    id: `${managerRole === "Gerente de Area" ? "area-manager" : "branch-manager"}-${record.id}`,
     manager: record.manager,
+    managerRole,
     branch: record.branch,
     branchCode: record.id,
+    branchesInScope: scopeRecords.map((scopeRecord) => scopeRecord.branch),
+    closingStatus: bonusState === "NOT ELIGIBLE" && record.dataQuality < 70 ? "INCOMPLETE" : "PUBLISHED",
     line: record.line,
     lineSlug: record.lineSlug,
     country: "El Salvador",
+    formulaVersion: "bonus-policy-v1-demo",
     region: record.region,
     managerType: getManagerType(record, index),
     goalType: getGoalType(record, dimensions),
+    period: "Julio 2026",
     startDate: index % 3 === 0 ? "2024-02-01" : index % 3 === 1 ? "2025-05-15" : "2023-09-01",
     score,
     scoreDelta: record.scoreDelta,
@@ -900,11 +972,15 @@ function buildManagerBonusRecord(
     ).length,
     bonusPotential,
     bonusProjected: projected,
+    bonusRecommended,
     bonusApproved,
-    bonusRetained: bonusState === "Retenido" ? projected : 0,
-    bonusBlocked: bonusState === "Bloqueado" ? projected : 0,
+    bonusRetained: bonusState === "REVIEW REQUIRED" ? projected : 0,
+    bonusBlocked: bonusState === "NOT ELIGIBLE" ? band.amount : 0,
     bonusPaid,
     bonusState,
+    bonusBand: band.band,
+    approvalReason: "Pendiente de revision humana; el sistema no paga automaticamente.",
+    approvalStatus: "SYSTEM RECOMMENDS",
     scoreMultiplier,
     fulfillmentFactor,
     qualityFactor,
@@ -919,6 +995,10 @@ function buildManagerBonusRecord(
             ? "Cerrar informes pendientes, disponibilidad tecnica y agenda por modalidad."
             : "Separar causa operacional, financiera y de datos antes de decidir bono.",
     explanation: `${record.manager} obtuvo ${score} puntos. ${highestDimension.insight} fue la principal fortaleza; pierde puntos por ${lowestDimension.label.toLowerCase()}. ${getLineSpecificExplanation(record)}`,
+    whyBonus:
+      bonusState === "NOT ELIGIBLE"
+        ? `No hay bono recomendado porque ${lowestDimension.label.toLowerCase()} y las reglas de elegibilidad requieren resolver datos o bloqueos antes de aprobacion.`
+        : `Recibe una recomendacion de ${formatCurrency(bonusRecommended)} por banda ${band.band}: Finanzas ${getDimensionByLabel(dimensions, /Finanzas|Resultado consolidado/)}/100, Operacion ${getDimensionByLabel(dimensions, /Operacion|Productividad|Utilizacion|Sucursales en meta|Mejora/)}/100, Metas ${getDimensionByLabel(dimensions, /Metas|Sucursales en meta/)}/100, Eficiencia/calidad ${getDimensionByLabel(dimensions, /Eficiencia|Calidad|SLA|Informes|margen/i)}/100 y Calidad dato ${getDimensionByLabel(dimensions, /Dato|Puntualidad/)}/100.`,
     dimensions,
     blockingConditions: conditions,
     waterfall,
@@ -933,8 +1013,115 @@ function buildManagerBonusRecord(
   };
 }
 
-export const allManagerBonusRecords: ManagerBonusRecord[] =
-  allBranchNetworkRecords.map(buildManagerBonusRecord);
+function normalizeKey(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function average(records: BranchNetworkRecord[], selector: (record: BranchNetworkRecord) => number) {
+  return records.reduce((sum, record) => sum + selector(record), 0) / Math.max(records.length, 1);
+}
+
+function aggregateAreaRecord(
+  lineSlug: BusinessLineSlug,
+  areaManager: string,
+  records: BranchNetworkRecord[],
+): BranchNetworkRecord {
+  const template = records[0] ?? allBranchNetworkRecords[0];
+  const id = `area-${lineSlug}-${normalizeKey(areaManager)}`;
+  const netSales = records.reduce((sum, record) => sum + record.netSales, 0);
+  const utility = records.reduce((sum, record) => sum + record.utility, 0);
+  const patients = records.reduce((sum, record) => sum + record.patients, 0);
+  const targetGap = Math.round(average(records, (record) => record.targetGap));
+  const normalizedPerformanceScore = Math.round(
+    average(records, (record) => record.normalizedPerformanceScore),
+  );
+
+  return {
+    ...template,
+    alerts: records.flatMap((record) => record.alerts).slice(0, 4),
+    areaManager,
+    branch: `Area ${areaManager}`,
+    branchType: "Propia",
+    capacityGapPoints: Math.round(average(records, (record) => record.capacityGapPoints)),
+    city: areaManager.replace(/^Direccion\s+/i, ""),
+    comparableGroup: `Area / ${template.line}`,
+    comparisonBasis: "Portafolio de sucursales asignadas; no suma simple de ventas",
+    dataQuality: Math.round(average(records, (record) => record.dataQuality)),
+    growthRate: average(records, (record) => record.growthRate),
+    id,
+    incidenceShare: Math.round(average(records, (record) => record.incidenceShare)),
+    incomingPatients: records.reduce((sum, record) => sum + record.incomingPatients, 0),
+    lineSlug,
+    manager: areaManager,
+    marginRate: average(records, (record) => record.marginRate),
+    movedPatients: records.reduce((sum, record) => sum + record.movedPatients, 0),
+    netSales,
+    normalizedPerformanceScore,
+    occupancyRate: average(records, (record) => record.occupancyRate),
+    operatingScore: Math.round(average(records, (record) => record.operatingScore)),
+    outlierFlags: records.flatMap((record) => record.outlierFlags).slice(0, 5),
+    patients,
+    priorityAction: "Revisar portafolio, sucursales rezagadas y calidad de cierres.",
+    productivityIndex: Math.round(average(records, (record) => record.productivityIndex)),
+    projectedClose: records.reduce((sum, record) => sum + record.projectedClose, 0),
+    recommendation:
+      "El bono de area evalua porcentaje de sucursales en meta, mejora de rezagadas, eficiencia, margen y calidad de cierres.",
+    recurrenceRate: average(records, (record) => record.recurrenceRate),
+    region: records.map((record) => record.region).join(" / "),
+    revenueShare: netSales,
+    score: normalizedPerformanceScore,
+    scoreDelta: Math.round(average(records, (record) => record.scoreDelta)),
+    serviceMix: records.length > 1 ? "Multiservicio" : template.serviceMix,
+    size: "Grande",
+    slaRate: average(records, (record) => record.slaRate),
+    strengths: ["Gestion de portafolio", "Seguimiento de sucursales"],
+    targetGap,
+    ticket: netSales / Math.max(records.reduce((sum, record) => sum + record.patients, 0), 1),
+    utility,
+    x: normalizedPerformanceScore,
+    y: Math.round((1 - average(records, (record) => record.marginRate)) * 100),
+  };
+}
+
+function buildAreaManagerBonusRecords(): ManagerBonusRecord[] {
+  const groups = new Map<string, BranchNetworkRecord[]>();
+
+  for (const record of allBranchNetworkRecords) {
+    const key = `${record.lineSlug}-${record.areaManager}`;
+    const current = groups.get(key) ?? [];
+    current.push(record);
+    groups.set(key, current);
+  }
+
+  return [...groups.entries()].map(([key, records], index) => {
+    const [lineSlug, ...areaParts] = key.split("-");
+    const areaManager = areaParts.join("-");
+    const aggregate = aggregateAreaRecord(
+      lineSlug as BusinessLineSlug,
+      areaManager,
+      records,
+    );
+
+    return buildManagerBonusRecord(
+      aggregate,
+      index + allBranchNetworkRecords.length,
+      "Gerente de Area",
+      records,
+    );
+  });
+}
+
+export const allManagerBonusRecords: ManagerBonusRecord[] = [
+  ...allBranchNetworkRecords.map((record, index) =>
+    buildManagerBonusRecord(record, index),
+  ),
+  ...buildAreaManagerBonusRecords(),
+];
 
 function buildMetrics(records: ManagerBonusRecord[]): ManagerBonusMetric[] {
   const active = records.length;
@@ -945,17 +1132,16 @@ function buildMetrics(records: ManagerBonusRecord[]): ManagerBonusMetric[] {
   const critical = records.filter((record) =>
     ["Critico", "Sin datos suficientes"].includes(record.status),
   ).length;
-  const projectedManagers = records.filter((record) =>
-    ["Proyectado", "En revision", "Aprobado", "Retenido", "Bloqueado"].includes(
-      record.bonusState,
-    ),
+  const eligibleManagers = records.filter((record) => record.bonusState === "ELIGIBLE").length;
+  const reviewManagers = records.filter(
+    (record) => record.bonusState === "REVIEW REQUIRED",
   ).length;
-  const blockedManagers = records.filter((record) => record.bonusState === "Bloqueado").length;
-  const totalFund = records.reduce((sum, record) => sum + record.bonusPotential, 0);
-  const totalProjected = records.reduce((sum, record) => sum + record.bonusProjected, 0);
+  const blockedManagers = records.filter(
+    (record) => record.bonusState === "NOT ELIGIBLE",
+  ).length;
+  const projectedManagers = records.filter((record) => record.bonusRecommended > 0).length;
+  const totalProjected = records.reduce((sum, record) => sum + record.bonusRecommended, 0);
   const totalApproved = records.reduce((sum, record) => sum + record.bonusApproved, 0);
-  const totalRetained = records.reduce((sum, record) => sum + record.bonusRetained, 0);
-  const totalBlocked = records.reduce((sum, record) => sum + record.bonusBlocked, 0);
   const totalPaid = records.reduce((sum, record) => sum + record.bonusPaid, 0);
   const averageScore =
     records.reduce((sum, record) => sum + record.score, 0) / Math.max(active, 1);
@@ -980,23 +1166,93 @@ function buildMetrics(records: ManagerBonusRecord[]): ManagerBonusMetric[] {
     { group: "Gerentes", label: "Gerentes sobre meta", value: `${aboveTarget}`, note: "cumplimiento >= 100%", tone: "positive" },
     { group: "Gerentes", label: "En precaucion", value: `${warning}`, note: "requieren accion", tone: warning > 0 ? "warning" : "positive" },
     { group: "Gerentes", label: "Criticos o sin datos", value: `${critical}`, note: "riesgo de bono", tone: critical > 0 ? "negative" : "positive" },
-    { group: "Bonos", label: "Fondo total de bonos", value: formatCurrency(totalFund), note: "bono potencial", tone: "neutral" },
-    { group: "Bonos", label: "Bono proyectado", value: formatCurrency(totalProjected), note: `${projectedManagers} gerentes con calculo`, tone: "positive" },
-    { group: "Bonos", label: "Bono aprobado", value: formatCurrency(totalApproved), note: "validado por revision", tone: totalApproved > 0 ? "positive" : "warning" },
-    { group: "Bonos", label: "Bono retenido", value: formatCurrency(totalRetained), note: "requiere evidencia", tone: totalRetained > 0 ? "warning" : "positive" },
-    { group: "Bonos", label: "Bono bloqueado", value: formatCurrency(totalBlocked), note: `${blockedManagers} bloqueos`, tone: totalBlocked > 0 ? "negative" : "positive" },
-    { group: "Bonos", label: "Bono promedio", value: formatCurrency(averageBonus), note: "por gerente con bono", tone: "neutral" },
+    { group: "Bonos", label: "Rango por gerente", value: "$100-$200", note: "si cumple elegibilidad", tone: "neutral" },
+    { group: "Bonos", label: "ELIGIBLE", value: `${eligibleManagers}`, note: "puede pasar a aprobacion humana", tone: eligibleManagers > 0 ? "positive" : "warning" },
+    { group: "Bonos", label: "REVIEW REQUIRED", value: `${reviewManagers}`, note: "requiere evidencia o conciliacion", tone: reviewManagers > 0 ? "warning" : "positive" },
+    { group: "Bonos", label: "NOT ELIGIBLE", value: `${blockedManagers}`, note: "sin bono hasta resolver", tone: blockedManagers > 0 ? "negative" : "positive" },
+    { group: "Bonos", label: "Bono recomendado", value: formatCurrency(totalProjected), note: `${projectedManagers} gerentes con monto`, tone: "positive" },
+    { group: "Bonos", label: "Bono promedio", value: formatCurrency(averageBonus), note: "solo con recomendacion", tone: "neutral" },
     { group: "Gestion", label: "Score gerencial promedio", value: `${Math.round(averageScore)}`, note: "0 a 100 ponderado", tone: averageScore >= 80 ? "positive" : "warning" },
     { group: "Gestion", label: "Venta gestionada", value: formatCurrency(managedSales), note: "no sustituye salud financiera", tone: "neutral" },
     { group: "Gestion", label: "Utilidad gestionada", value: formatCurrency(managedUtility), note: "base de retorno", tone: managedUtility > 0 ? "positive" : "negative" },
-    { group: "Gestion", label: "Margen promedio", value: formatRate(averageMargin), note: "ponderado simple DEMO", tone: averageMargin >= 0.84 ? "positive" : "warning" },
+    { group: "Gestion", label: "Margen promedio", value: formatRate(averageMargin), note: "ponderado simple DEMO", tone: averageMargin >= 0.38 ? "positive" : "warning" },
     { group: "Gestion", label: "Ocupacion efectiva", value: formatRate(averageOccupancy), note: "capacidad utilizada", tone: averageOccupancy >= 0.78 ? "positive" : "warning" },
     { group: "Gestion", label: "Cumplimiento SLA", value: formatRate(averageSla), note: "calidad operativa", tone: averageSla >= 0.86 ? "positive" : "warning" },
     { group: "Gestion", label: "Calidad de datos", value: `${Math.round(averageDataQuality)}`, note: "habilita aprobacion", tone: averageDataQuality >= 82 ? "positive" : "warning" },
     { group: "Gestion", label: "Costo bono / utilidad", value: formatRate(bonusCostOnUtility), note: "peso del incentivo", tone: bonusCostOnUtility <= 0.12 ? "positive" : "warning" },
     { group: "Gestion", label: "Retorno por $1 bono", value: `$${bonusRoi.toFixed(1)}`, note: "utilidad por dolar incentivado", tone: bonusRoi >= 8 ? "positive" : "warning" },
-    { group: "Bonos", label: "Bono pagado", value: formatCurrency(totalPaid), note: "estado final", tone: "neutral" },
+    { group: "Bonos", label: "Bono aprobado", value: formatCurrency(totalApproved), note: "solo despues de revision", tone: "neutral" },
+    { group: "Bonos", label: "Pago automatico", value: formatCurrency(totalPaid), note: "no integrado", tone: "neutral" },
   ];
+}
+
+export function getManagerBonusBacktest(
+  records: ManagerBonusRecord[] = allManagerBonusRecords,
+): BonusBacktestSummary {
+  const withRecommendation = records.filter((record) => record.bonusRecommended > 0);
+  const exceptional = records.filter((record) => record.bonusBand === "Exceptional").length;
+  const satisfactory = records.filter((record) => record.bonusBand === "Satisfactory").length;
+  const eligible = records.filter((record) => record.bonusState === "ELIGIBLE").length;
+  const reviewRequired = records.filter((record) => record.bonusState === "REVIEW REQUIRED").length;
+  const notEligible = records.filter((record) => record.bonusState === "NOT ELIGIBLE").length;
+  const topSalesRecords = [...records]
+    .sort((first, second) => second.netSales - first.netSales)
+    .slice(0, Math.max(1, Math.ceil(records.length * 0.25)));
+  const topSalesNotMaxed = topSalesRecords.some((record) => record.bonusRecommended < 200);
+  const smallBranchWithBonus = records.some(
+    (record) =>
+      record.managerRole === "Gerente de Sucursal" &&
+      /Pequena|comparable/i.test(record.managerType) &&
+      record.bonusRecommended >= 100,
+  );
+  const areaRecords = records.filter((record) => record.managerRole === "Gerente de Area");
+  const branchRecords = records.filter(
+    (record) => record.managerRole === "Gerente de Sucursal",
+  );
+  const averageRecommendedBonus =
+    withRecommendation.reduce((sum, record) => sum + record.bonusRecommended, 0) /
+    Math.max(withRecommendation.length, 1);
+
+  return {
+    averageRecommendedBonus: Math.round(averageRecommendedBonus),
+    eligible,
+    exceptional,
+    findings: [
+      {
+        check: "No premia volumen absoluto automaticamente",
+        result: topSalesNotMaxed
+          ? "Al menos una sucursal de alto volumen no recibe $200 por tener brechas de margen, meta o datos."
+          : "Todos los registros de alto volumen llegan a $200; revisar sesgo por tamano.",
+        status: topSalesNotMaxed ? "PASS" : "REVIEW",
+      },
+      {
+        check: "No penaliza sucursal pequena por tamano",
+        result: smallBranchWithBonus
+          ? "Existe al menos una sucursal pequena/comparable con bono recomendado por desempeno normalizado."
+          : "No hay sucursales pequenas con bono; revisar thresholds o datos.",
+        status: smallBranchWithBonus ? "PASS" : "REVIEW",
+      },
+      {
+        check: "No genera demasiados $200",
+        result: `${exceptional} de ${records.length} registros quedan en Exceptional.`,
+        status: exceptional <= Math.ceil(records.length * 0.15) ? "PASS" : "REVIEW",
+      },
+      {
+        check: "No concentra todo en $100",
+        result: `${satisfactory} de ${records.length} registros quedan en Satisfactory.`,
+        status: satisfactory <= Math.ceil(records.length * 0.45) ? "PASS" : "REVIEW",
+      },
+      {
+        check: "Evalua sucursal y area por separado",
+        result: `${branchRecords.length} registros de sucursal y ${areaRecords.length} registros de area.`,
+        status: branchRecords.length > 0 && areaRecords.length > 0 ? "PASS" : "REVIEW",
+      },
+    ],
+    notEligible,
+    records: records.length,
+    reviewRequired,
+    satisfactory,
+  };
 }
 
 export function getManagerBonusScreen(slug: BusinessLineSlug): ManagerBonusScreen {
@@ -1007,27 +1263,27 @@ export function getManagerBonusScreen(slug: BusinessLineSlug): ManagerBonusScree
   const titles: Record<BusinessLineSlug, Pick<ManagerBonusScreen, "title" | "subtitle" | "description">> = {
     consolidado: {
       title: "Gerentes y bonos",
-      subtitle: "Vitrina ejecutiva del calculo gerencial",
+      subtitle: "Bonos mensuales transparentes y auditables",
       description:
-        "Muestra que gerentes cumplen metas, que resultados dependen de su gestion, cuanto bono generan y que evidencia reduce, retiene o bloquea el pago.",
+        "Muestra score, componentes, elegibilidad, bono recomendado y decision pendiente para Gerentes de Sucursal y Gerentes de Area.",
     },
     laboratorio: {
       title: "Gerentes de Laboratorio",
       subtitle: "Ordenes, margen, inventario, SLA y bono",
       description:
-        "El bono se calcula con venta, utilidad, costo por orden, muestras, resultados, inventario, reactivos, medicos y datos.",
+        "El bono se calcula con finanzas, operacion, metas, eficiencia/calidad y calidad del dato, sin premiar solo volumen de ordenes.",
     },
     fisioterapia: {
       title: "Gerentes de Fisioterapia",
       subtitle: "Agenda efectiva, continuidad terapeutica y bono",
       description:
-        "No premia solo agenda llena: revisa sesiones atendidas, continuidad, no-show, margen por sesion, experiencia y equipo.",
+        "No premia solo agenda llena: revisa finanzas, ocupacion efectiva, sesiones, metas, no-show proxy y calidad del cierre.",
     },
     imagenes: {
       title: "Gerentes de Imagenes",
       subtitle: "Equipos, estudios, informes, SLA y bono",
       description:
-        "El calculo incorpora utilizacion de equipos, disponibilidad tecnica, informes pendientes, repeticiones, costos y datos.",
+        "El calculo incorpora finanzas, estudios, utilizacion, metas, informes/SLA y calidad del dato.",
     },
   };
 
@@ -1035,15 +1291,15 @@ export function getManagerBonusScreen(slug: BusinessLineSlug): ManagerBonusScree
     slug,
     ...titles[slug],
     rule:
-      "Regla: Gerentes y bonos responde que tanto del resultado corresponde a la gestion del gerente y cuanto bono genera; no reemplaza Sucursales, Finanzas, Capacidad ni Profesionales.",
+      "Regla: el sistema recomienda bonos mensuales de $100 a $200 con formula visible; no paga automaticamente y no reemplaza aprobacion humana.",
     weights: managerBonusWeightsByLine[slug],
     metrics: buildMetrics(records),
     records,
     executiveInsights: [
-      "El score no depende solo de venta: rentabilidad, operacion, capacidad, pacientes, calidad, personas y datos pesan en la aprobacion.",
-      "Un bono proyectado puede quedar retenido o bloqueado si existen cierres sin conciliar, baja calidad de datos, SLA critico o evidencia pendiente.",
-      "La aprobacion final debe pasar por direccion, finanzas, RRHH y auditoria; el gerente puede ver el calculo y adjuntar evidencia, pero no editar reglas.",
-      "Para gerentes multiservicio, una linea sobresaliente no puede ocultar una falla critica en otra.",
+      "El score no depende solo de venta: finanzas, operacion, metas, eficiencia/calidad y calidad del dato pesan en la recomendacion.",
+      "BONUS STATUS puede ser ELIGIBLE, REVIEW REQUIRED o NOT ELIGIBLE segun cierre, calidad, KPIs criticos e inconsistencias.",
+      "La aprobacion final debe pasar por autoridad autorizada; el gerente puede ver el calculo y evidencia, pero no aprobar su bono.",
+      "El Gerente de Area se evalua por portafolio, porcentaje de sucursales en meta y mejora de rezagadas, no por suma simple.",
     ],
   };
 }
@@ -1063,8 +1319,8 @@ function seriesForRecords(
       points: record.trend[field],
     })),
     {
-      label: field === "projectedBonus" ? "Meta presupuesto" : "Meta gerencial",
-      value: field === "projectedBonus" ? "$900" : "85",
+      label: field === "projectedBonus" ? "Tope politica" : "Meta gerencial",
+      value: field === "projectedBonus" ? "$200" : "85",
       color: "slate" as const,
       points: recordGoalPoints(field),
     },
@@ -1073,7 +1329,7 @@ function seriesForRecords(
 
 function recordGoalPoints(field: keyof ManagerBonusRecord["trend"]) {
   if (field === "projectedBonus") {
-    return [900, 900, 900, 900, 900, 900, 900];
+    return [200, 200, 200, 200, 200, 200, 200];
   }
 
   return [85, 85, 85, 85, 85, 85, 85];
@@ -1103,7 +1359,7 @@ export function buildManagerBonusTrendChart(
       label: "Mayor riesgo",
       value: `${firstRecord?.bonusState ?? "Sin datos"}`,
       note: firstRecord?.explanation ?? "Selecciona una linea con datos.",
-      tone: firstRecord?.bonusState === "Bloqueado" ? "negative" : "warning",
+      tone: firstRecord?.bonusState === "NOT ELIGIBLE" ? "negative" : "warning",
     },
     {
       label: "Decision",
@@ -1129,7 +1385,7 @@ export function buildManagerBonusTrendChart(
         "Finanzas separa venta, utilidad y margen para evitar bonos por crecimiento poco rentable.",
       yLabel: "Score financiero",
       series: seriesForRecords(scopedRecords, "financialScore", (record) =>
-        `${getDimensionByLabel(record.dimensions, /Finanzas|Resultado financiero/)}`,
+        `${getDimensionByLabel(record.dimensions, /Finanzas|Resultado consolidado/)}`,
       ),
       insights: baseInsights,
     },
@@ -1140,7 +1396,7 @@ export function buildManagerBonusTrendChart(
         "Operacion muestra productividad, SLA, uso de capacidad y cuellos de botella.",
       yLabel: "Score operativo",
       series: seriesForRecords(scopedRecords, "operationalScore", (record) =>
-        `${getDimensionByLabel(record.dimensions, /Operacion|Productividad|Utilizacion/)}`,
+        `${getDimensionByLabel(record.dimensions, /Operacion|Productividad|Utilizacion|Sucursales en meta|Mejora/)}`,
       ),
       insights: baseInsights,
     },
@@ -1151,18 +1407,18 @@ export function buildManagerBonusTrendChart(
         "Calidad permite detectar bonos altos con evidencia pendiente, reclamos o SLA debil.",
       yLabel: "Score calidad",
       series: seriesForRecords(scopedRecords, "qualityScore", (record) =>
-        `${getDimensionByLabel(record.dimensions, /Calidad|SLA|Informes/)}`,
+        `${getDimensionByLabel(record.dimensions, /Calidad|SLA|Informes|Puntualidad/)}`,
       ),
       insights: baseInsights,
     },
     {
       id: "bono-proyectado-gerente",
-      label: "Bono proyectado",
+      label: "Bono recomendado",
       description:
-        "Evolucion del bono proyectado frente a meta, periodo anterior o rango personalizado.",
+        "Evolucion del bono recomendado frente al tope de politica, periodo anterior o rango personalizado.",
       yLabel: "USD",
       series: seriesForRecords(scopedRecords, "projectedBonus", (record) =>
-        formatCurrency(record.bonusProjected),
+        formatCurrency(record.bonusRecommended),
       ),
       insights: baseInsights,
     },
