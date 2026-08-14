@@ -39,7 +39,7 @@ assert(
 );
 
 assert(
-  navigation.includes("APIs e integraciones") &&
+  navigation.includes("Integraciones") &&
     navigation.includes("href: \"/protected/apis\""),
   "Navigation must define /protected/apis explicitly.",
 );
@@ -56,9 +56,9 @@ assert(
 );
 
 for (const requiredText of [
-  "Executive Command Center",
+  "Resumen Ejecutivo",
   "Calidad del dato",
-  "Tarjetas principales del Executive Command Center",
+  "Tarjetas principales del Resumen Ejecutivo",
   "Requiere su atencion",
   "Ingresos",
   "Cumplimiento meta",
@@ -92,7 +92,7 @@ for (const requiredManagerText of [
   "Productividad",
   "Margen",
   "Calidad",
-  "Score ejecutivo no concluyente",
+  "Puntaje ejecutivo no concluyente",
 ]) {
   assert(
     managerDashboard.includes(requiredManagerText),
@@ -143,14 +143,14 @@ for (const requiredAccountMigrationText of [
 
 for (const requiredImportText of [
   "ImportPipelineStepper",
-  "Upload",
-  "Mapping",
+  "Recepcion",
+  "Revision de columnas",
   "Validacion",
-  "Preview",
-  "Publish",
-  "Lineage",
-  "RAW inmutable",
-  "PUBLISHED",
+  "Vista previa",
+  "Publicacion",
+  "Trazabilidad",
+  "Archivo original preservado",
+  "Datos publicados",
 ]) {
   assert(
     importsDashboard.includes(requiredImportText),
@@ -159,11 +159,11 @@ for (const requiredImportText of [
 }
 
 for (const requiredConnectorText of [
-  "Supervisa endpoints",
-  "Credenciales reales solo en servidor",
+  "Supervisa conexiones",
+  "Credenciales protegidas",
   "No se debe pegar una llave real",
   "Sin configurar",
-  "Freshness",
+  "Vigencia",
   "Fallback sin conector",
   "md:hidden",
 ]) {

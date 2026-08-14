@@ -80,7 +80,7 @@ for (const requiredApiRouteText of [
   "ANALIA_OPENAI_MODEL",
   "https://api.openai.com/v1/responses",
   "store: false",
-  "Agente IA server-side",
+  "Agente IA protegido",
   "sanitizeText",
   "createAnaliaScreenChatResponse",
   "extractOpenAIResponseText",

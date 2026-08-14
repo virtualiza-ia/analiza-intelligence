@@ -26,7 +26,7 @@ export async function GET(_request: Request, context: ImportRouteContext) {
     })
   ) {
     return NextResponse.json(
-      { error: "Actor no autorizado para consultar este lineage." },
+      { error: "No tienes permiso para consultar esta trazabilidad." },
       { status: 403 },
     );
   }

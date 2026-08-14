@@ -952,7 +952,7 @@ export function ingestTabularFile(params: IngestFileParams): ImportPipelineResul
     buildAuditEvent({
       action: "validation",
       actor: params.actor,
-      details: `Validacion ${status} con quality score ${qualityScore}.`,
+      details: `Validacion ${status} con puntaje de calidad ${qualityScore}.`,
       importId,
       status,
     }),
@@ -1075,7 +1075,7 @@ export function rollbackImport(importId: string, actor: AuthorizationActor, reas
   const audit = buildAuditEvent({
     action: "rollback",
     actor,
-    details: `Rollback registrado. Motivo: ${reason || "No especificado"}. RAW preservado.`,
+    details: `Reversion registrada. Motivo: ${reason || "No especificado"}. Archivo original preservado.`,
     importId,
     status: "ROLLED_BACK",
   });

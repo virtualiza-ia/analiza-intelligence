@@ -267,7 +267,7 @@ function mergeAiResponse({
     directAnswer:
       getString(modelResponse.directAnswer) || fallbackResponse.directAnswer,
     intent: normalizeIntent(modelResponse.intent, fallbackResponse.intent),
-    sources: [...fallbackResponse.sources, "Agente IA server-side"],
+    sources: [...fallbackResponse.sources, "Agente IA protegido"],
     suggestedNextStep:
       getString(modelResponse.suggestedNextStep) ||
       fallbackResponse.suggestedNextStep,

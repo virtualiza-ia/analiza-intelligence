@@ -118,7 +118,7 @@ export function LoginForm({
         const payload = (await response.json().catch(() => null)) as
           | { error?: string }
           | null;
-        throw new Error(payload?.error ?? "No se pudo iniciar DEMO local.");
+        throw new Error(payload?.error ?? "No se pudo iniciar el entorno DEMO local.");
       }
 
       window.localStorage.setItem(roleStorageKey, activeDemoRole);
@@ -127,7 +127,11 @@ export function LoginForm({
       router.push("/protected/context");
       router.refresh();
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      setError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo completar el acceso. Intenta nuevamente.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -184,7 +188,11 @@ export function LoginForm({
       if (error) throw error;
       router.push("/protected/context");
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      setError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo completar el acceso. Intenta nuevamente.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -240,7 +248,7 @@ export function LoginForm({
                     ANALIZA INTELLIGENCE
                   </div>
                   <div className="mt-1 text-xs tracking-[0.01em] text-[#8fa6c4]">
-                    Business Intelligence Platform
+                    Plataforma de inteligencia ejecutiva
                   </div>
                 </div>
               </div>
@@ -397,8 +405,8 @@ export function LoginForm({
                   <div>
                     <div className="font-semibold">Entorno DEMO local</div>
                     <p className="mt-1 text-xs leading-5 text-amber-900">
-                      Crea una sesion demo server-side para revision visual. No
-                      usa passwords en cliente y esta bloqueado fuera de demo.
+                      Crea una sesion demo validada para revision visual. No
+                      muestra contrasenas y solo funciona en entorno demo.
                     </p>
                   </div>
                   <Label htmlFor="demo-role">Perfil de prueba autorizado</Label>
@@ -442,7 +450,7 @@ export function LoginForm({
                     type="button"
                     variant="secondary"
                   >
-                    {isLoading ? "Creando sesion..." : "Entrar en DEMO local"}
+                    {isLoading ? "Preparando acceso..." : "Entrar en DEMO local"}
                   </Button>
                 </div>
               )}

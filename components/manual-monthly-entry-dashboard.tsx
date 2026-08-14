@@ -739,7 +739,7 @@ function getAutomaticQualityAlerts({
     alerts.push({
       title: "Ingreso muy por debajo de meta",
       reason:
-        "La venta esta por debajo del 50% de la meta. Puede ser real, pero requiere explicacion antes de afectar score o bono.",
+        "La venta esta por debajo del 50% de la meta. Puede ser real, pero requiere explicacion antes de afectar puntaje o bono.",
       severity: "alta",
     });
   }
@@ -1147,7 +1147,7 @@ function YearToDateDashboard({
         <div>
           <div className="flex items-center gap-2 text-sm font-medium">
             <TrendingUp className="size-4 text-primary" />
-            Dashboard Year to date
+            Acumulado anual
           </div>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
             Acumulado 2026 por linea y sucursal seleccionada. Si la sucursal no
@@ -1889,7 +1889,7 @@ export function ManualMonthlyEntryDashboard() {
                 <span>
                   Penalizacion:{" "}
                   {currentDeadlineStatus === "Tarde DEMO"
-                    ? "impacta score y bono"
+                    ? "impacta puntaje y bono"
                     : "sin penalizacion"}
                 </span>
                 <span>{branchGroupCount || 0} sucursales bajo esta gerencia.</span>

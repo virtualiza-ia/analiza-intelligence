@@ -1179,7 +1179,7 @@ export function LaboratoryPresentationDashboard() {
             Lectura tecnica de Laboratorio
           </h2>
           <p className="text-sm leading-6 text-muted-foreground">
-            Ordenes, pruebas, throughput, utilizacion, TAT, rechazo, reproceso,
+            Ordenes, pruebas, flujo de procesamiento, utilizacion, TAT, rechazo, reproceso,
             ingreso/prueba, costo/prueba y margen se muestran separados para no
             usar la semantica clinica de citas.
           </p>

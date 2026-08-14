@@ -1010,7 +1010,7 @@ export function buildPhysioPresentationSlides(
         { label: "Gerente", value: record.branchManager },
         { label: "Gerente de area", value: record.areaManager },
         { label: "Version", value: record.version },
-        { label: "Score de calidad", value: `${record.dataQualityScore}/100` },
+        { label: "Puntaje de calidad", value: `${record.dataQualityScore}/100` },
       ],
       narrative:
         "Presentacion generada como borrador de comite. No puede cerrarse oficialmente mientras existan errores bloqueantes.",

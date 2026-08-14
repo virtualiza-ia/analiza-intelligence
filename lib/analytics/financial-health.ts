@@ -835,7 +835,7 @@ export const financialHealthScreens: Record<
           { label: "Costo de mantenimiento", value: "$4.8K", note: "preventivo", status: "warning" },
           { label: "Costo correctivo", value: "$2.4K", note: "fallas", status: "warning" },
           { label: "Depreciacion", value: "Pendiente", note: "CAPEX requerido", status: "pending-upload" },
-          { label: "Contratos de mantenimiento", value: "Fuente no conectada", note: "proveedores", status: "not-connected" },
+          { label: "Contratos de mantenimiento", value: "Datos pendientes de conexion", note: "proveedores", status: "not-connected" },
           { label: "Costo de licencias", value: "Pendiente", note: "software/equipo", status: "pending-upload" },
           { label: "Recuperacion de inversion", value: "Pendiente", note: "requiere CAPEX", status: "pending-upload" },
           { label: "Punto de equilibrio por equipo", value: "615 estudios", note: "estimado DEMO", status: "calculated" },

@@ -597,7 +597,7 @@ export function getDataScienceCockpit(
       scatter: buildQualityScatter(line),
       sourceFields: ["medical_exam_sales_file", "sourceTrace", "createdAt", ...fields.customerFields],
       targetValue: 90,
-      trendLabel: "Score de calidad",
+      trendLabel: "Puntaje de calidad",
       unit: "score",
       warning:
         totals.quality < 85

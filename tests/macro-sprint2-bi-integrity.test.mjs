@@ -287,7 +287,7 @@ for (const requiredText of [
   "Tabla ejecutiva por sucursal",
   "Tabla ejecutiva por gerente",
   "Sin datos disponibles para este filtro",
-  "Score comparable",
+  "Puntaje comparable",
   "Base",
   "Atipicos",
 ]) {
@@ -298,7 +298,7 @@ assert.ok(financialDashboard.includes("Margen contribucion"));
 assert.ok(capacityDashboard.includes("CapacityNoDataState"));
 assert.ok(dataQualityDashboard.includes("Reglas de calidad del filtro activo"));
 assert.ok(branchNetworkDashboard.includes('useState<SortKey>("normalizedPerformanceScore")'));
-assert.ok(branchNetworkDashboard.includes("Score comparable"));
+assert.ok(branchNetworkDashboard.includes("Puntaje comparable"));
 assert.ok(branchNetworkDashboard.includes("Base comparable"));
 assert.ok(branchNetworkAnalytics.includes("normalizedPerformanceScore"));
 assert.ok(branchNetworkAnalytics.includes("outlierFlags"));

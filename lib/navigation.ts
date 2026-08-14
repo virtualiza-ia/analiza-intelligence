@@ -298,7 +298,7 @@ export const navigationItems: NavigationItem[] = [
     allowedRoles: connectorAdminRoles,
   },
   {
-    title: "APIs e integraciones",
+    title: "Integraciones",
     href: "/protected/apis",
     icon: DatabaseZap,
     group: "datos",
@@ -333,7 +333,7 @@ export const navigationItems: NavigationItem[] = [
     allowedRoles: allRoles,
   },
   {
-    title: "Auditoria",
+    title: "Auditoria del sistema",
     href: "/protected/auditoria",
     icon: BarChart3,
     group: "sistema",

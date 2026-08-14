@@ -343,7 +343,7 @@ export function DataQualityAnaliaDashboard() {
         <aside className="rounded-md border bg-card p-4 text-sm">
           <div className="mb-2 flex items-center gap-2 font-medium">
             <ShieldCheck className="size-4 text-primary" />
-            Score de confiabilidad DEMO
+            Puntaje de confiabilidad DEMO
           </div>
           <div className="text-3xl font-semibold">{qualityScore}%</div>
           <Badge
@@ -378,7 +378,7 @@ export function DataQualityAnaliaDashboard() {
           },
           {
             icon: BarChart3,
-            label: "Dashboards",
+            label: "Vistas",
             value: `${visibleSuggestions.filter((item) => item.target === "Dashboard").length} lecturas`,
           },
           { icon: ClipboardCheck, label: "Aplicadas", value: `${appliedCount}` },
@@ -526,7 +526,7 @@ export function DataQualityAnaliaDashboard() {
                     </p>
                   </div>
                   <div className="rounded-md border bg-background p-3">
-                    <div className="font-medium">Dashboards afectados</div>
+                    <div className="font-medium">Vistas afectadas</div>
                     <p className="mt-1 text-muted-foreground">
                       {suggestion.affectedDashboards.join(", ")}
                     </p>

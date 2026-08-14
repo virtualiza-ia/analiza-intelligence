@@ -232,13 +232,33 @@ function bonusStateClass(state: BonusState) {
   return "bg-blue-100 text-blue-800 hover:bg-blue-100";
 }
 
+function bonusStateLabel(state: BonusState) {
+  if (state === "ELIGIBLE") {
+    return "Elegible";
+  }
+
+  if (state === "NOT ELIGIBLE") {
+    return "No elegible";
+  }
+
+  return "Requiere revision";
+}
+
 function workflowStatusLabel(status: BonusWorkflowStatus) {
   if (status === "SYSTEM_RECOMMENDED") {
-    return "SYSTEM RECOMMENDED";
+    return "Pendiente de revision";
+  }
+
+  if (status === "APPROVED") {
+    return "Bono aprobado";
+  }
+
+  if (status === "REJECTED") {
+    return "Bono rechazado";
   }
 
   if (status === "ADJUSTED") {
-    return "ADJUSTED";
+    return "Bono ajustado";
   }
 
   return status;
@@ -258,6 +278,18 @@ function workflowStatusClass(status: BonusWorkflowStatus) {
   }
 
   return "bg-amber-100 text-amber-800 hover:bg-amber-100";
+}
+
+function closingStatusLabel(status: ManagerBonusRecord["closingStatus"]) {
+  if (status === "PUBLISHED") {
+    return "Cierre publicado";
+  }
+
+  if (status === "INCOMPLETE") {
+    return "Periodo incompleto";
+  }
+
+  return "Cierre pendiente";
 }
 
 function defaultWorkflowItem(record: ManagerBonusRecord): BonusWorkflowItem {
@@ -370,7 +402,7 @@ function ManagerFiltersPanel({
   }[] = [
     {
       key: "bonusState",
-      label: "BONUS STATUS",
+      label: "Estado del bono",
       options: uniqueOptions(records.map((record) => record.bonusState)),
     },
     {
@@ -390,7 +422,7 @@ function ManagerFiltersPanel({
     },
     {
       key: "status",
-      label: "Estado del score",
+      label: "Estado del puntaje",
       options: uniqueOptions(records.map((record) => record.status)),
     },
   ];
@@ -414,7 +446,9 @@ function ManagerFiltersPanel({
             >
               {field.options.map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {field.key === "bonusState"
+                    ? bonusStateLabel(option as BonusState)
+                    : option}
                 </option>
               ))}
             </select>
@@ -494,7 +528,7 @@ function WeightModel({
           {
             color: "bg-blue-600",
             label: "Barra",
-            text: "peso que tiene esa dimension dentro del score total.",
+            text: "peso que tiene esa dimension dentro del puntaje total.",
           },
           {
             color: "bg-slate-500",
@@ -527,8 +561,8 @@ function BonusBacktestPanel({ backtest }: { backtest: BonusBacktestSummary }) {
       <div className="mb-4 grid gap-3 md:grid-cols-4">
         {[
           { label: "Registros", value: `${backtest.records}`, note: "sucursal + area" },
-          { label: "ELIGIBLE", value: `${backtest.eligible}`, note: "sin bloqueo activo" },
-          { label: "REVIEW REQUIRED", value: `${backtest.reviewRequired}`, note: "requiere evidencia" },
+          { label: "Elegibles", value: `${backtest.eligible}`, note: "sin bloqueo activo" },
+          { label: "Requieren revision", value: `${backtest.reviewRequired}`, note: "requiere evidencia" },
           { label: "Promedio", value: formatCurrency(backtest.averageRecommendedBonus), note: "con bono recomendado" },
         ].map((item) => (
           <article className="rounded-md border bg-background p-3" key={item.label}>
@@ -552,7 +586,7 @@ function BonusBacktestPanel({ backtest }: { backtest: BonusBacktestSummary }) {
                   : "bg-amber-100 text-amber-800 hover:bg-amber-100"
               }
             >
-              {finding.status}
+              {finding.status === "PASS" ? "Aprobado" : "Revisar"}
             </Badge>
           </div>
         ))}
@@ -596,7 +630,7 @@ function ExecutiveManagerPerformanceTable({
         <p className="text-xs leading-5 text-muted-foreground">
           Respeta jerarquia Gerente Operaciones {"->"} Gerente Area {"->"}{" "}
           Gerente Sucursal. No rankea solo por ingresos absolutos; separa
-          componentes para evitar un score opaco.
+          componentes para evitar un puntaje opaco.
         </p>
       </div>
 
@@ -697,7 +731,7 @@ function ExecutiveManagerPerformanceTable({
                   {record.dataQuality}/100
                   {record.dataQuality < 72 ? (
                     <div className="text-xs text-amber-700">
-                      Score ejecutivo no concluyente
+                      Puntaje ejecutivo no concluyente
                     </div>
                   ) : null}
                 </td>
@@ -749,7 +783,7 @@ function ManagerRankingTable({
     label: string;
     render: (record: ManagerBonusRecord) => string;
   }[] = [
-    { key: "score", label: "Score", render: (record) => `${record.score}` },
+    { key: "score", label: "Puntaje", render: (record) => `${record.score}` },
     {
       key: "targetCompletionRate",
       label: "Cumplimiento",
@@ -840,7 +874,7 @@ function ManagerRankingTable({
                   </td>
                   <td className="py-3 pr-4">
                     <Badge className={bonusStateClass(record.bonusState)}>
-                      {record.bonusState}
+                      {bonusStateLabel(record.bonusState)}
                     </Badge>
                   </td>
                   <td className="max-w-[260px] py-3 pr-4 text-muted-foreground">
@@ -848,7 +882,7 @@ function ManagerRankingTable({
                       {workflowStatusLabel(workflow.status)}
                     </Badge>
                     <div className="mt-1">
-                      Final: {formatCurrency(workflow.finalAmount)}
+                      Bono final: {formatCurrency(workflow.finalAmount)}
                     </div>
                   </td>
                 </tr>
@@ -867,7 +901,7 @@ function ScoreDimensionBars({ record }: { record: ManagerBonusRecord }) {
       <div className="mb-4 grid gap-1">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Target className="size-4 text-primary" />
-          Score por dimension
+          Desglose del puntaje
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
           {record.explanation}
@@ -903,7 +937,7 @@ function ScoreDimensionBars({ record }: { record: ManagerBonusRecord }) {
           {
             color: "bg-slate-500",
             label: "Cada fila",
-            text: "es una dimension del score del gerente, como finanzas, operacion, calidad o datos.",
+            text: "es una dimension del puntaje del gerente, como finanzas, operacion, calidad o datos.",
           },
           {
             color: "bg-slate-500",
@@ -918,7 +952,7 @@ function ScoreDimensionBars({ record }: { record: ManagerBonusRecord }) {
           {
             color: "bg-blue-600",
             label: "Puntos",
-            text: "son el aporte ponderado de esa dimension al score total.",
+            text: "son el aporte ponderado de esa dimension al puntaje total.",
           },
         ]}
       />
@@ -1026,7 +1060,7 @@ function ComplianceBonusChart({ records }: { records: ManagerBonusRecord[] }) {
                   <title>{`${record.manager}
 Cumplimiento: ${formatRate(record.targetCompletionRate)}
 Bono recomendado: ${formatCurrency(record.bonusRecommended)}
-Estado: ${record.bonusState}`}</title>
+Estado: ${bonusStateLabel(record.bonusState)}`}</title>
                 </rect>
                 <text fill="#64748b" fontSize="10" textAnchor="middle" x={x + barWidth / 2} y={height - 18}>
                   {record.manager.split(" ")[0]}
@@ -1138,7 +1172,7 @@ function ProfitabilityPerformanceMatrix({
           Rentabilidad versus desempeno gerencial
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
-          Eje X: score gerencial. Eje Y: utilidad operativa. Tamano: venta.
+          Eje X: puntaje gerencial. Eje Y: utilidad operativa. Tamano: venta.
           Pasa encima para ver datos exactos.
         </p>
       </div>
@@ -1218,17 +1252,17 @@ function ProfitabilityPerformanceMatrix({
                 </text>
                 <title>{`${record.manager}
 Sucursal: ${record.branch}
-Score: ${record.score}
+Puntaje: ${record.score}
 Utilidad: ${formatCurrency(record.utility)}
 Venta: ${formatCurrency(record.netSales)}
 Bono: ${formatCurrency(record.bonusRecommended)}
-Estado: ${record.bonusState}`}</title>
+Estado: ${bonusStateLabel(record.bonusState)}`}</title>
               </g>
             );
           })}
 
           <text fill="#334155" fontSize="12" fontWeight="600" textAnchor="middle" x={padding.left + plotWidth / 2} y={height - 18}>
-            Score gerencial
+            Puntaje gerencial
           </text>
           <text
             fill="#334155"
@@ -1248,7 +1282,7 @@ Estado: ${record.bonusState}`}</title>
           {
             color: "bg-slate-500",
             label: "Eje X",
-            text: "score gerencial; mientras mas a la derecha, mejor desempeno integral.",
+            text: "puntaje gerencial; mientras mas a la derecha, mejor desempeno integral.",
           },
           {
             color: "bg-slate-500",
@@ -1538,7 +1572,7 @@ Estado: ${record.status}`}</title>
           {
             color: "bg-slate-500",
             label: "Eje X",
-            text: "desempeno actual del gerente medido por su score integral.",
+            text: "desempeno actual del gerente medido por su puntaje integral.",
           },
           {
             color: "bg-slate-500",
@@ -1587,7 +1621,7 @@ function ManagerProfile({
         <div className="flex flex-wrap gap-2">
           <Badge className={statusClass(record.status)}>{record.status}</Badge>
           <Badge className={bonusStateClass(record.bonusState)}>
-            {record.bonusState}
+            {bonusStateLabel(record.bonusState)}
           </Badge>
           <Badge className={workflowStatusClass(workflow.status)}>
             {workflowStatusLabel(workflow.status)}
@@ -1597,7 +1631,7 @@ function ManagerProfile({
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Score total", value: `${record.score}`, note: `${record.scoreDelta >= 0 ? "+" : ""}${record.scoreDelta} pts vs periodo anterior` },
+          { label: "Puntaje de desempeno", value: `${record.score}`, note: `${record.scoreDelta >= 0 ? "+" : ""}${record.scoreDelta} pts vs periodo anterior` },
           { label: "Rol evaluado", value: record.managerRole, note: `${record.branchesInScope.length} sucursal(es) en alcance` },
           { label: "Cumplimiento", value: formatRate(record.targetCompletionRate), note: "meta aprobada del periodo" },
           { label: "Bono recomendado", value: formatCurrency(workflow.recommendedAmount), note: `${record.bonusBand} / monto original preservado` },
@@ -1618,7 +1652,7 @@ function ManagerProfile({
         <div className="font-medium">Por que recibo este bono</div>
         <p className="mt-1">{record.whyBonus}</p>
         <p className="mt-1 text-xs">
-          Periodo {record.period}. Cierre {record.closingStatus}. Formula{" "}
+          Periodo {record.period}. Cierre {closingStatusLabel(record.closingStatus)}. Modelo{" "}
           {record.formulaVersion}. {workflow.reason ?? record.approvalReason}
         </p>
       </div>
@@ -1660,12 +1694,12 @@ function ManagerProfile({
           <div className="mb-3 text-sm font-medium">Flujo de aprobacion</div>
           <div className="grid gap-2 text-xs">
             {[
-              "SYSTEM RECOMMENDS: sistema calcula score y bono sugerido",
-              "Gerente visualiza calculo y agrega evidencia",
-              "Gerente de Operaciones o autoridad revisa",
-              "APPROVED, REJECTED o ADJUSTED WITH REASON",
-              "Auditoria consulta cambios, usuario, razon y evidencia",
-              "Nomina externa solo recibe resultado aprobado, no automatico",
+              "El sistema calcula puntaje y bono recomendado",
+              "El gerente revisa el calculo y agrega evidencia",
+              "Gerencia de Operaciones o autoridad autorizada revisa",
+              "La decision queda como aprobada, rechazada o ajustada con motivo",
+              "Auditoria consulta cambios, usuario, motivo y evidencia",
+              "Nomina externa recibe solo el resultado aprobado; no hay pago automatico",
             ].map((step, index) => (
               <div className="flex items-center gap-3 rounded-md border bg-card p-2" key={step}>
                 <div className="flex size-6 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
@@ -1755,11 +1789,12 @@ function BonusDecisionWorkflow({
         <div className="grid gap-1">
           <div className="flex items-center gap-2 text-sm font-medium">
             <BadgeDollarSign className="size-4 text-primary" />
-            Workflow auditable de bono
+            Aprobacion auditable de bono
           </div>
           <p className="text-xs leading-5 text-muted-foreground">
-            La decision se registra server-side. El score original, monto
-            recomendado y desglose no se modifican despues de decidir.
+            La decision queda registrada con usuario, fecha y motivo cuando
+            aplica. El puntaje original, monto recomendado y desglose se
+            conservan despues de decidir.
           </p>
         </div>
         <Badge className={workflowStatusClass(workflow.status)}>
@@ -1786,8 +1821,8 @@ function BonusDecisionWorkflow({
                 : formatCurrency(workflow.finalAmount),
           },
           {
-            label: "SCORE",
-            note: "score original preservado",
+            label: "PUNTAJE",
+            note: "puntaje original preservado",
             value: `${workflow.scoreOriginal}/100`,
           },
           {
@@ -2091,11 +2126,11 @@ function BonusSimulator({ record }: { record: ManagerBonusRecord }) {
         </div>
         <div className="grid gap-3 rounded-md border bg-background p-3">
           <div>
-            <div className="text-xs text-muted-foreground">Score actual</div>
+            <div className="text-xs text-muted-foreground">Puntaje actual</div>
             <div className="text-2xl font-semibold">{record.score}</div>
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">Score simulado</div>
+            <div className="text-xs text-muted-foreground">Puntaje simulado</div>
             <div className="text-2xl font-semibold text-emerald-700">
               {simulatedScore}
             </div>

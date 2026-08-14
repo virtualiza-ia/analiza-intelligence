@@ -815,7 +815,7 @@ function WarningSummaryCards({
       <div className="rounded-md border bg-amber-50 p-4 text-amber-900">
         <div className="text-xs font-medium">Riesgo promedio</div>
         <div className="mt-2 text-2xl font-semibold">{summary.averageRisk}/100</div>
-        <p className="mt-1 text-xs">Score exploratorio DEMO.</p>
+        <p className="mt-1 text-xs">Puntaje exploratorio DEMO.</p>
       </div>
       <div className="rounded-md border bg-slate-50 p-4 text-slate-800">
         <div className="text-xs font-medium">Fuentes pendientes</div>

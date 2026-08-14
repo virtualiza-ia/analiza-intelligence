@@ -137,7 +137,7 @@ for (const requiredText of [
   "Ocupacion agendada",
   "orden_creada",
   "resultado_validado",
-  "Fuente no conectada; no se interpreta como cero operativo",
+  "Datos pendientes de conexion; no se interpreta como cero operativo",
   "KPI Registry conectado",
 ]) {
   if (!operationsComponent.includes(requiredText)) {

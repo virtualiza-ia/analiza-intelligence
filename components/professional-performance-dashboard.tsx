@@ -413,7 +413,7 @@ function WeightModel({
     <section className="min-w-0 rounded-md border bg-card p-4">
       <div className="mb-4 flex items-center gap-2 text-sm font-medium">
         <Scale className="size-4 text-primary" />
-        Ponderacion del score por rol
+        Ponderacion del puntaje por rol
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {weights.map((weight) => (
@@ -431,7 +431,7 @@ function WeightModel({
           {
             color: "bg-blue-600",
             label: "Barra",
-            text: "peso de esa dimension dentro del score integral.",
+            text: "peso de esa dimension dentro del puntaje integral.",
           },
           {
             color: "bg-slate-500",
@@ -582,7 +582,7 @@ Estado: ${record.status}`}</title>
           {
             color: "bg-slate-500",
             label: "Eje Y",
-            text: "score de calidad, seguridad, protocolos y reclamos.",
+            text: "puntaje de calidad, seguridad, protocolos y reclamos.",
           },
           {
             color: "bg-blue-600",
@@ -832,7 +832,7 @@ function ProfessionalRankingTable({
   }
 
   const columns: { key: SortKey; label: string; render: (record: ProfessionalRecord) => string }[] = [
-    { key: "score", label: "Score", render: (record) => `${record.score}` },
+    { key: "score", label: "Puntaje", render: (record) => `${record.score}` },
     { key: "productivityAdjusted", label: "Productividad", render: (record) => `${record.productivityAdjusted}` },
     { key: "qualityScore", label: "Calidad", render: (record) => `${record.qualityScore}` },
     { key: "utilizationRate", label: "Utilizacion", render: (record) => `${record.utilizationRate}%` },
@@ -850,7 +850,7 @@ function ProfessionalRankingTable({
           Ranking normalizado por rol
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
-          Ordenable, pero el score se interpreta dentro del rol y grupo comparable.
+          Ordenable, pero el puntaje se interpreta dentro del rol y grupo comparable.
         </p>
       </div>
       <div className="max-w-full overflow-x-auto">
@@ -921,7 +921,7 @@ function ScoreDimensionBars({ record }: { record: ProfessionalRecord }) {
       <div className="mb-4 grid gap-1">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Target className="size-4 text-primary" />
-          Score integral del profesional
+          Puntaje integral del profesional
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
           {record.name} se evalua contra {record.comparableGroup}.
@@ -1302,7 +1302,7 @@ function ProfessionalProfile({ record }: { record: ProfessionalRecord }) {
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Score integral", value: `${record.score}`, note: `${record.scoreDelta >= 0 ? "+" : ""}${record.scoreDelta} pts vs periodo anterior` },
+          { label: "Puntaje integral", value: `${record.score}`, note: `${record.scoreDelta >= 0 ? "+" : ""}${record.scoreDelta} pts vs periodo anterior` },
           { label: "Productividad", value: `${record.productivityAdjusted}`, note: "ajustada por rol y horas" },
           { label: "Calidad", value: `${record.qualityScore}`, note: "protocolos, errores y reclamos" },
           { label: "Utilizacion", value: `${record.utilizationRate}%`, note: `${record.usedHours} h usadas` },

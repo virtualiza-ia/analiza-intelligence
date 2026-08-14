@@ -451,7 +451,7 @@ const wizardSteps = [
   "Calidad",
   "Observaciones",
   "Validacion",
-  "Preview",
+  "Vista previa",
   "Publicar",
 ];
 
@@ -884,7 +884,7 @@ function ValidationPanel({ closure }: { closure: ImagingClosure | null }) {
   if (!closure) {
     return (
       <section className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
-        Guarda un borrador para ejecutar validacion server-side.
+        Guarda un borrador para validar la informacion antes de publicar.
       </section>
     );
   }
@@ -951,7 +951,7 @@ function Header({
     insights: "Insights Imagenes",
     "new-closure": "Nuevo cierre mensual Imagenes",
     operations: "Resumen operativo Imagenes",
-    overview: "Imagenes en Overview",
+    overview: "Resumen Imagenes",
     results: "Resultados Imagenes",
     targets: "Metas Imagenes",
   };
@@ -959,19 +959,19 @@ function Header({
     "branch-home":
       "Entrada simple para completar cierre, revisar resultado, metas e insights de la sucursal.",
     history:
-      "Cierres versionados. Un cierre publicado no se edita silenciosamente; se reemplaza con correccion trazable.",
+      "Cierres con historial. Un cierre publicado solo se corrige creando una nueva version con motivo.",
     insights:
-      "Alertas deterministicas desde dato real, meta aprobada y cierre publicado.",
+      "Alertas generadas desde datos reales, metas aprobadas y cierres publicados.",
     "new-closure":
-      "Wizard profesional para capturar el cierre mensual sin replicar cuadrículas de Excel.",
+      "Formulario guiado para capturar el cierre mensual sin replicar las hojas de Excel.",
     operations:
       "Consolidado por area y sucursal dentro del alcance autorizado.",
     overview:
       "Lectura ejecutiva de Imagenes desde cierres publicados.",
     results:
-      "KPIs automaticos calculados desde la misma fuente de verdad publicada.",
+      "Indicadores calculados desde el cierre mensual publicado.",
     targets:
-      "Configuracion real de metas por periodo, pais, sucursal y KPI.",
+      "Metas por periodo, pais, sucursal e indicador.",
   };
 
   return (
@@ -996,7 +996,7 @@ function Header({
       <aside className="rounded-md border bg-card p-4 text-sm">
         <div className="mb-2 flex items-center gap-2 font-medium">
           <ShieldCheck className="size-4 text-primary" />
-          Alcance server-side
+          Alcance de acceso
         </div>
         <div className="grid gap-1 text-muted-foreground">
           <span>Rol: {workspace?.actorRole ?? "verificando"}</span>
@@ -1608,7 +1608,7 @@ export function ImagingVerticalDashboard({
           />
           <MetricCard
             label="Calidad"
-            note="Puntaje server-side"
+            note="Puntaje calculado"
             value={`${workingClosure?.dataQualityScore ?? 0}/100`}
           />
         </div>
@@ -1965,10 +1965,10 @@ export function ImagingVerticalDashboard({
             propuestos claramente marcados.
           </span>
           <span>
-            Calculation: KPIs automaticos sin NaN, Infinity ni ceros falsos.
+            Calculo: indicadores automaticos sin valores incompletos ni ceros falsos.
           </span>
           <span>
-            Dashboards: sucursal, area, operaciones y CEO leen el mismo cierre
+            Vistas: sucursal, area, operaciones y CEO leen el mismo cierre
             publicado.
           </span>
         </div>

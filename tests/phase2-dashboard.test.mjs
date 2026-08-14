@@ -134,7 +134,7 @@ const requiredNavigationTitles = [
   "Metas y avances",
   "Usuarios y permisos",
   "Mi cuenta",
-  "Auditoria",
+  "Auditoria del sistema",
 ];
 
 for (const title of requiredNavigationTitles) {
@@ -417,7 +417,7 @@ for (const requiredKpiRegistryText of [
   "higherIsBetter",
   "safeDivide",
   "Pendiente de carga",
-  "Fuente no conectada",
+  "Datos pendientes de conexion",
   "Datos incompletos",
   "No aplica",
 ]) {
@@ -491,7 +491,7 @@ for (const requiredBranchUiText of [
   "Ranking integral de sucursales",
   "Mapa operativo de sucursales",
   "Matriz rentabilidad versus operacion",
-  "Score operativo",
+  "Puntaje operativo",
   "Rentable con riesgo operativo",
   "Intervencion prioritaria",
   "Pasa encima",
@@ -518,7 +518,7 @@ for (const requiredBranchDataText of [
   "allBranchNetworkRecords",
   "getBranchNetworkScreen",
   "buildBranchTrendChart",
-  "Score integral",
+  "Puntaje comparable",
   "Resultado financiero",
   "Mapa de mando de toda la red",
   "Laboratorio por sucursal",
@@ -528,7 +528,7 @@ for (const requiredBranchDataText of [
   "La sucursal Centro tiene una ocupacion agendada de 89%",
   "Santa Tecla concentra la mayor lista de espera de tomografia",
   "Comparar cada sede contra promedio de red",
-  "El score nunca se muestra solo",
+  "El puntaje nunca se muestra solo",
   "fecha exacta",
   "venta-neta-sucursal",
   "pacientes-sucursal",

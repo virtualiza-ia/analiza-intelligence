@@ -489,7 +489,7 @@ function buildDimensions(
         label: "Operacion",
         score: operationalScore,
         weight: 25,
-        insight: "Pruebas, productividad, throughput disponible y operacion diaria.",
+        insight: "Pruebas, productividad, flujo de procesamiento disponible y operacion diaria.",
       },
       {
         id: "targets",
@@ -656,7 +656,7 @@ function buildAreaDimensions(
       label: "Mejora de rezagadas",
       score: Math.round(laggingImprovement),
       weight: 20,
-      insight: "Avance de sucursales con brecha o score bajo.",
+      insight: "Avance de sucursales con brecha o puntaje bajo.",
     },
     {
       id: "area-efficiency",
@@ -809,13 +809,13 @@ function buildWaterfall({
         label: `Banda ${band}`,
         amount: scoreBandAmount - bonusCap,
         kind: "adjustment" as const,
-        note: "Monto discreto segun score transparente.",
+        note: "Monto discreto segun puntaje transparente.",
       },
       {
         label: "Elegibilidad",
         amount: eligibilityAdjustment,
         kind: "adjustment" as const,
-        note: `BONUS STATUS: ${eligibilityStatus}.`,
+        note: `Estado del bono: ${eligibilityStatus}.`,
       },
       {
         label: "Bono recomendado",
@@ -872,18 +872,18 @@ function buildReductionCauses(
 
 function getLineSpecificExplanation(record: BranchNetworkRecord) {
   if (record.lineSlug === "laboratorio") {
-    return "El score de laboratorio pondera ordenes, muestras, SLA, inventario, reactivos, medicos, margen y datos.";
+    return "El puntaje de laboratorio pondera ordenes, muestras, SLA, inventario, reactivos, medicos, margen y datos.";
   }
 
   if (record.lineSlug === "fisioterapia") {
-    return "El score de fisioterapia evita premiar solo agenda llena: revisa ocupacion efectiva, continuidad terapeutica y no-show.";
+    return "El puntaje de fisioterapia evita premiar solo agenda llena: revisa ocupacion efectiva, continuidad terapeutica y no-show.";
   }
 
   if (record.lineSlug === "imagenes") {
-    return "El score de imagenes incorpora utilizacion, disponibilidad tecnica, informes, repeticiones y estudios sin facturar.";
+    return "El puntaje de imagenes incorpora utilizacion, disponibilidad tecnica, informes, repeticiones y estudios sin facturar.";
   }
 
-  return "El score multiservicio separa cada linea para que una fortaleza no oculte una falla critica.";
+  return "El puntaje multiservicio separa cada linea para que una fortaleza no oculte una falla critica.";
 }
 
 function buildManagerBonusRecord(
@@ -1167,12 +1167,12 @@ function buildMetrics(records: ManagerBonusRecord[]): ManagerBonusMetric[] {
     { group: "Gerentes", label: "En precaucion", value: `${warning}`, note: "requieren accion", tone: warning > 0 ? "warning" : "positive" },
     { group: "Gerentes", label: "Criticos o sin datos", value: `${critical}`, note: "riesgo de bono", tone: critical > 0 ? "negative" : "positive" },
     { group: "Bonos", label: "Rango por gerente", value: "$100-$200", note: "si cumple elegibilidad", tone: "neutral" },
-    { group: "Bonos", label: "ELIGIBLE", value: `${eligibleManagers}`, note: "puede pasar a aprobacion humana", tone: eligibleManagers > 0 ? "positive" : "warning" },
-    { group: "Bonos", label: "REVIEW REQUIRED", value: `${reviewManagers}`, note: "requiere evidencia o conciliacion", tone: reviewManagers > 0 ? "warning" : "positive" },
-    { group: "Bonos", label: "NOT ELIGIBLE", value: `${blockedManagers}`, note: "sin bono hasta resolver", tone: blockedManagers > 0 ? "negative" : "positive" },
+    { group: "Bonos", label: "Elegibles", value: `${eligibleManagers}`, note: "puede pasar a aprobacion humana", tone: eligibleManagers > 0 ? "positive" : "warning" },
+    { group: "Bonos", label: "Requieren revision", value: `${reviewManagers}`, note: "requiere evidencia o conciliacion", tone: reviewManagers > 0 ? "warning" : "positive" },
+    { group: "Bonos", label: "No elegibles", value: `${blockedManagers}`, note: "sin bono hasta resolver", tone: blockedManagers > 0 ? "negative" : "positive" },
     { group: "Bonos", label: "Bono recomendado", value: formatCurrency(totalProjected), note: `${projectedManagers} gerentes con monto`, tone: "positive" },
     { group: "Bonos", label: "Bono promedio", value: formatCurrency(averageBonus), note: "solo con recomendacion", tone: "neutral" },
-    { group: "Gestion", label: "Score gerencial promedio", value: `${Math.round(averageScore)}`, note: "0 a 100 ponderado", tone: averageScore >= 80 ? "positive" : "warning" },
+    { group: "Gestion", label: "Puntaje gerencial promedio", value: `${Math.round(averageScore)}`, note: "0 a 100 ponderado", tone: averageScore >= 80 ? "positive" : "warning" },
     { group: "Gestion", label: "Venta gestionada", value: formatCurrency(managedSales), note: "no sustituye salud financiera", tone: "neutral" },
     { group: "Gestion", label: "Utilidad gestionada", value: formatCurrency(managedUtility), note: "base de retorno", tone: managedUtility > 0 ? "positive" : "negative" },
     { group: "Gestion", label: "Margen promedio", value: formatRate(averageMargin), note: "ponderado simple DEMO", tone: averageMargin >= 0.38 ? "positive" : "warning" },
@@ -1296,8 +1296,8 @@ export function getManagerBonusScreen(slug: BusinessLineSlug): ManagerBonusScree
     metrics: buildMetrics(records),
     records,
     executiveInsights: [
-      "El score no depende solo de venta: finanzas, operacion, metas, eficiencia/calidad y calidad del dato pesan en la recomendacion.",
-      "BONUS STATUS puede ser ELIGIBLE, REVIEW REQUIRED o NOT ELIGIBLE segun cierre, calidad, KPIs criticos e inconsistencias.",
+      "El puntaje no depende solo de venta: finanzas, operacion, metas, eficiencia/calidad y calidad del dato pesan en la recomendacion.",
+      "El estado del bono puede ser Elegible, Requiere revision o No elegible segun cierre, calidad, indicadores criticos e inconsistencias.",
       "La aprobacion final debe pasar por autoridad autorizada; el gerente puede ver el calculo y evidencia, pero no aprobar su bono.",
       "El Gerente de Area se evalua por portafolio, porcentaje de sucursales en meta y mejora de rezagadas, no por suma simple.",
     ],
@@ -1371,19 +1371,19 @@ export function buildManagerBonusTrendChart(
   const metricOptions: TrendChartOption[] = [
     {
       id: "score-gerencial",
-      label: "Score gerencial",
+      label: "Puntaje gerencial",
       description:
-        "Evolucion del score total por gerente, con fecha exacta al pasar sobre cada punto.",
-      yLabel: "Score 0-100",
+        "Evolucion del puntaje total por gerente, con fecha exacta al pasar sobre cada punto.",
+      yLabel: "Puntaje 0-100",
       series: seriesForRecords(scopedRecords, "totalScore", (record) => `${record.score}`),
       insights: baseInsights,
     },
     {
       id: "score-financiero",
-      label: "Score financiero",
+      label: "Puntaje financiero",
       description:
         "Finanzas separa venta, utilidad y margen para evitar bonos por crecimiento poco rentable.",
-      yLabel: "Score financiero",
+      yLabel: "Puntaje financiero",
       series: seriesForRecords(scopedRecords, "financialScore", (record) =>
         `${getDimensionByLabel(record.dimensions, /Finanzas|Resultado consolidado/)}`,
       ),
@@ -1391,10 +1391,10 @@ export function buildManagerBonusTrendChart(
     },
     {
       id: "score-operativo",
-      label: "Score operativo",
+      label: "Puntaje operativo",
       description:
         "Operacion muestra productividad, SLA, uso de capacidad y cuellos de botella.",
-      yLabel: "Score operativo",
+      yLabel: "Puntaje operativo",
       series: seriesForRecords(scopedRecords, "operationalScore", (record) =>
         `${getDimensionByLabel(record.dimensions, /Operacion|Productividad|Utilizacion|Sucursales en meta|Mejora/)}`,
       ),
@@ -1402,10 +1402,10 @@ export function buildManagerBonusTrendChart(
     },
     {
       id: "score-calidad",
-      label: "Score calidad",
+      label: "Puntaje de calidad",
       description:
         "Calidad permite detectar bonos altos con evidencia pendiente, reclamos o SLA debil.",
-      yLabel: "Score calidad",
+      yLabel: "Puntaje de calidad",
       series: seriesForRecords(scopedRecords, "qualityScore", (record) =>
         `${getDimensionByLabel(record.dimensions, /Calidad|SLA|Informes|Puntualidad/)}`,
       ),
@@ -1425,7 +1425,7 @@ export function buildManagerBonusTrendChart(
   ];
 
   return {
-    title: "Evolucion del score y bono",
+    title: "Evolucion del puntaje y bono",
     description:
       "Selecciona KPI y rango de fechas; la grafica muestra valores exactos al pasar encima.",
     xLabels: exactDateLabels,

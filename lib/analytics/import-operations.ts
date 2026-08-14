@@ -1983,7 +1983,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
     fields: [
       {
         id: "team_feedback_score",
-        label: "Score 360 del equipo automatico",
+        label: "Puntaje 360 del equipo automatico",
         description:
           "Promedio anonimo de confianza, claridad, seguimiento y apoyo del gerente recibido por correo.",
         inputType: "percent",

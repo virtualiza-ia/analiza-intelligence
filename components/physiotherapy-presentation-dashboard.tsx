@@ -830,7 +830,7 @@ function ExecutiveGuard() {
         <div className="grid gap-3 md:grid-cols-3">
           <KpiTile
             kpi={{
-              label: "Score de calidad",
+              label: "Puntaje de calidad",
               note: qualityStatus,
               value: `${physioReferenceRecord.dataQualityScore}/100`,
             }}
@@ -1319,7 +1319,7 @@ function QualityPanel() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className="size-4 text-primary" />
-          <h3 className="font-semibold">Score de calidad del archivo</h3>
+          <h3 className="font-semibold">Puntaje de calidad del archivo</h3>
         </div>
         <Badge className="bg-red-100 text-red-800 hover:bg-red-100">
           {qualityStatus}
@@ -1423,7 +1423,7 @@ function TemplateTab({
           </Button>
           <Button onClick={onRollback} type="button" variant="outline">
             <RotateCcw className="size-4" />
-            Rollback
+            Revertir importacion
           </Button>
         </div>
 
@@ -2088,7 +2088,7 @@ function DataModelSummary() {
         </h3>
         <p className="text-sm leading-6 text-muted-foreground">
           Archivo, sucursal, periodo, gerente, version, mapeo de hojas,
-          validaciones, conciliaciones, score de calidad, auditoria y rollback.
+          validaciones, conciliaciones, puntaje de calidad, auditoria y reversion.
         </p>
       </div>
       <div className="rounded-md border bg-card p-4">
@@ -2269,10 +2269,10 @@ export function PhysiotherapyPresentationDashboard() {
   function handleRollback() {
     setUploadStatus("Revertido");
     setHistory((current) =>
-      addHistoryEvent(current, "Rollback ejecutado sobre la ultima importacion", "Revertido"),
+      addHistoryEvent(current, "Reversion ejecutada sobre la ultima importacion", "Revertido"),
     );
     setNotice({
-      text: "Rollback registrado. La version anterior queda visible en historial.",
+      text: "Reversion registrada. La version anterior queda visible en historial.",
       tone: "warning",
     });
   }

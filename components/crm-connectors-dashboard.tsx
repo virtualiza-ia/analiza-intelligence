@@ -136,7 +136,7 @@ export function CrmConnectorsDashboard() {
             <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
               Entorno DEMO
             </Badge>
-            <Badge variant="outline">Credenciales reales solo en servidor</Badge>
+            <Badge variant="outline">Credenciales protegidas</Badge>
             <Badge variant="outline">Fuentes y Conectores</Badge>
           </div>
           <div className="flex items-center gap-3">
@@ -148,8 +148,8 @@ export function CrmConnectorsDashboard() {
                 Conectores CRM por linea de negocio
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                Supervisa endpoints, credenciales server-side y respaldo manual
-                para conectar el CRM de cada linea. Si una API no esta
+                Supervisa conexiones, credenciales protegidas y respaldo manual
+                para conectar el CRM de cada linea. Si una fuente no esta
                 configurada, las plantillas siguen alimentando el sistema con
                 trazabilidad.
               </p>
@@ -164,7 +164,7 @@ export function CrmConnectorsDashboard() {
           </div>
           <p className="leading-6 text-muted-foreground">
             No se debe pegar una llave real en el navegador, Excel o dashboard.
-            Produccion debe crearla server-side, guardarla cifrada y mostrar
+            Produccion debe crearla en un entorno protegido, guardarla cifrada y mostrar
             solo ultimos 4 caracteres.
           </p>
         </aside>
@@ -257,7 +257,7 @@ export function CrmConnectorsDashboard() {
                           variant="outline"
                         >
                           <RefreshCcw className="size-4" />
-                          Sync
+                          Actualizar datos
                         </Button>
                       </div>
                     </td>
@@ -285,11 +285,11 @@ export function CrmConnectorsDashboard() {
                 </div>
                 <dl className="grid gap-2 text-xs text-muted-foreground">
                   <div className="flex items-center justify-between gap-3">
-                    <dt>Ultimo sync</dt>
+                    <dt>Ultima actualizacion</dt>
                     <dd>{connector.lastSyncAt ?? "pendiente"}</dd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <dt>Proximo sync</dt>
+                    <dt>Proxima actualizacion</dt>
                     <dd>{connector.nextSyncAt ?? "pendiente"}</dd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
@@ -299,7 +299,7 @@ export function CrmConnectorsDashboard() {
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <dt>Freshness</dt>
+                    <dt>Vigencia</dt>
                     <dd>{connector.freshness}</dd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
@@ -324,7 +324,7 @@ export function CrmConnectorsDashboard() {
                     variant="outline"
                   >
                     <RefreshCcw className="size-4" />
-                    Sync
+                    Actualizar datos
                   </Button>
                 </div>
               </article>
@@ -366,7 +366,7 @@ export function CrmConnectorsDashboard() {
             <div className="rounded-md border bg-background p-3">
               <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                 <LockKeyhole className="size-4 text-primary" />
-                Credencial server-side
+                Credencial protegida
               </div>
               <p className="text-xs leading-5 text-muted-foreground">
                 No se generan ni muestran llaves reales en el navegador. La

@@ -77,7 +77,7 @@ export async function POST(request: Request, context: ConnectorRouteContext) {
         error:
           error instanceof Error
             ? error.message
-            : "No se pudo ejecutar sync.",
+            : "No se pudo actualizar la informacion.",
       },
       { status: 400 },
     );

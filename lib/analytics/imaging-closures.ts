@@ -2108,7 +2108,7 @@ function validateDemoImagingClosureDraft(
     details:
       validated.validation.errors.length > 0
         ? "Validacion bloqueada por reglas de calidad."
-        : "Cierre validado por reglas server-side.",
+        : "Cierre validado por reglas de negocio.",
   });
 
   appendAudit(store, validated, event);
@@ -4386,7 +4386,7 @@ async function validatePostgresImagingClosureDraft(
       closure.validation.errors.length > 0 ? "validation_blocked" : "validated",
       closure.validation.errors.length > 0
         ? "Validacion bloqueada por reglas de calidad."
-        : "Cierre validado por reglas server-side.",
+        : "Cierre validado por reglas de negocio.",
     );
 
     const nextContext = await getPostgresContext(client, actor);

@@ -362,7 +362,7 @@ export function getKpiStatusLabel(status: KpiDataStatus) {
   const labels: Record<KpiDataStatus, string> = {
     AVAILABLE: "Disponible",
     PENDING_UPLOAD: "Pendiente de carga",
-    NOT_CONNECTED: "Fuente no conectada",
+    NOT_CONNECTED: "Datos pendientes de conexion",
     INCOMPLETE: "Datos incompletos",
     INVALID: "Dato invalido",
     DEMO: "DEMO",

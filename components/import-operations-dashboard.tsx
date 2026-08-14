@@ -181,6 +181,34 @@ const lineColors: Record<ImportBusinessLine, string> = {
   Laboratorio: "bg-indigo-600",
 };
 
+function serverImportStatusLabel(status: ServerImportRecord["status"] | string) {
+  if (status === "RAW_RECEIVED") {
+    return "Archivo recibido";
+  }
+
+  if (status === "VALIDATED") {
+    return "Validado";
+  }
+
+  if (status === "WARNING") {
+    return "Revisar";
+  }
+
+  if (status === "BLOCKED") {
+    return "Requiere correccion";
+  }
+
+  if (status === "PUBLISHED") {
+    return "Datos publicados";
+  }
+
+  if (status === "ROLLED_BACK") {
+    return "Publicacion revertida";
+  }
+
+  return status;
+}
+
 function readStoredContext() {
   if (typeof window === "undefined") {
     return null;
@@ -548,39 +576,39 @@ function ImportPipelineStepper({
   const steps = [
     {
       complete: Boolean(latestResult?.raw),
-      label: "Upload",
-      note: "Archivo recibido y RAW inmutable.",
+      label: "Recepcion",
+      note: "Archivo recibido y preservado.",
     },
     {
       complete: Boolean(latestResult),
-      label: "Mapping",
+      label: "Revision de columnas",
       note: "Columnas alineadas con plantilla versionada.",
     },
     {
       complete: importIsValidated,
       label: "Validacion",
-      note: "Reglas server-side, errores y warnings.",
+      note: "Reglas de negocio, errores y advertencias.",
     },
     {
       complete: Boolean(latestResult?.previewRows.length),
-      label: "Preview",
+      label: "Vista previa",
       note: "Muestra segura antes de publicar.",
     },
     {
       complete: status === "Importado",
-      label: "Publish",
-      note: "Filas pasan a PUBLISHED.",
+      label: "Publicacion",
+      note: "Filas aprobadas pasan a datos oficiales.",
     },
     {
       complete: hasLineage,
-      label: "Lineage",
+      label: "Trazabilidad",
       note: "Auditoria y origen consultables.",
     },
   ];
 
   return (
     <div className="grid gap-3 rounded-md border bg-muted/30 p-3">
-      <div className="text-sm font-medium">Pipeline de importacion</div>
+      <div className="text-sm font-medium">Flujo de importacion</div>
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {steps.map((step, index) => (
           <div
@@ -698,7 +726,7 @@ function DocumentDetail({
           </Button>
           <Button onClick={onValidate} type="button" variant="secondary">
             <ServerCog className="size-4" />
-            Validar en servidor
+            Validar informacion
           </Button>
           <Button onClick={onPublish} type="button">
             <CheckCircle2 className="size-4" />
@@ -706,11 +734,11 @@ function DocumentDetail({
           </Button>
           <Button onClick={onRollback} type="button" variant="outline">
             <Archive className="size-4" />
-            Rollback
+            Revertir publicacion
           </Button>
           <Button onClick={onReplace} type="button" variant="outline">
             <RefreshCcw className="size-4" />
-            Reemplazar version
+            Reemplazar archivo
           </Button>
           <Button onClick={onLineage} type="button" variant="outline">
             <History className="size-4" />
@@ -718,8 +746,8 @@ function DocumentDetail({
           </Button>
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
-          Archivo seleccionado: {selectedFileName || "ninguno"}. La validacion
-          ocurre en servidor antes de publicar.
+          Archivo seleccionado: {selectedFileName || "ninguno"}. La informacion
+          se valida antes de publicar.
         </p>
       </div>
 
@@ -727,21 +755,21 @@ function DocumentDetail({
         <div className="grid gap-3 rounded-md border bg-muted/30 p-3 text-xs leading-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge className={statusClass(status)}>
-              {latestResult.importRecord.status}
+              {serverImportStatusLabel(latestResult.importRecord.status)}
             </Badge>
             <Badge variant="outline">
               Calidad {latestResult.qualityScore}%
             </Badge>
             <Badge variant="outline">
-              {latestResult.stagingRows} filas staging
+              {latestResult.stagingRows} filas preparadas
             </Badge>
           </div>
           <div>
-            <strong>Import ID:</strong> {latestResult.importRecord.id}
+            <strong>Codigo de carga:</strong> {latestResult.importRecord.id}
           </div>
           <div>
-            <strong>RAW:</strong> {latestResult.raw.sanitizedFileName} ·{" "}
-            {latestResult.raw.fileSize} bytes · checksum{" "}
+            <strong>Archivo recibido:</strong> {latestResult.raw.sanitizedFileName} ·{" "}
+            {latestResult.raw.fileSize} bytes · huella{" "}
             {latestResult.raw.checksum.slice(0, 12)}
           </div>
           {latestResult.duplicateOf ? (
@@ -751,7 +779,7 @@ function DocumentDetail({
           ) : null}
           {latestResult.issues.length > 0 ? (
             <div className="grid gap-1">
-              <strong>Errores y warnings</strong>
+              <strong>Errores y advertencias</strong>
               {latestResult.issues.slice(0, 6).map((item) => (
                 <span key={`${item.code}-${item.rowNumber ?? "header"}-${item.column ?? "row"}`}>
                   {item.severity.toUpperCase()} {item.rowNumber ? `fila ${item.rowNumber}` : "archivo"}:{" "}
@@ -760,7 +788,7 @@ function DocumentDetail({
               ))}
             </div>
           ) : (
-            <span>Sin errores bloqueantes en preview.</span>
+            <span>Sin errores bloqueantes en la vista previa.</span>
           )}
           {latestResult.previewRows.length > 0 ? (
             <div className="overflow-x-auto rounded-md border bg-background">
@@ -784,10 +812,10 @@ function DocumentDetail({
                       </td>
                       <td className="px-2 py-2">
                         {row.errors.length > 0
-                          ? "BLOCKED"
+                          ? "Requiere correccion"
                           : row.warnings.length > 0
-                            ? "WARNING"
-                            : "VALIDATED"}
+                            ? "Revisar"
+                            : "Validado"}
                       </td>
                     </tr>
                   ))}
@@ -800,13 +828,13 @@ function DocumentDetail({
 
       {lineage ? (
         <div className="grid gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs leading-5 text-blue-900">
-          <strong>Lineage del ultimo import</strong>
-          <span>RAW inmutable: {lineage.raw?.immutable ? "si" : "pendiente"}</span>
+          <strong>Trazabilidad de la ultima carga</strong>
+          <span>Archivo original preservado: {lineage.raw?.immutable ? "si" : "pendiente"}</span>
           <span>Eventos auditados: {lineage.audit.length}</span>
           <span>Filas publicadas activas: {lineage.publishedRows.filter((row) => row.active).length}</span>
           {lineage.audit.slice(-3).map((event) => (
             <span key={`${event.at}-${event.action}`}>
-              {event.action} · {event.status} · {event.details}
+              {event.action} · {serverImportStatusLabel(event.status)} · {event.details}
             </span>
           ))}
         </div>
@@ -1399,7 +1427,7 @@ export function ImportOperationsDashboard() {
       return;
     }
 
-    setNotice("Validando en servidor: RAW, mapping, staging, calidad e idempotencia.");
+    setNotice("Validando estructura, calidad, duplicados y consistencia.");
 
     try {
       const response = await fetch("/api/imports/upload", {
@@ -1421,7 +1449,7 @@ export function ImportOperationsDashboard() {
       setDocumentStatus(
         importDocument,
         payload.importRecord.status === "BLOCKED" ? "Con errores" : "Validado",
-        `${importDocument.name}: ${payload.importRecord.status} con calidad ${payload.qualityScore}%. Preview server-side listo.`,
+        `${importDocument.name}: ${serverImportStatusLabel(payload.importRecord.status)} con calidad ${payload.qualityScore}%. Vista previa lista.`,
       );
     } catch (error) {
       setDocumentStatus(
@@ -1469,7 +1497,7 @@ export function ImportOperationsDashboard() {
       setDocumentStatus(
         importDocument,
         "Importado",
-        `${importDocument.name}: ${payload.publishedRows ?? 0} filas publicadas con auditoria y lineage.`,
+        `${importDocument.name}: ${payload.publishedRows ?? 0} filas publicadas con auditoria y trazabilidad.`,
       );
     } catch (error) {
       setDocumentStatus(
@@ -1501,7 +1529,7 @@ export function ImportOperationsDashboard() {
         `/api/imports/${serverResult.importRecord.id}/rollback`,
         {
           body: JSON.stringify({
-            reason: "Rollback solicitado desde centro de importaciones.",
+            reason: "Reversion solicitada desde centro de importaciones.",
           }),
           headers: { "Content-Type": "application/json" },
           method: "POST",
@@ -1513,7 +1541,7 @@ export function ImportOperationsDashboard() {
       };
 
       if (!response.ok || !payload.importRecord) {
-        throw new Error(payload.error ?? "Rollback rechazado.");
+        throw new Error(payload.error ?? "Reversion rechazada.");
       }
 
       const nextImportRecord = payload.importRecord;
@@ -1528,7 +1556,7 @@ export function ImportOperationsDashboard() {
       setDocumentStatus(
         importDocument,
         "Archivado",
-        `${importDocument.name}: rollback ejecutado, RAW preservado y analytics revertido.`,
+      `${importDocument.name}: publicacion revertida, archivo original preservado y datos publicados corregidos.`,
       );
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "No se pudo hacer rollback.");
@@ -1539,7 +1567,7 @@ export function ImportOperationsDashboard() {
     const serverResult = serverResultByDocument[importDocument.id];
 
     if (!serverResult) {
-      setNotice("Valida o publica primero para consultar lineage.");
+      setNotice("Valida o publica primero para consultar la trazabilidad.");
       return;
     }
 
@@ -1550,7 +1578,7 @@ export function ImportOperationsDashboard() {
       const payload = (await response.json()) as LineageResult & { error?: string };
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Lineage no disponible.");
+        throw new Error(payload.error ?? "Trazabilidad no disponible.");
       }
 
       setLineageByDocument((currentValue) => ({
@@ -1558,10 +1586,10 @@ export function ImportOperationsDashboard() {
         [importDocument.id]: payload,
       }));
       setNotice(
-        `${importDocument.name}: lineage consultado con ${payload.audit.length} eventos.`,
+        `${importDocument.name}: trazabilidad consultada con ${payload.audit.length} eventos.`,
       );
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "No se pudo consultar lineage.");
+      setNotice(error instanceof Error ? error.message : "No se pudo consultar la trazabilidad.");
     }
   }
 

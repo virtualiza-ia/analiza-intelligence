@@ -162,7 +162,7 @@ export const dashboardValidationAudits: DashboardValidationAudit[] = [
     prompt: "Leer que sucursal necesita apoyo y cual puede servir como modelo.",
   }),
   buildAudit({
-    chartPriority: ["Score de gerente", "Bono proyectado", "Causas de ajuste"],
+    chartPriority: ["Puntaje de gerente", "Bono proyectado", "Causas de ajuste"],
     densityScore: 70,
     densityStatus: "Cargada",
     href: "/protected/gerentes",
@@ -716,7 +716,7 @@ export function createAnaliaScreenChatResponse({
       bullets: [
         "Sin llave de IA, AnaliA solo usa una lectura DEMO deterministica y puede malinterpretar preguntas abiertas.",
         "La respuesta anterior salio como resumen porque no existia una intencion especial para preguntas sobre el propio chat.",
-        "Con OPENAI_API_KEY configurada, la pregunta se envia al agente server-side y puede responder como conversacion real.",
+        "Con OPENAI_API_KEY configurada, la pregunta se envia al agente protegido y puede responder como conversacion real.",
       ],
       caveat:
         "Esta respuesta explica el estado del agente; no es un insight operativo del negocio.",
@@ -730,7 +730,7 @@ export function createAnaliaScreenChatResponse({
       sources: [
         `Pantalla visible: ${audit.module}`,
         "Estado de AnaliA",
-        "Configuracion server-side",
+        "Configuracion protegida",
       ],
       suggestedNextStep:
         "Configurar OPENAI_API_KEY en .env.local y reiniciar el servidor para activar conversacion real.",
@@ -821,7 +821,7 @@ export function createAnaliaScreenChatResponse({
     bullets: compactChatBullets([
       `Lo mas importante: ${audit.decisionPrompt}`,
       `Prioridad visual: ${audit.chartPriority.slice(0, 2).join(" y ")}.`,
-      `Estado de lectura: ${audit.densityStatus}, score ${audit.densityScore}/100.`,
+      `Estado de lectura: ${audit.densityStatus}, puntaje ${audit.densityScore}/100.`,
       ...screenSignals.slice(0, 2).map((signal) => `Dato visible: ${signal}`),
     ]),
     caveat:

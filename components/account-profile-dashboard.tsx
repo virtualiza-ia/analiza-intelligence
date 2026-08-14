@@ -190,8 +190,8 @@ export function AccountProfileDashboard() {
         </div>
 
         <aside className="rounded-md border bg-card p-4 text-sm leading-6 text-muted-foreground">
-          El rol, pais, empresa, area y sucursal vienen de autorizacion
-          server-side. Esta pantalla no permite ampliar permisos ni cambiar
+          El rol, pais, empresa, area y sucursal vienen de la autorizacion de
+          la plataforma. Esta pantalla no permite ampliar permisos ni cambiar
           jerarquia.
         </aside>
       </div>

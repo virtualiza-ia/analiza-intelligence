@@ -133,8 +133,8 @@ const laboratoryStatusRows = [
   },
   {
     status: "resultado_validado",
-    count: "Fuente no conectada",
-    qualityNote: "Fuente no conectada; no se interpreta como cero operativo",
+    count: "Datos pendientes de conexion",
+    qualityNote: "Datos pendientes de conexion; no se interpreta como cero operativo",
   },
 ];
 

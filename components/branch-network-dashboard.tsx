@@ -86,7 +86,7 @@ const heatmapColumns: {
 }[] = [
   {
     key: "normalizedPerformanceScore",
-    label: "Score comp.",
+    label: "Puntaje comp.",
     formatter: (record) => `${record.normalizedPerformanceScore}`,
     value: (record) => record.normalizedPerformanceScore,
   },
@@ -315,7 +315,7 @@ function buildBranchManagerMetrics(
       value: record.patients.toLocaleString("en-US"),
     },
     {
-      label: "Score",
+      label: "Puntaje",
       note: `${record.scoreDelta >= 0 ? "+" : ""}${record.scoreDelta} pts vs periodo previo`,
       tone: record.score >= 80 ? "positive" : "warning",
       value: `${record.score}`,
@@ -532,10 +532,10 @@ function BranchRankingTable({
   const columns: { key: SortKey; label: string; render: (record: BranchNetworkRecord) => string }[] = [
     {
       key: "normalizedPerformanceScore",
-      label: "Score comparable",
+      label: "Puntaje comparable",
       render: (record) => `${record.normalizedPerformanceScore}`,
     },
-    { key: "score", label: "Score operativo", render: (record) => `${record.score}` },
+    { key: "score", label: "Puntaje operativo", render: (record) => `${record.score}` },
     { key: "netSales", label: "Venta", render: (record) => formatCurrency(record.netSales) },
     { key: "marginRate", label: "Margen", render: (record) => formatRate(record.marginRate) },
     { key: "patients", label: "Pacientes", render: (record) => record.patients.toLocaleString("en-US") },
@@ -695,7 +695,7 @@ Venta: ${formatCurrency(record.netSales)}
 Pacientes: ${record.patients.toLocaleString("en-US")}
 Margen: ${formatRate(record.marginRate)}
 Ocupacion: ${formatRate(record.occupancyRate)}
-Score comparable: ${record.normalizedPerformanceScore}
+Puntaje comparable: ${record.normalizedPerformanceScore}
 Linea: ${record.line}
 Alerta: ${record.alerts[0] ?? "Sin alerta critica"}`}
                   type="button"
@@ -719,7 +719,7 @@ Alerta: ${record.alerts[0] ?? "Sin alerta critica"}`}
 
                   <div className="grid gap-2">
                     {[
-                      { label: "Score", value: record.normalizedPerformanceScore, display: `${record.normalizedPerformanceScore}`, color: "bg-slate-700" },
+                      { label: "Puntaje", value: record.normalizedPerformanceScore, display: `${record.normalizedPerformanceScore}`, color: "bg-slate-700" },
                       { label: "Venta", value: Math.min(100, (record.netSales / 52000) * 100), display: formatCurrency(record.netSales), color: "bg-blue-600" },
                       { label: "Margen", value: record.marginRate * 100, display: formatRate(record.marginRate), color: "bg-emerald-600" },
                       { label: "Ocupacion", value: record.occupancyRate * 100, display: formatRate(record.occupancyRate), color: "bg-amber-500" },
@@ -789,7 +789,7 @@ function BubbleMatrix({
       <div className="mb-4 grid gap-1">
         <div className="text-sm font-medium">Matriz rentabilidad versus operacion</div>
         <p className="text-xs leading-5 text-muted-foreground">
-          Eje X: score comparable. Eje Y: margen. Tamano: pacientes. Pasa
+          Eje X: puntaje comparable. Eje Y: margen. Tamano: pacientes. Pasa
           encima de cada burbuja para ver los datos exactos.
         </p>
       </div>
@@ -880,7 +880,7 @@ function BubbleMatrix({
           </text>
 
           <text fill="#334155" fontSize="12" fontWeight="600" textAnchor="middle" x={padding.left + plotWidth / 2} y={height - 18}>
-            Score comparable
+            Puntaje comparable
           </text>
           <text
             fill="#334155"
@@ -919,7 +919,7 @@ function BubbleMatrix({
                   {record.city.slice(0, 2)}
                 </text>
                 <title>{`${record.branch}
-Score comparable: ${record.normalizedPerformanceScore}
+Puntaje comparable: ${record.normalizedPerformanceScore}
 Margen: ${formatRate(record.marginRate)}
 Pacientes: ${record.patients.toLocaleString("en-US")}
 Venta: ${formatCurrency(record.netSales)}
@@ -935,7 +935,7 @@ Estado: ${record.status}`}</title>
               {hoveredRecord.branch}
             </div>
             <div className="grid gap-1 text-muted-foreground">
-              <span>Score comparable: {hoveredRecord.normalizedPerformanceScore}</span>
+              <span>Puntaje comparable: {hoveredRecord.normalizedPerformanceScore}</span>
               <span>Margen: {formatRate(hoveredRecord.marginRate)}</span>
               <span>Pacientes: {hoveredRecord.patients.toLocaleString("en-US")}</span>
               <span>Venta: {formatCurrency(hoveredRecord.netSales)}</span>
@@ -1051,7 +1051,7 @@ function BranchProfile({ record }: { record: BranchNetworkRecord }) {
         <div className="flex flex-wrap items-center gap-2">
           <Badge className={getStatusClass(record.status)}>{record.status}</Badge>
           <Badge variant="outline">
-            Score comparable {record.normalizedPerformanceScore}
+            Puntaje comparable {record.normalizedPerformanceScore}
           </Badge>
           <Badge variant="outline">Base {record.comparisonBasis}</Badge>
           <Badge variant="outline">
@@ -1203,7 +1203,7 @@ function ExecutiveActions({ actions }: { actions: string[] }) {
 function ScoreWeightsPanel() {
   return (
     <section className="rounded-md border bg-card p-4">
-      <div className="mb-3 text-sm font-medium">Pesos del score integral</div>
+      <div className="mb-3 text-sm font-medium">Pesos del puntaje integral</div>
       <div className="grid gap-2 text-sm md:grid-cols-4">
         {branchScoreWeights.map((item) => (
           <div className="rounded-md border p-3" key={item.dimension}>

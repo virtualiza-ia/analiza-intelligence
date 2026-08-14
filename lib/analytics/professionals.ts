@@ -1123,7 +1123,7 @@ export function getProfessionalScreen(slug: BusinessLineSlug): ProfessionalScree
     slug,
     ...titles[slug],
     insights: [
-      "El score se calcula dentro del rol y grupo comparable; no compara directamente a un fisioterapeuta con un tecnico de laboratorio.",
+      "El puntaje se calcula dentro del rol y grupo comparable; no compara directamente a un fisioterapeuta con un tecnico de laboratorio.",
       "Alta productividad con baja calidad debe revisarse antes de reconocer buenas practicas.",
       "Una ocupacion alta no siempre es buena: puede indicar sobrecarga, riesgo de agotamiento o deterioro de experiencia.",
       "Factores fuera del control del profesional, como equipo detenido, insumos o agenda asignada, deben ajustarse con autorizacion y auditoria.",
@@ -1202,7 +1202,7 @@ export function buildProfessionalTrendChart(records: ProfessionalRecord[]) {
       series: seriesForRecords(scopedRecords, "productivity", (record) =>
         `${record.productivityAdjusted}`,
       ),
-      yLabel: "Score productividad",
+      yLabel: "Puntaje productividad",
     },
     {
       description:
@@ -1213,7 +1213,7 @@ export function buildProfessionalTrendChart(records: ProfessionalRecord[]) {
       series: seriesForRecords(scopedRecords, "quality", (record) =>
         `${record.qualityScore}`,
       ),
-      yLabel: "Score calidad",
+      yLabel: "Puntaje calidad",
     },
     {
       description:
@@ -1261,14 +1261,14 @@ export function buildProfessionalTrendChart(records: ProfessionalRecord[]) {
     },
     {
       description:
-        "Score integral del profesional dentro de su rol comparable.",
+        "Puntaje integral del profesional dentro de su rol comparable.",
       id: "score-integral-profesional",
       insights,
-      label: "Score integral",
+      label: "Puntaje integral",
       series: seriesForRecords(scopedRecords, "score", (record) =>
         `${record.score}`,
       ),
-      yLabel: "Score 0-100",
+      yLabel: "Puntaje 0-100",
     },
   ];
 

@@ -210,7 +210,7 @@ abstract class BaseConnector implements DataConnector {
     }
 
     return {
-      message: "Configuracion disponible para ejecutar prueba real server-side.",
+      message: "Configuracion disponible para ejecutar una prueba real protegida.",
       ok: true,
       requiredCredentials: [],
       status: "Conectado",

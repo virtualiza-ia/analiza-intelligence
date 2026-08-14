@@ -793,7 +793,7 @@ function scoreMetrics(records: BranchNetworkRecord[]): BranchNetworkMetric[] {
     { label: "Calidad de datos", value: `${dataProblems}`, note: "debajo de 80 puntos", tone: dataProblems > 0 ? "warning" : "positive" },
     { label: "Venta neta", value: formatCurrency(totalSales), note: "periodo seleccionado", tone: "positive" },
     { label: "Pacientes", value: totalPatients.toLocaleString("en-US"), note: "unicos DEMO", tone: "neutral" },
-    { label: "Score comparable", value: `${Math.round(averageScore)}`, note: "normalizado, no volumen", tone: averageScore >= 80 ? "positive" : "warning" },
+    { label: "Puntaje comparable", value: `${Math.round(averageScore)}`, note: "normalizado, no volumen", tone: averageScore >= 80 ? "positive" : "warning" },
   ];
 }
 
@@ -838,7 +838,7 @@ export function getBranchNetworkScreen(slug: BusinessLineSlug): BranchNetworkScr
     executiveActions: [
       "Comparar cada sede contra promedio de red, grupo comparable, mejor sede del grupo, resultado anterior y meta.",
       "No comparar injustamente una sede pequena con una sede central: usar tamano, capacidad instalada, mezcla de servicios y nivel de demanda.",
-      "El score nunca se muestra solo: siempre explica que lo subio, que lo redujo, cuanto cambio y que accion se recomienda.",
+      "El puntaje nunca se muestra solo: siempre explica que lo subio, que lo redujo, cuanto cambio y que accion se recomienda.",
       "Sucursal critica no siempre significa baja venta; puede ser alta ocupacion con bajo SLA, margen bajo o calidad de datos incompleta.",
     ],
   };
@@ -887,7 +887,7 @@ export function buildBranchTrendChart(records: BranchNetworkRecord[]): BranchTre
       tone: "neutral",
     },
     {
-      label: "Mayor score comparable",
+      label: "Mayor puntaje comparable",
       value: `${primaryRecord.city} ${primaryRecord.normalizedPerformanceScore}`,
       note: primaryRecord.recommendation,
       tone: primaryRecord.normalizedPerformanceScore >= 80 ? "positive" : "warning",
@@ -958,10 +958,10 @@ export function buildBranchTrendChart(records: BranchNetworkRecord[]): BranchTre
     },
     {
       id: "score-sucursal",
-      label: "Score comparable (Score integral)",
+      label: "Puntaje comparable",
       description:
-        "Score balanceado por meta, margen, capacidad, SLA, calidad y productividad proxy.",
-      yLabel: "Score 0-100",
+        "Puntaje balanceado por meta, margen, capacidad, SLA, calidad y productividad.",
+      yLabel: "Puntaje 0-100",
       series: seriesForMetric(scopedRecords, "normalizedPerformanceScore", (record) =>
         `${record.normalizedPerformanceScore}`,
       ),

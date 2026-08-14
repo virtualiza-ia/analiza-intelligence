@@ -370,7 +370,7 @@ export function DashboardValidationAgent() {
       response = {
         ...fallbackResponse,
         caveat:
-          "No pude contactar al agente server-side en este momento; respondo con lectura DEMO local.",
+          "No pude contactar al agente de analisis en este momento; respondo con lectura DEMO local.",
       };
     }
 

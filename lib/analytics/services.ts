@@ -1532,14 +1532,14 @@ export function buildServiceTrendChart(records: ServiceRecord[]) {
       yLabel: "% SLA",
     },
     {
-      description: "Score integral del servicio dentro de su linea y categoria.",
+      description: "Puntaje integral del servicio dentro de su linea y categoria.",
       id: "score-servicio",
       insights,
-      label: "Score integral",
+      label: "Puntaje integral",
       series: seriesForRecords(scopedRecords, "score", (record) =>
         `${record.score}`,
       ),
-      yLabel: "Score 0-100",
+      yLabel: "Puntaje 0-100",
     },
   ];
 

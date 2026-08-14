@@ -572,7 +572,7 @@ function stateLabel(state: ExecutiveState) {
 function ExecutiveKpiGrid({ metrics }: { metrics: CommandCenterMetric[] }) {
   return (
     <section
-      aria-label="Tarjetas principales del Executive Command Center"
+      aria-label="Tarjetas principales del Resumen Ejecutivo"
       className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5"
     >
       {metrics.map((metric) => (
@@ -654,7 +654,7 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
           Tabla ejecutiva por sucursal
         </h2>
         <p className="text-sm leading-6 text-muted-foreground">
-          Ordenada por riesgo, cumplimiento y score comparable, no por ingreso absoluto.
+          Ordenada por riesgo, cumplimiento y puntaje comparable, no por ingreso absoluto.
         </p>
       </div>
       <div className="grid gap-3 md:hidden">
@@ -671,7 +671,7 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
             </div>
             <dl className="grid gap-2 text-xs text-muted-foreground">
               <div className="flex items-center justify-between gap-3">
-                <dt>Score comparable</dt>
+                <dt>Puntaje comparable</dt>
                 <dd>{row.normalizedPerformanceScore ?? row.qualityScore}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -731,7 +731,7 @@ function ExecutiveBranchTable({ rows }: { rows: ExecutiveBranchRow[] }) {
               <th className="py-2 pr-4 font-medium">Sucursal</th>
               <th className="py-2 pr-4 font-medium">Empresa</th>
               <th className="py-2 pr-4 font-medium">Gerente</th>
-              <th className="py-2 pr-4 font-medium">Score comparable</th>
+              <th className="py-2 pr-4 font-medium">Puntaje comparable</th>
               <th className="py-2 pr-4 font-medium">Ingresos</th>
               <th className="py-2 pr-4 font-medium">Meta</th>
               <th className="py-2 pr-4 font-medium">Margen contribucion</th>
@@ -804,7 +804,7 @@ function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
         </h2>
         <p className="text-sm leading-6 text-muted-foreground">
           Compara responsabilidad, calidad, meta, margen, ocupacion efectiva y
-          score comparable promedio.
+          puntaje comparable promedio.
         </p>
       </div>
       <div className="grid gap-3 md:hidden">
@@ -821,7 +821,7 @@ function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
             </div>
             <dl className="grid gap-2 text-xs text-muted-foreground">
               <div className="flex items-center justify-between gap-3">
-                <dt>Score comparable</dt>
+                <dt>Puntaje comparable</dt>
                 <dd>{row.normalizedPerformanceScore ?? row.qualityScore}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -855,7 +855,7 @@ function ExecutiveManagerTable({ rows }: { rows: ExecutiveManagerRow[] }) {
             <tr className="border-b">
               <th className="py-2 pr-4 font-medium">Gerente</th>
               <th className="py-2 pr-4 font-medium">Sucursales</th>
-              <th className="py-2 pr-4 font-medium">Score comparable</th>
+              <th className="py-2 pr-4 font-medium">Puntaje comparable</th>
               <th className="py-2 pr-4 font-medium">Meta promedio</th>
               <th className="py-2 pr-4 font-medium">Margen contribucion</th>
               <th className="py-2 pr-4 font-medium">Ocupacion / utilizacion</th>
@@ -1436,12 +1436,11 @@ export function ExecutiveDashboard() {
             </div>
             <div className="grid gap-2">
               <h1 className="text-3xl font-semibold tracking-normal text-white sm:text-4xl">
-                Executive Command Center
+                Resumen Ejecutivo
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-white/70">
-                Resumen ejecutivo DEMO para entender en menos de 30 segundos como
-                va el negocio, donde falta meta, donde hay capacidad ociosa y que
-                dato no es suficientemente confiable.
+                Rendimiento operativo y financiero consolidado del periodo:
+                metas, capacidad, riesgos y calidad del dato en una sola vista.
               </p>
             </div>
           </div>

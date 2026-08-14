@@ -76,15 +76,15 @@ for (const requiredWeightText of [
 }
 
 for (const requiredDashboardText of [
-  "BONUS STATUS",
+  "Estado del bono",
   "Rol evaluado",
   "Bono recomendado",
   "Bono final",
   "Por que recibo este bono",
   "Backtest de politica de bonos",
-  "SYSTEM RECOMMENDS",
-  "APPROVED, REJECTED o ADJUSTED WITH REASON",
-  "Workflow auditable de bono",
+  "El sistema calcula puntaje y bono recomendado",
+  "La decision queda como aprobada, rechazada o ajustada con motivo",
+  "Aprobacion auditable de bono",
   "Aprobar",
   "Ajustar",
   "Rechazar",

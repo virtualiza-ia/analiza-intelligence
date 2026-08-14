@@ -84,7 +84,7 @@ function getStatusLabel(status: FinancialMetricStatus) {
     calculated: "Calculado",
     critical: "Critico",
     incomplete: "Datos incompletos",
-    "not-connected": "Fuente no conectada",
+    "not-connected": "Datos pendientes de conexion",
     "pending-upload": "Pendiente de carga",
     warning: "Vigilar",
   };

@@ -428,7 +428,7 @@ function WeightModel({
     <section className="min-w-0 rounded-md border bg-card p-4">
       <div className="mb-4 flex items-center gap-2 text-sm font-medium">
         <Scale className="size-4 text-primary" />
-        Ponderacion del score del servicio
+        Ponderacion del puntaje del servicio
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {weights.map((weight) => (
@@ -446,7 +446,7 @@ function WeightModel({
           {
             color: "bg-blue-600",
             label: "Barra",
-            text: "peso de cada dimension dentro del score integral.",
+            text: "peso de cada dimension dentro del puntaje integral.",
           },
           {
             color: "bg-slate-500",
@@ -456,7 +456,7 @@ function WeightModel({
           {
             color: "bg-slate-500",
             label: "Decision",
-            text: "explica que impulsa o reduce el score antes de actuar.",
+            text: "explica que impulsa o reduce el puntaje antes de actuar.",
           },
         ]}
       />
@@ -648,7 +648,7 @@ function ServiceRankingTable({
   }
 
   const columns: { key: ServiceSortKey; label: string; render: (record: ServiceRecord) => string }[] = [
-    { key: "score", label: "Score", render: (record) => `${record.score}` },
+    { key: "score", label: "Puntaje", render: (record) => `${record.score}` },
     { key: "requests", label: "Demanda", render: (record) => record.requests.toLocaleString("en-US") },
     { key: "completed", label: "Volumen", render: (record) => record.completed.toLocaleString("en-US") },
     { key: "patients", label: "Pacientes", render: (record) => record.patients.toLocaleString("en-US") },
@@ -1182,7 +1182,7 @@ function ScoreDimensionBars({ record }: { record: ServiceRecord }) {
       <div className="mb-4 grid gap-1">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Target className="size-4 text-primary" />
-          Score integral del servicio
+          Puntaje integral del servicio
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
           {record.name} se evalua dentro de {record.line} / {record.category}.
@@ -1237,7 +1237,7 @@ function ServiceProfile({ record }: { record: ServiceRecord }) {
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Score integral", value: `${record.score}`, note: `${record.scoreDelta >= 0 ? "+" : ""}${record.scoreDelta} pts vs periodo anterior` },
+          { label: "Puntaje integral", value: `${record.score}`, note: `${record.scoreDelta >= 0 ? "+" : ""}${record.scoreDelta} pts vs periodo anterior` },
           { label: "Solicitudes", value: record.requests.toLocaleString("en-US"), note: "demanda registrada" },
           { label: "Servicios realizados", value: record.completed.toLocaleString("en-US"), note: `${record.conversionRate}% conversion` },
           { label: "Pacientes", value: record.patients.toLocaleString("en-US"), note: `${record.newPatients} nuevos` },
