@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Home, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -15,13 +15,24 @@ import {
 } from "@/lib/navigation";
 import {
   demoRoleProfiles,
+  getCompanyForBusinessLine,
   roleKeys,
   type RoleKey,
 } from "@/lib/tenant/demo-context";
+import {
+  allBranchesValue,
+  allManagersValue,
+  allOperationalAreasValue,
+} from "@/lib/analytics/global-filters";
 
 const storageKey = "analiza:sidebar-collapsed";
 const roleStorageKey = "analiza:demo-role";
 const roleChangeEvent = "analiza:role-change";
+const businessLineByHref: Record<string, string> = {
+  "/protected/fisioterapia": "business-line-fisioterapia",
+  "/protected/imagenes": "business-line-imagenes",
+  "/protected/laboratorio": "business-line-laboratorio",
+};
 
 type AppSidebarProps = {
   allowDemoRoleSwitch: boolean;
@@ -34,6 +45,7 @@ function isActive(pathname: string, item: NavigationItem) {
 
 export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [collapsed, setCollapsed] = useState(false);
   const [activeRole, setActiveRole] = useState<RoleKey>(roleKey);
   const visibleItems = getNavigationForRole(activeRole);
@@ -66,6 +78,26 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
+  }
+
+  function hrefForItem(item: NavigationItem) {
+    const businessLineId = businessLineByHref[item.href];
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (!businessLineId) {
+      const serializedParams = params.toString();
+      return serializedParams ? `${item.href}?${serializedParams}` : item.href;
+    }
+
+    const company = getCompanyForBusinessLine(businessLineId);
+
+    params.set("line", businessLineId);
+    params.set("company", company.id);
+    params.set("branch", allBranchesValue);
+    params.set("area", allOperationalAreasValue);
+    params.set("manager", allManagersValue);
+
+    return `${item.href}?${params.toString()}`;
   }
 
   return (
@@ -140,7 +172,7 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
                         "bg-white text-[#07172d] shadow-[0_14px_30px_-22px_rgba(255,255,255,0.65)] hover:bg-white hover:text-[#07172d]",
                       collapsed && "justify-center px-0",
                     )}
-                    href={item.href}
+                    href={hrefForItem(item)}
                     key={item.href}
                     title={`${group.title}: ${item.title}`}
                   >

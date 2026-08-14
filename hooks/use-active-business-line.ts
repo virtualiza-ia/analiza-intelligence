@@ -15,6 +15,23 @@ type StoredBusinessLineContext = {
   companyName?: string;
 };
 
+const consolidatedBusinessLineIds = new Set(["__consolidated__"]);
+const consolidatedBusinessLineCodes = new Set(["CONSOLIDATED"]);
+
+const businessLineById: Record<string, ActiveBusinessLine> = {
+  "__consolidated__": "Consolidado",
+  "business-line-fisioterapia": "Fisioterapia",
+  "business-line-laboratorio": "Laboratorio",
+  "business-line-imagenes": "Imagenes",
+};
+
+const businessLineByCode: Record<string, ActiveBusinessLine> = {
+  CONSOLIDATED: "Consolidado",
+  IMAGING: "Imagenes",
+  LABORATORY: "Laboratorio",
+  PHYSIOTHERAPY: "Fisioterapia",
+};
+
 function isString(value: unknown): value is string {
   return typeof value === "string";
 }
@@ -63,6 +80,21 @@ function readStoredContext(storage: Storage) {
 export function resolveActiveBusinessLine(
   context: StoredBusinessLineContext & { lineParam?: string | null },
 ): ActiveBusinessLine {
+  if (context.lineParam && businessLineById[context.lineParam]) {
+    return businessLineById[context.lineParam];
+  }
+
+  if (context.businessLineId && businessLineById[context.businessLineId]) {
+    return businessLineById[context.businessLineId];
+  }
+
+  if (
+    context.businessLineCode &&
+    businessLineByCode[context.businessLineCode]
+  ) {
+    return businessLineByCode[context.businessLineCode];
+  }
+
   const lineText = normalizeText(
     [
       context.lineParam,
@@ -99,6 +131,7 @@ export function resolveActiveBusinessLine(
 
 function getActiveBusinessLineFromBrowser(): ActiveBusinessLine {
   const searchParams = new URLSearchParams(window.location.search);
+  const lineParam = searchParams.get("line");
   const storedContext =
     readStoredContext(window.localStorage) ??
     readStoredContext(window.sessionStorage) ??
@@ -106,6 +139,12 @@ function getActiveBusinessLineFromBrowser(): ActiveBusinessLine {
   const demoBusinessLineCode =
     window.localStorage.getItem(demoBusinessLineStorageKey) ??
     window.sessionStorage.getItem(demoBusinessLineStorageKey);
+  const explicitConsolidatedContext =
+    (lineParam && consolidatedBusinessLineIds.has(lineParam)) ||
+    (storedContext.businessLineId &&
+      consolidatedBusinessLineIds.has(storedContext.businessLineId)) ||
+    (storedContext.businessLineCode &&
+      consolidatedBusinessLineCodes.has(storedContext.businessLineCode));
   const storedBusinessLineCode =
     storedContext.businessLineCode === "CONSOLIDATED"
       ? undefined
@@ -113,7 +152,10 @@ function getActiveBusinessLineFromBrowser(): ActiveBusinessLine {
 
   return resolveActiveBusinessLine({
     ...storedContext,
-    businessLineCode: storedBusinessLineCode ?? demoBusinessLineCode ?? undefined,
+    businessLineCode:
+      storedBusinessLineCode ??
+      (explicitConsolidatedContext ? undefined : demoBusinessLineCode) ??
+      undefined,
     lineParam: searchParams.get("line"),
   });
 }

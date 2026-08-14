@@ -675,7 +675,10 @@ function BranchMapPanel({
 
       <div className="grid gap-3">
         {groupedRecords.map((group) => (
-          <div className="rounded-md border bg-background p-3" key={group.region}>
+          <div
+            className="rounded-md border bg-background p-3"
+            key={`${group.region}-${group.records.length}`}
+          >
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="text-sm font-semibold">{group.region}</div>
               <Badge variant="outline">{group.records.length} sedes</Badge>

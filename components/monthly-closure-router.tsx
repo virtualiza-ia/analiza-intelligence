@@ -25,6 +25,7 @@ function requestedLine(value: string | string[] | undefined) {
   const normalizedValue = rawValue?.trim().toLowerCase();
 
   if (
+    normalizedValue === "business-line-imagenes" ||
     normalizedValue === "imagenes" ||
     normalizedValue === "imagen" ||
     normalizedValue === "imaging" ||
@@ -34,6 +35,7 @@ function requestedLine(value: string | string[] | undefined) {
   }
 
   if (
+    normalizedValue === "business-line-laboratorio" ||
     normalizedValue === "laboratorio" ||
     normalizedValue === "laboratory" ||
     normalizedValue === "lab"
@@ -42,6 +44,7 @@ function requestedLine(value: string | string[] | undefined) {
   }
 
   if (
+    normalizedValue === "business-line-fisioterapia" ||
     normalizedValue === "fisioterapia" ||
     normalizedValue === "physiotherapy" ||
     normalizedValue === "fisio"

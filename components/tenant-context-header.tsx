@@ -392,6 +392,12 @@ export function TenantContextHeader() {
       return;
     }
 
+    const searchParams = new URLSearchParams(window.location.search);
+
+    if (searchParams.has("line")) {
+      return;
+    }
+
     setBusinessLineId((currentBusinessLineId) => {
       const currentBusinessLine = demoBusinessLineOptions.find(
         (line) => line.id === currentBusinessLineId,
@@ -684,6 +690,7 @@ export function TenantContextHeader() {
           <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
             <select
+              aria-label="Area operativa"
               className="min-w-48 bg-transparent outline-none"
               value={operationalAreaId}
               onChange={(event) => setOperationalAreaId(event.target.value)}
@@ -699,6 +706,7 @@ export function TenantContextHeader() {
           <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <MapPin className="size-3.5 text-muted-foreground" />
             <select
+              aria-label="Sucursal"
               className="min-w-44 bg-transparent outline-none"
               value={branchId}
               onChange={(event) => setBranchId(event.target.value)}
@@ -719,6 +727,7 @@ export function TenantContextHeader() {
           <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <UsersRound className="size-3.5 text-muted-foreground" />
             <select
+              aria-label="Gerente"
               className="min-w-40 bg-transparent outline-none"
               value={managerId}
               onChange={(event) => setManagerId(event.target.value)}
@@ -734,6 +743,7 @@ export function TenantContextHeader() {
           <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <UsersRound className="size-3.5 text-muted-foreground" />
             <select
+              aria-label="Profesional"
               className="min-w-44 bg-transparent outline-none"
               value={professionalId}
               onChange={(event) => setProfessionalId(event.target.value)}
@@ -749,6 +759,7 @@ export function TenantContextHeader() {
           <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
             <select
+              aria-label="Servicio"
               className="min-w-44 bg-transparent outline-none"
               value={serviceId}
               onChange={(event) => setServiceId(event.target.value)}
@@ -764,6 +775,7 @@ export function TenantContextHeader() {
           <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
             <select
+              aria-label="Pagador"
               className="min-w-40 bg-transparent outline-none"
               value={payerId}
               onChange={(event) => setPayerId(event.target.value)}
@@ -779,6 +791,7 @@ export function TenantContextHeader() {
           <label className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-2 text-xs">
             <BriefcaseBusiness className="size-3.5 text-muted-foreground" />
             <select
+              aria-label="Canal"
               className="min-w-40 bg-transparent outline-none"
               value={channelId}
               onChange={(event) => setChannelId(event.target.value)}
