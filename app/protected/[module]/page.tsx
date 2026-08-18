@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 
 import { BranchNetworkDashboard } from "@/components/branch-network-dashboard";
 import { BusinessModuleDashboard } from "@/components/business-module-dashboard";
@@ -84,6 +85,8 @@ export default async function ModulePage({
   params,
   searchParams,
 }: ModulePageProps) {
+  await connection();
+
   const { module } = await params;
   const item = navigationItems.find(
     (navigationItem) => navigationItem.href === `/protected/${module}`,

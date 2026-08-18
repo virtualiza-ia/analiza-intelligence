@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 
 import { MonthlyClosureRouter } from "@/components/monthly-closure-router";
 import { requireProtectedPath } from "@/lib/server/authorization";
@@ -9,15 +10,22 @@ type MyBranchPageProps = {
   }>;
 };
 
-async function MyBranchGate({ line }: { line?: string | string[] }) {
+async function MyBranchGate({
+  searchParams,
+}: {
+  searchParams?: MyBranchPageProps["searchParams"];
+}) {
+  await connection();
+
+  const params = searchParams ? await searchParams : {};
   const actor = await requireProtectedPath("/protected/mi-sucursal");
 
-  return <MonthlyClosureRouter actor={actor} line={line} mode="branch-home" />;
+  return (
+    <MonthlyClosureRouter actor={actor} line={params.line} mode="branch-home" />
+  );
 }
 
-export default async function MyBranchPage({ searchParams }: MyBranchPageProps) {
-  const params = searchParams ? await searchParams : {};
-
+export default function MyBranchPage({ searchParams }: MyBranchPageProps) {
   return (
     <Suspense
       fallback={
@@ -26,7 +34,7 @@ export default async function MyBranchPage({ searchParams }: MyBranchPageProps) 
         </div>
       }
     >
-      <MyBranchGate line={params.line} />
+      <MyBranchGate searchParams={searchParams} />
     </Suspense>
   );
 }

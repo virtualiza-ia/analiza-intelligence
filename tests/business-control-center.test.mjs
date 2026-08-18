@@ -144,14 +144,18 @@ for (const requiredHeaderText of [
   }
 }
 
-const replaceStateIndex = header.indexOf("window.history.replaceState");
+const routeReplaceIndex = header.indexOf("replaceRouteSearchParams(searchParams)");
 const contextEventIndex = header.indexOf(
   "window.dispatchEvent(new Event(contextChangeEvent))",
 );
 
-if (replaceStateIndex < 0 || contextEventIndex < replaceStateIndex) {
+if (
+  !header.includes("router.replace(nextHref, { scroll: false })") ||
+  routeReplaceIndex < 0 ||
+  contextEventIndex < routeReplaceIndex
+) {
   throw new Error(
-    "Context header must update the URL before notifying dashboards.",
+    "Context header must update URL/server context through the router before notifying dashboards.",
   );
 }
 

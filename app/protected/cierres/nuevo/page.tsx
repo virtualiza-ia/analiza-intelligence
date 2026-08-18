@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 
 import { MonthlyClosureRouter } from "@/components/monthly-closure-router";
 import { requireProtectedPath } from "@/lib/server/authorization";
@@ -9,17 +10,24 @@ type NewClosurePageProps = {
   }>;
 };
 
-async function NewClosureGate({ line }: { line?: string | string[] }) {
+async function NewClosureGate({
+  searchParams,
+}: {
+  searchParams?: NewClosurePageProps["searchParams"];
+}) {
+  await connection();
+
+  const params = searchParams ? await searchParams : {};
   const actor = await requireProtectedPath("/protected/cierres/nuevo");
 
-  return <MonthlyClosureRouter actor={actor} line={line} mode="new-closure" />;
+  return (
+    <MonthlyClosureRouter actor={actor} line={params.line} mode="new-closure" />
+  );
 }
 
-export default async function NewClosurePage({
+export default function NewClosurePage({
   searchParams,
 }: NewClosurePageProps) {
-  const params = searchParams ? await searchParams : {};
-
   return (
     <Suspense
       fallback={
@@ -28,7 +36,7 @@ export default async function NewClosurePage({
         </div>
       }
     >
-      <NewClosureGate line={params.line} />
+      <NewClosureGate searchParams={searchParams} />
     </Suspense>
   );
 }

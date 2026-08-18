@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   BriefcaseBusiness,
   CalendarDays,
@@ -159,6 +160,8 @@ type TenantContextHeaderProps = {
 export function TenantContextHeader({
   isDemoEnvironment,
 }: TenantContextHeaderProps) {
+  const router = useRouter();
+  const routeSearchParams = useSearchParams();
   const [currentUserAccess, setCurrentUserAccess] =
     useState<CurrentUserAccess | null>(null);
   const [demoBusinessLineCode, setDemoBusinessLineCode] = useState<string | null>(
@@ -181,10 +184,13 @@ export function TenantContextHeader({
   const [periodStart, setPeriodStart] = useState(`${getDefaultPeriod()}-01`);
   const [periodEnd, setPeriodEnd] = useState(`${getDefaultPeriod()}-31`);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const [routeContextReady, setRouteContextReady] = useState(false);
   const scopedBranchAccess = isBranchManagerScopedAccess(currentUserAccess)
     ? currentUserAccess
     : null;
-  const scopedCompanyAccess = currentUserAccess?.scope.companyId
+  const scopedCompanyAccess =
+    currentUserAccess?.scope.companyId &&
+    currentUserAccess.scope.companyId !== consolidatedCompanyId
     ? currentUserAccess
     : null;
   const scopedAreaAccess =
@@ -225,6 +231,21 @@ export function TenantContextHeader({
   const selectedChannel =
     demoChannelOptions.find((channel) => channel.id === channelId) ??
     demoChannelOptions[0];
+  const replaceRouteSearchParams = useCallback(
+    (searchParams: URLSearchParams) => {
+      const serializedParams = searchParams.toString();
+      const currentPathname = window.location.pathname;
+      const nextHref = serializedParams
+        ? `${currentPathname}?${serializedParams}`
+        : currentPathname;
+      const currentHref = `${window.location.pathname}${window.location.search}`;
+
+      if (currentHref !== nextHref) {
+        router.replace(nextHref, { scroll: false });
+      }
+    },
+    [router],
+  );
 
   const countryBranches = useMemo(
     () =>
@@ -297,7 +318,7 @@ export function TenantContextHeader({
   }, [isDemoEnvironment]);
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
+    const searchParams = new URLSearchParams(routeSearchParams.toString());
     const storedContext = isDemoEnvironment ? readStoredContext() : null;
     const nextContext = createGlobalFilterContextFromSearchParams(
       searchParams,
@@ -316,7 +337,8 @@ export function TenantContextHeader({
     setChannelId(nextContext.channelId);
     setPeriodStart(nextContext.periodStart);
     setPeriodEnd(nextContext.periodEnd);
-  }, [isDemoEnvironment]);
+    setRouteContextReady(true);
+  }, [isDemoEnvironment, routeSearchParams]);
 
   useEffect(() => {
     if (scopedCompanyAccess) {
@@ -432,6 +454,10 @@ export function TenantContextHeader({
   }, [demoScopedBusinessLine, scopedBranchAccess]);
 
   useEffect(() => {
+    if (!routeContextReady) {
+      return;
+    }
+
     const country = demoCountryOptions.find((item) => item.id === countryId);
     const company = demoCompanyOptions.find((item) => item.id === companyId);
     const businessLine =
@@ -505,11 +531,7 @@ export function TenantContextHeader({
     window.sessionStorage.setItem(storageKey, JSON.stringify(context));
 
     const searchParams = toGlobalFilterSearchParams(context);
-    window.history.replaceState(
-      null,
-      "",
-      `${window.location.pathname}?${searchParams.toString()}`,
-    );
+    replaceRouteSearchParams(searchParams);
     window.dispatchEvent(new Event(contextChangeEvent));
   }, [
     branchId,
@@ -523,12 +545,14 @@ export function TenantContextHeader({
     periodEnd,
     periodStart,
     professionalId,
+    routeContextReady,
     currentUserAccess,
     scopedBranchAccess,
     scopedBusinessLine,
     scopedAreaAccess,
     scopedCompanyAccess,
     isDemoEnvironment,
+    replaceRouteSearchParams,
     selectedManager.name,
     serviceId,
   ]);
@@ -538,29 +562,11 @@ export function TenantContextHeader({
       ? getCompanyForBusinessLine(nextBusinessLineId).id
       : scopedCompanyAccess?.scope.companyId ?? consolidatedCompanyId;
 
-    function syncLineSearchParams() {
-      const searchParams = new URLSearchParams(window.location.search);
-
-      searchParams.set("line", nextBusinessLineId);
-      searchParams.set("company", nextCompanyId);
-      searchParams.set("branch", allBranchesValue);
-      searchParams.set("area", allOperationalAreasValue);
-      searchParams.set("manager", allManagersValue);
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}?${searchParams.toString()}`,
-      );
-    }
-
     setBusinessLineId(nextBusinessLineId);
     setCompanyId(nextCompanyId);
     setBranchId(allBranchesValue);
     setOperationalAreaId(allOperationalAreasValue);
     setManagerId(allManagersValue);
-    syncLineSearchParams();
-    window.setTimeout(syncLineSearchParams, 0);
-    window.setTimeout(syncLineSearchParams, 250);
   }
 
   const selectedBranch = demoBranches.find((item) => item.id === branchId);

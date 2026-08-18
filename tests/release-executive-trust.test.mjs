@@ -17,6 +17,7 @@ const officialDashboard = read(
 );
 const overviewPage = read("app/protected/overview/page.tsx");
 const modulePage = read("app/protected/[module]/page.tsx");
+const resultsPage = read("app/protected/resultados/page.tsx");
 const monthlyRouter = read("components/monthly-closure-router.tsx");
 const mobileNavigation = read("components/mobile-navigation.tsx");
 const sidebar = read("components/app-sidebar.tsx");
@@ -117,8 +118,26 @@ assert.ok(
     tenantContextHeader.includes("consolidatedCompanyId") &&
     tenantContextHeader.includes("isDemoEnvironment ? readStoredContext() : null") &&
     tenantContextHeader.includes("isDemoEnvironment ? \"DEMO\" : \"Oficial\"") &&
+    tenantContextHeader.includes("useRouter") &&
+    tenantContextHeader.includes("useSearchParams") &&
+    tenantContextHeader.includes("router.replace(nextHref, { scroll: false })") &&
+    tenantContextHeader.includes(
+      "currentUserAccess.scope.companyId !== consolidatedCompanyId",
+    ) &&
+    tenantContextHeader.includes("routeContextReady") &&
+    !tenantContextHeader.includes("window.history.replaceState") &&
     !tenantContextHeader.includes('searchParams.set("company", nextCompany.id)'),
-  "Global filter header must keep URL/server context primary and avoid demo company routing outside demo.",
+  "Global filter header must keep URL/server context primary, navigate with the Next router and avoid demo company routing outside demo.",
+);
+
+assert.ok(
+  resultsPage.includes("await connection()") &&
+    resultsPage.includes("<ResultsGate searchParams={searchParams} />") &&
+    resultsPage.includes("line={params.line}") &&
+    monthlyRouter.includes('normalizedValue === "business-line-imagenes"') &&
+    monthlyRouter.includes('normalizedValue === "business-line-laboratorio"') &&
+    monthlyRouter.includes('normalizedValue === "business-line-fisioterapia"'),
+  "Resultados must receive the active line from URL context and route every business line correctly.",
 );
 
 assert.ok(

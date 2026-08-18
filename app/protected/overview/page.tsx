@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 
 import { requireProtectedPath } from "@/lib/server/authorization";
 import { getOfficialExecutiveSnapshot } from "@/lib/server/official-bi";
@@ -16,6 +17,8 @@ type OverviewPageProps = {
 };
 
 async function OverviewGate({ searchParams }: OverviewPageProps) {
+  await connection();
+
   const actor = await requireProtectedPath("/protected/overview");
 
   if (isDemoRuntimeEnvironment()) {
