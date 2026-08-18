@@ -1256,6 +1256,9 @@ export function LaboratoryVerticalDashboard({
   const showHistory = ["history", "branch-home"].includes(mode);
   const showTargets = mode === "targets" || showHome;
   const showInsights = mode === "insights" || showHome || mode === "overview";
+  const wizardProgress = Math.round(
+    ((activeStep + 1) / wizardSteps.length) * 100,
+  );
 
   function renderNumberFields(fields: FieldConfig[]) {
     return (
@@ -1437,7 +1440,12 @@ export function LaboratoryVerticalDashboard({
               productividad y utilizacion.
             </p>
           </div>
-          {renderNumberFields(capacityFields)}
+          <details className="rounded-md border bg-background p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Campos avanzados de capacidad
+            </summary>
+            <div className="mt-4">{renderNumberFields(capacityFields)}</div>
+          </details>
         </section>
       );
     }
@@ -1454,7 +1462,12 @@ export function LaboratoryVerticalDashboard({
               KPIs permanecen no calculables.
             </p>
           </div>
-          {renderNumberFields(qualityFields)}
+          <details className="rounded-md border bg-background p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Campos avanzados de calidad
+            </summary>
+            <div className="mt-4">{renderNumberFields(qualityFields)}</div>
+          </details>
         </section>
       );
     }
@@ -1618,8 +1631,26 @@ export function LaboratoryVerticalDashboard({
 
       {showWizard ? (
         <section className="grid gap-4">
-          <div className="rounded-md border bg-card p-3">
-            <div className="grid gap-2 md:grid-cols-5 xl:grid-cols-10">
+          <div className="rounded-md border bg-card p-4 lg:hidden">
+            <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
+              <span>
+                Paso {activeStep + 1} de {wizardSteps.length}
+              </span>
+              <span>{wizardProgress}%</span>
+            </div>
+            <div className="mt-3 h-2 rounded-full bg-muted">
+              <div
+                className="h-2 rounded-full bg-primary"
+                style={{ width: `${wizardProgress}%` }}
+              />
+            </div>
+            <div className="mt-3 text-base font-semibold tracking-normal">
+              {wizardSteps[activeStep]}
+            </div>
+          </div>
+
+          <div className="hidden rounded-md border bg-card p-3 lg:block">
+            <div className="grid gap-2 lg:grid-cols-5 xl:grid-cols-10">
               {wizardSteps.map((step, index) => (
                 <button
                   className={cn(
@@ -1640,7 +1671,7 @@ export function LaboratoryVerticalDashboard({
 
           {renderWizardStep()}
 
-          <div className="flex flex-col gap-3 rounded-md border bg-card p-3 md:flex-row md:items-center md:justify-between">
+          <div className="sticky bottom-3 z-10 flex flex-col gap-3 rounded-md border bg-card/95 p-3 shadow-lg backdrop-blur md:flex-row md:items-center md:justify-between">
             <div className="text-xs text-muted-foreground">
               {saving ? "Guardando..." : "Autosave activo"}
               {lastSavedAt ? ` / ultimo guardado ${lastSavedAt}` : ""}
@@ -1656,7 +1687,7 @@ export function LaboratoryVerticalDashboard({
                 variant="outline"
               >
                 <ArrowLeft className="size-4" />
-                Atras
+                Anterior
               </Button>
               <Button
                 disabled={saving || !activeWorkspace.canCreateClosure}

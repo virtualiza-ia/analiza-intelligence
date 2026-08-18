@@ -28,6 +28,7 @@ const roleChangeEvent = "analiza:role-change";
 
 type RoleWorkspaceHomeProps = {
   allowDemoRoleSwitch: boolean;
+  isDemoEnvironment: boolean;
   roleKey: RoleKey;
 };
 
@@ -354,6 +355,7 @@ function toneIcon(tone: WorkspaceItem["tone"]) {
 
 export function RoleWorkspaceHome({
   allowDemoRoleSwitch,
+  isDemoEnvironment,
   roleKey,
 }: RoleWorkspaceHomeProps) {
   const [activeRole, setActiveRole] = useState<RoleKey>(roleKey);
@@ -383,6 +385,50 @@ export function RoleWorkspaceHome({
     [activeRole],
   );
   const workspace = workspaceByRole[activeRole];
+  const visibleMetrics = isDemoEnvironment
+    ? workspace.metrics
+    : [
+        {
+          label: "Fuente BI",
+          note: "sin demo",
+          value: "Cierres publicados",
+        },
+        {
+          label: "Metas",
+          note: "aprobadas",
+          value: "Oficiales",
+        },
+        {
+          label: "Insights",
+          note: "calculados",
+          value: "Desde cierres",
+        },
+      ];
+  const visibleInbox = isDemoEnvironment
+    ? workspace.inbox
+    : [
+        {
+          detail:
+            "Abrir el resumen ejecutivo para revisar cierres publicados, metas e insights autorizados.",
+          href: "/protected/overview",
+          title: "Revisar resultados oficiales",
+          tone: "ok" as const,
+        },
+        {
+          detail:
+            "Confirmar que las metas activas tengan aprobacion antes de usarlas para cumplimiento.",
+          href: "/protected/metas",
+          title: "Validar metas aprobadas",
+          tone: "action" as const,
+        },
+        {
+          detail:
+            "Atender primero los insights de cierres publicados con mayor severidad.",
+          href: "/protected/insights",
+          title: "Priorizar insights oficiales",
+          tone: "action" as const,
+        },
+      ];
   const shortcutItems = workspace.shortcutHrefs
     .map((href) => navigationItems.find((item) => item.href === href))
     .filter((item): item is (typeof navigationItems)[number] => {
@@ -398,9 +444,15 @@ export function RoleWorkspaceHome({
       <div className="grid gap-4 xl:grid-cols-[1fr_340px] xl:items-end">
         <div className="grid gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
-              Entorno DEMO
-            </Badge>
+            {isDemoEnvironment ? (
+              <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
+                Entorno DEMO
+              </Badge>
+            ) : (
+              <Badge className="w-fit bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                Datos oficiales
+              </Badge>
+            )}
             <Badge variant="outline">{workspace.badge}</Badge>
           </div>
           <div className="grid gap-2">
@@ -429,7 +481,7 @@ export function RoleWorkspaceHome({
       <section className="grid gap-3">
         <div className="text-sm font-medium">Lectura en 10 segundos</div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {workspace.metrics.map((metric) => (
+          {visibleMetrics.map((metric) => (
             <article className="rounded-md border bg-card p-4" key={metric.label}>
               <div className="text-sm text-muted-foreground">{metric.label}</div>
               <div className="mt-2 text-2xl font-semibold tracking-normal">
@@ -460,7 +512,7 @@ export function RoleWorkspaceHome({
             Que necesita decidir o completar este rol ahora
           </div>
           <div className="grid gap-3">
-            {workspace.inbox.map((item) => {
+            {visibleInbox.map((item) => {
               const Icon = toneIcon(item.tone);
 
               return (

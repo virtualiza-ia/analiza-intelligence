@@ -20,6 +20,7 @@ import {
   getBusinessLineForCompany,
   getCompanyForBusinessLine,
   getDefaultPeriod,
+  consolidatedCompanyId,
 } from "@/lib/tenant/demo-context";
 import {
   allBranchesValue,
@@ -151,7 +152,13 @@ function findBusinessLineByCompanyScope(companyId?: string | null, companyName?:
   return demoBusinessLineOptions[0];
 }
 
-export function TenantContextHeader() {
+type TenantContextHeaderProps = {
+  isDemoEnvironment: boolean;
+};
+
+export function TenantContextHeader({
+  isDemoEnvironment,
+}: TenantContextHeaderProps) {
   const [currentUserAccess, setCurrentUserAccess] =
     useState<CurrentUserAccess | null>(null);
   const [demoBusinessLineCode, setDemoBusinessLineCode] = useState<string | null>(
@@ -191,7 +198,7 @@ export function TenantContextHeader() {
       )
     : null;
   const demoScopedBusinessLine =
-    demoBusinessLineCode && !scopedCompanyAccess
+    isDemoEnvironment && demoBusinessLineCode && !scopedCompanyAccess
       ? demoBusinessLineOptions.find(
           (line) =>
             line.code === demoBusinessLineCode && !line.isConsolidated,
@@ -268,6 +275,11 @@ export function TenantContextHeader() {
 
   useEffect(() => {
     function syncDemoBusinessLine() {
+      if (!isDemoEnvironment) {
+        setDemoBusinessLineCode(null);
+        return;
+      }
+
       setDemoBusinessLineCode(
         window.localStorage.getItem(demoBusinessLineStorageKey) ??
           window.sessionStorage.getItem(demoBusinessLineStorageKey),
@@ -282,11 +294,11 @@ export function TenantContextHeader() {
       window.removeEventListener("storage", syncDemoBusinessLine);
       window.removeEventListener(roleChangeEvent, syncDemoBusinessLine);
     };
-  }, []);
+  }, [isDemoEnvironment]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
-    const storedContext = readStoredContext();
+    const storedContext = isDemoEnvironment ? readStoredContext() : null;
     const nextContext = createGlobalFilterContextFromSearchParams(
       searchParams,
       storedContext,
@@ -304,7 +316,7 @@ export function TenantContextHeader() {
     setChannelId(nextContext.channelId);
     setPeriodStart(nextContext.periodStart);
     setPeriodEnd(nextContext.periodEnd);
-  }, []);
+  }, [isDemoEnvironment]);
 
   useEffect(() => {
     if (scopedCompanyAccess) {
@@ -426,7 +438,7 @@ export function TenantContextHeader() {
       scopedBusinessLine ??
       demoBusinessLineOptions.find((item) => item.id === businessLineId);
     const businessLineCompany =
-      businessLine?.companyId
+      isDemoEnvironment && businessLine?.companyId
         ? demoCompanyOptions.find((item) => item.id === businessLine.companyId)
         : company;
     const branch = demoBranches.find((item) => item.id === branchId);
@@ -451,7 +463,8 @@ export function TenantContextHeader() {
     const contextCountryId =
       scopedCompanyAccess?.scope.countryId ?? country?.id ?? getInitialCountryId();
     const contextCompanyId =
-      scopedCompanyAccess?.scope.companyId ?? businessLineCompany?.id ?? "";
+      scopedCompanyAccess?.scope.companyId ??
+      (isDemoEnvironment ? businessLineCompany?.id ?? "" : consolidatedCompanyId);
     const context = resolveGlobalFilterContext({
       branchId: contextBranchId,
       branchName,
@@ -461,14 +474,15 @@ export function TenantContextHeader() {
       companyId: contextCompanyId,
       companyName:
         scopedCompanyAccess?.scope.companyName ??
-        businessLineCompany?.name ??
-        businessLine.name,
+        (isDemoEnvironment
+          ? businessLineCompany?.name ?? businessLine.name
+          : "Vista consolidada"),
       countryId: contextCountryId,
       countryName:
         scopedCompanyAccess?.scope.countryName ?? country?.name ?? "Pais asignado",
       dateFrom: periodStart,
       dateTo: periodEnd,
-      isDemo: !currentUserAccess,
+      isDemo: isDemoEnvironment,
       managerId: scopedBranchAccess ? allManagersValue : managerId,
       managerName: scopedBranchAccess
         ? scopedBranchAccess.scope.branchName
@@ -514,17 +528,21 @@ export function TenantContextHeader() {
     scopedBusinessLine,
     scopedAreaAccess,
     scopedCompanyAccess,
+    isDemoEnvironment,
     selectedManager.name,
     serviceId,
   ]);
 
   function handleBusinessLineChange(nextBusinessLineId: string) {
-    const nextCompany = getCompanyForBusinessLine(nextBusinessLineId);
+    const nextCompanyId = isDemoEnvironment
+      ? getCompanyForBusinessLine(nextBusinessLineId).id
+      : scopedCompanyAccess?.scope.companyId ?? consolidatedCompanyId;
+
     function syncLineSearchParams() {
       const searchParams = new URLSearchParams(window.location.search);
 
       searchParams.set("line", nextBusinessLineId);
-      searchParams.set("company", nextCompany.id);
+      searchParams.set("company", nextCompanyId);
       searchParams.set("branch", allBranchesValue);
       searchParams.set("area", allOperationalAreasValue);
       searchParams.set("manager", allManagersValue);
@@ -536,7 +554,7 @@ export function TenantContextHeader() {
     }
 
     setBusinessLineId(nextBusinessLineId);
-    setCompanyId(nextCompany.id);
+    setCompanyId(nextCompanyId);
     setBranchId(allBranchesValue);
     setOperationalAreaId(allOperationalAreasValue);
     setManagerId(allManagersValue);
@@ -677,7 +695,8 @@ export function TenantContextHeader() {
             className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
             title={`${selectedProfessional.name} · ${selectedPayer.name} · ${selectedChannel.name}`}
           >
-            {selectedManager.name} · {selectedService.name} · DEMO
+            {selectedManager.name} · {selectedService.name} ·{" "}
+            {isDemoEnvironment ? "DEMO" : "Oficial"}
           </span>
         </div>
       </div>

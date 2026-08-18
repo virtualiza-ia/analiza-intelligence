@@ -13,6 +13,16 @@ import {
 import { getNavigationForRole } from "../lib/navigation.ts";
 import { canAccessProtectedPath } from "../lib/security/authorization-policy.ts";
 
+const originalAppEnv = process.env.APP_ENV;
+process.env.APP_ENV = "demo";
+process.on("exit", () => {
+  if (originalAppEnv === undefined) {
+    delete process.env.APP_ENV;
+  } else {
+    process.env.APP_ENV = originalAppEnv;
+  }
+});
+
 const root = process.cwd();
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const physiotherapyCompanyId = "40000000-0000-4000-8000-000000000001";

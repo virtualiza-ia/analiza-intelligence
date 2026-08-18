@@ -3,6 +3,7 @@ import type { PoolClient } from "pg";
 import {
   getMissingDatabaseConfig,
   getPostgresPool,
+  withPostgresRlsContext,
 } from "../server/database.ts";
 import {
   canPerformAction,
@@ -2548,6 +2549,7 @@ function ensurePostgresPersistenceConfigured() {
 }
 
 async function withPostgresClient<T>(
+  actor: AuthorizationActor,
   work: (client: PoolClient) => Promise<T>,
 ) {
   ensurePostgresPersistenceConfigured();
@@ -2556,28 +2558,17 @@ async function withPostgresClient<T>(
   const client = await pool.connect();
 
   try {
-    return await work(client);
+    return await withPostgresRlsContext(client, actor, () => work(client));
   } finally {
     client.release();
   }
 }
 
 async function withPostgresTransaction<T>(
+  actor: AuthorizationActor,
   work: (client: PoolClient) => Promise<T>,
 ) {
-  return withPostgresClient(async (client) => {
-    await client.query("begin");
-
-    try {
-      const result = await work(client);
-
-      await client.query("commit");
-      return result;
-    } catch (error) {
-      await client.query("rollback");
-      throw error;
-    }
-  });
+  return withPostgresClient(actor, work);
 }
 
 function uuidOrNull(value: string) {
@@ -2893,6 +2884,9 @@ async function getPostgresTargets(
       from public.kpi_targets
       where business_line = 'PHYSIOTHERAPY'
         and branch_id = any($1::uuid[])
+        and status = 'active'
+        and approved_at is not null
+        and is_demo = false
       order by period_month desc, branch_id, kpi_id, version desc
     `,
     [branchIds],
@@ -3345,7 +3339,7 @@ async function savePostgresPhysiotherapyClosureDraft(
 ) {
   assertWritableRole(actor);
 
-  return withPostgresTransaction(async (client) => {
+  return withPostgresTransaction(actor, async (client) => {
     const payload = (typeof rawPayload === "object" && rawPayload !== null
       ? rawPayload
       : {}) as PhysiotherapyDraftPayload;
@@ -3633,7 +3627,7 @@ async function validatePostgresPhysiotherapyClosureDraft(
 ) {
   assertWritableRole(actor);
 
-  return withPostgresTransaction(async (client) => {
+  return withPostgresTransaction(actor, async (client) => {
     const { closure, context } = await getPostgresClosureById(
       client,
       actor,
@@ -3698,7 +3692,7 @@ async function publishPostgresPhysiotherapyClosure(
 ) {
   assertWritableRole(actor);
 
-  return withPostgresTransaction(async (client) => {
+  return withPostgresTransaction(actor, async (client) => {
     const { closure, context } = await getPostgresClosureById(
       client,
       actor,
@@ -3817,7 +3811,7 @@ async function upsertPostgresPhysiotherapyTarget(
     throw new Error("Este rol no puede configurar metas.");
   }
 
-  return withPostgresTransaction(async (client) => {
+  return withPostgresTransaction(actor, async (client) => {
     const payload = (typeof rawPayload === "object" && rawPayload !== null
       ? rawPayload
       : {}) as PhysiotherapyTargetPayload;
@@ -4066,7 +4060,7 @@ export async function getPhysiotherapyWorkspace(
   options: { period?: string } = {},
 ): Promise<PhysiotherapyWorkspace> {
   if (shouldUsePostgresPersistence()) {
-    return withPostgresClient(async (client) =>
+    return withPostgresClient(actor, async (client) =>
       buildWorkspaceFromContext(
         actor,
         await getPostgresContext(client, actor),

@@ -32,7 +32,7 @@ export function getAnalizaRuntimeEnvironment(): AnalizaRuntimeEnvironment {
     return "staging";
   }
 
-  return process.env.NODE_ENV === "production" ? "production" : "demo";
+  return "production";
 }
 
 export function isProductionRuntimeEnvironment() {

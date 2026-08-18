@@ -7,10 +7,7 @@ import { AccountProfileDashboard } from "@/components/account-profile-dashboard"
 import { CrmConnectorsDashboard } from "@/components/crm-connectors-dashboard";
 import { DataQualityAnaliaDashboard } from "@/components/data-quality-analia-dashboard";
 import { ExecutiveOperationDashboard } from "@/components/executive-operation-dashboard";
-import { FinancialHealthDashboard } from "@/components/financial-health-dashboard";
-import { GoalsAdvancesDashboard } from "@/components/goals-advances-dashboard";
 import { ImagingPresentationDashboard } from "@/components/imaging-presentation-dashboard";
-import { InsightsIntelligenceDashboard } from "@/components/insights-intelligence-dashboard";
 import { ImportOperationsDashboard } from "@/components/import-operations-dashboard";
 import { LaboratoryPresentationDashboard } from "@/components/laboratory-presentation-dashboard";
 import { ManualMonthlyEntryDashboard } from "@/components/manual-monthly-entry-dashboard";
@@ -23,11 +20,20 @@ import { Badge } from "@/components/ui/badge";
 import { moduleConfigs } from "@/lib/analytics/demo-business-modules";
 import { navigationItems } from "@/lib/navigation";
 import { requireProtectedPath } from "@/lib/server/authorization";
+import { getOfficialExecutiveSnapshot } from "@/lib/server/official-bi";
 import { isDemoRuntimeEnvironment } from "@/lib/security/environment";
 
 type ModulePageProps = {
   params: Promise<{
     module: string;
+  }>;
+  searchParams?: Promise<{
+    branch?: string;
+    company?: string;
+    country?: string;
+    from?: string;
+    line?: string;
+    to?: string;
   }>;
 };
 
@@ -53,7 +59,31 @@ export function generateStaticParams() {
     }));
 }
 
-export default async function ModulePage({ params }: ModulePageProps) {
+async function renderOfficialDataModule(
+  mode: "finances" | "insights" | "targets",
+  actor: Awaited<ReturnType<typeof requireProtectedPath>>,
+  searchParams: ModulePageProps["searchParams"],
+) {
+  const params = searchParams ? await searchParams : {};
+  const snapshot = await getOfficialExecutiveSnapshot(actor, {
+    branchId: params.branch,
+    businessLineId: params.line,
+    companyId: params.company,
+    countryId: params.country,
+    periodEnd: params.to,
+    periodStart: params.from,
+  });
+  const { OfficialExecutiveDataDashboard } = await import(
+    "@/components/official-executive-data-dashboard"
+  );
+
+  return <OfficialExecutiveDataDashboard mode={mode} snapshot={snapshot} />;
+}
+
+export default async function ModulePage({
+  params,
+  searchParams,
+}: ModulePageProps) {
   const { module } = await params;
   const item = navigationItems.find(
     (navigationItem) => navigationItem.href === `/protected/${module}`,
@@ -63,7 +93,7 @@ export default async function ModulePage({ params }: ModulePageProps) {
     notFound();
   }
 
-  await requireProtectedPath(item.href);
+  const actor = await requireProtectedPath(item.href);
 
   const Icon = item.icon;
 
@@ -100,6 +130,14 @@ export default async function ModulePage({ params }: ModulePageProps) {
   }
 
   if (module === "insights") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule("insights", actor, searchParams);
+    }
+
+    const { InsightsIntelligenceDashboard } = await import(
+      "@/components/insights-intelligence-dashboard"
+    );
+
     return <InsightsIntelligenceDashboard />;
   }
 
@@ -124,6 +162,14 @@ export default async function ModulePage({ params }: ModulePageProps) {
   }
 
   if (module === "metas") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule("targets", actor, searchParams);
+    }
+
+    const { GoalsAdvancesDashboard } = await import(
+      "@/components/goals-advances-dashboard"
+    );
+
     return <GoalsAdvancesDashboard />;
   }
 
@@ -144,6 +190,14 @@ export default async function ModulePage({ params }: ModulePageProps) {
   }
 
   if (module === "finanzas") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule("finances", actor, searchParams);
+    }
+
+    const { FinancialHealthDashboard } = await import(
+      "@/components/financial-health-dashboard"
+    );
+
     return <FinancialHealthDashboard />;
   }
 

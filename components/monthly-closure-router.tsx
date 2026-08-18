@@ -2,7 +2,8 @@ import { LaboratoryVerticalDashboard } from "@/components/laboratory-vertical-da
 import { ImagingVerticalDashboard } from "@/components/imaging-vertical-dashboard";
 import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
 import type { AuthorizationActor } from "@/lib/security/authorization-policy";
-import { demoCompanies } from "@/lib/tenant/demo-context";
+import { isDemoRuntimeEnvironment } from "@/lib/security/environment";
+import { getBusinessLineForCompany } from "@/lib/tenant/demo-context";
 
 type DashboardMode =
   | "branch-home"
@@ -55,11 +56,12 @@ function requestedLine(value: string | string[] | undefined) {
   return null;
 }
 
-function scopedCompanyUnit(actor: AuthorizationActor) {
-  return (
-    demoCompanies.find((company) => company.id === actor.scope.companyId)
-      ?.unitType ?? null
-  );
+function demoScopedCompanyUnit(actor: AuthorizationActor) {
+  if (!isDemoRuntimeEnvironment()) {
+    return null;
+  }
+
+  return getBusinessLineForCompany(actor.scope.companyId ?? "").unitType;
 }
 
 export function MonthlyClosureRouter({
@@ -67,7 +69,7 @@ export function MonthlyClosureRouter({
   line,
   mode,
 }: MonthlyClosureRouterProps) {
-  const selectedLine = requestedLine(line) ?? scopedCompanyUnit(actor);
+  const selectedLine = requestedLine(line) ?? demoScopedCompanyUnit(actor);
 
   if (selectedLine === "laboratorio") {
     return <LaboratoryVerticalDashboard mode={mode} />;
@@ -75,6 +77,22 @@ export function MonthlyClosureRouter({
 
   if (selectedLine === "imagenes") {
     return <ImagingVerticalDashboard mode={mode} />;
+  }
+
+  if (selectedLine !== "fisioterapia" && !isDemoRuntimeEnvironment()) {
+    return (
+      <section className="flex w-full flex-col gap-4 px-4 py-6 lg:px-6">
+        <div className="rounded-md border border-dashed bg-card p-6">
+          <h1 className="text-xl font-semibold tracking-normal">
+            Selecciona una linea de negocio
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            El cierre mensual necesita una linea en el contexto de la URL o en
+            el alcance autorizado del usuario para abrir el formulario correcto.
+          </p>
+        </div>
+      </section>
+    );
   }
 
   return <PhysiotherapyVerticalDashboard mode={mode} />;

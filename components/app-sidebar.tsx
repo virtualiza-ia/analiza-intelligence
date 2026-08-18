@@ -15,15 +15,9 @@ import {
 } from "@/lib/navigation";
 import {
   demoRoleProfiles,
-  getCompanyForBusinessLine,
   roleKeys,
   type RoleKey,
 } from "@/lib/tenant/demo-context";
-import {
-  allBranchesValue,
-  allManagersValue,
-  allOperationalAreasValue,
-} from "@/lib/analytics/global-filters";
 
 const storageKey = "analiza:sidebar-collapsed";
 const roleStorageKey = "analiza:demo-role";
@@ -89,13 +83,7 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
       return serializedParams ? `${item.href}?${serializedParams}` : item.href;
     }
 
-    const company = getCompanyForBusinessLine(businessLineId);
-
     params.set("line", businessLineId);
-    params.set("company", company.id);
-    params.set("branch", allBranchesValue);
-    params.set("area", allOperationalAreasValue);
-    params.set("manager", allManagersValue);
 
     return `${item.href}?${params.toString()}`;
   }

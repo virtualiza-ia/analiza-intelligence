@@ -1,8 +1,3 @@
-import {
-  dashboardBusinessLines,
-  type BusinessLineDashboard,
-} from "@/lib/analytics/demo-dashboard";
-
 export type DashboardAnalysisModel =
   | "Exploratorio"
   | "Descriptivo"
@@ -50,6 +45,17 @@ export type AnaliaScreenChatResponse = {
   confidence: number;
   caveat: string;
 };
+
+type ChatBusinessLine = {
+  key: "fisioterapia" | "laboratorio" | "imagenes";
+  shortName: string;
+};
+
+const chatBusinessLines: ChatBusinessLine[] = [
+  { key: "fisioterapia", shortName: "Fisioterapia" },
+  { key: "laboratorio", shortName: "Laboratorio" },
+  { key: "imagenes", shortName: "Imagenes" },
+];
 
 const standardChecks = [
   "KPI principal visible antes del detalle",
@@ -340,26 +346,6 @@ function normalizeText(value: string) {
     .toLowerCase();
 }
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    currency: "USD",
-    maximumFractionDigits: 0,
-    style: "currency",
-  }).format(value);
-}
-
-function formatRate(value: number) {
-  return `${Math.round(value * 100)}%`;
-}
-
-function formatSignedPercent(value: number) {
-  return `${value > 0 ? "+" : ""}${value}%`;
-}
-
-function formatSignedPoints(value: number) {
-  return `${value > 0 ? "+" : ""}${value} pts`;
-}
-
 function cleanScreenLine(value: string) {
   return value
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -438,93 +424,47 @@ function getBusinessLineForChat(businessLine: string) {
   const normalizedBusinessLine = normalizeText(businessLine);
 
   if (normalizedBusinessLine.includes("laboratorio")) {
-    return dashboardBusinessLines.find((line) => line.key === "laboratorio");
+    return chatBusinessLines.find((line) => line.key === "laboratorio");
   }
 
   if (normalizedBusinessLine.includes("fisioterapia")) {
-    return dashboardBusinessLines.find((line) => line.key === "fisioterapia");
+    return chatBusinessLines.find((line) => line.key === "fisioterapia");
   }
 
   if (
     normalizedBusinessLine.includes("imagenes") ||
     normalizedBusinessLine.includes("imagen")
   ) {
-    return dashboardBusinessLines.find((line) => line.key === "imagenes");
+    return chatBusinessLines.find((line) => line.key === "imagenes");
   }
 
   return null;
 }
 
-function getTargetCompletion(line: BusinessLineDashboard) {
-  if (line.revenueTarget <= 0) {
-    return 0;
-  }
-
-  return Math.round((line.revenue / line.revenueTarget) * 100);
-}
-
-function getMarginReading(line: BusinessLineDashboard) {
-  if (line.marginDeltaPoints < 0) {
-    return `el margen cayo ${Math.abs(line.marginDeltaPoints)} pts`;
-  }
-
-  if (line.marginDeltaPoints > 0) {
-    return `el margen mejoro ${line.marginDeltaPoints} pts`;
-  }
-
-  return "el margen se mantuvo estable";
-}
-
-function getLineComparisonBullet(line: BusinessLineDashboard) {
-  return `${line.shortName}: ingresos ${formatSignedPercent(line.revenueGrowthRate)}, margen ${formatSignedPoints(line.marginDeltaPoints)}, ocupacion ${line.effectiveOccupancy}% y estado ${line.executiveStatus}.`;
-}
-
-function getSingleLineComparisonSummary(line: BusinessLineDashboard) {
-  const targetCompletion = getTargetCompletion(line);
-  const targetGap = targetCompletion - 100;
-  const hasRevenueGrowth = line.revenueGrowthRate > 0;
-  const hasMarginPressure = line.marginDeltaPoints < 0;
-  const directAnswer = hasRevenueGrowth
-    ? hasMarginPressure
-      ? `Si, pero la mejora es parcial: ${line.shortName} crece ${formatSignedPercent(line.revenueGrowthRate)} contra el periodo comparable, pero ${getMarginReading(line)}.`
-      : `Si, ${line.shortName} mejora contra el periodo comparable: crece ${formatSignedPercent(line.revenueGrowthRate)} y ${getMarginReading(line)}.`
-    : `No hay una mejora clara en ${line.shortName}: el crecimiento esta en ${formatSignedPercent(line.revenueGrowthRate)} y ${getMarginReading(line)}.`;
-
+function getSingleLineComparisonSummary(line: ChatBusinessLine) {
   return {
     bullets: compactChatBullets([
-      `Ingresos actuales: ${formatMoney(line.revenue)}; avance de meta ${targetCompletion}%.`,
-      `Comparacion anual: crecimiento ${formatSignedPercent(line.revenueGrowthRate)} y margen ${formatRate(line.marginRate)} (${formatSignedPoints(line.marginDeltaPoints)}).`,
-      `Meta: ${targetGap >= 0 ? "sobre meta" : "debajo de meta"} por ${Math.abs(targetGap)} pts.`,
-      `Lectura ejecutiva: ${line.executiveInterpretation}`,
+      `${line.shortName}: revisar Meta, Resultado, Variacion, Cumplimiento y Estado en la pantalla visible.`,
+      "Usar solo cierres publicados y metas aprobadas para conclusiones oficiales.",
+      "Separar volumen, margen, ocupacion o calidad antes de decidir si una mejora es sana.",
     ]),
-    directAnswer,
-    suggestedNextStep: hasMarginPressure
-      ? "Separar crecimiento de rentabilidad: revisar costo por servicio, prueba o sucursal antes de celebrar la mejora."
-      : "Confirmar si la mejora tambien se sostiene contra meta, ocupacion y calidad de datos.",
+    directAnswer:
+      `Para comparar ${line.shortName}, necesito leer los datos visibles oficiales de la pantalla actual; no uso cifras DEMO precargadas fuera del entorno demo.`,
+    suggestedNextStep:
+      "Confirmar la comparacion contra meta, periodo anterior y calidad de datos antes de presentar una decision.",
     title: `Comparacion anual: ${line.shortName}`,
   };
 }
 
 function getConsolidatedComparisonSummary() {
-  const riskLines = dashboardBusinessLines.filter(
-    (line) => line.marginDeltaPoints < 0 || line.executiveStatus === "rojo",
-  );
-  const strongestGrowth = [...dashboardBusinessLines].sort(
-    (firstLine, secondLine) =>
-      secondLine.revenueGrowthRate - firstLine.revenueGrowthRate,
-  )[0];
-  const directAnswer = riskLines.length > 0
-    ? `Si hay mejora en crecimiento, especialmente ${strongestGrowth?.shortName ?? "una linea"}, pero no es una mejora sana en todas las lineas.`
-    : "Si, el consolidado muestra mejora general contra el periodo comparable.";
-
   return {
     bullets: compactChatBullets([
-      ...dashboardBusinessLines.map(getLineComparisonBullet),
-      riskLines.length > 0
-        ? `Mayor cautela: ${riskLines.map((line) => line.shortName).join(", ")} requiere revisar margen o estado.`
-        : "No aparece una linea en rojo dentro de esta lectura DEMO.",
+      "Comparar lineas por Meta, Resultado, Variacion, Cumplimiento y Estado.",
+      "No concluir con datos precargados de demostracion fuera de APP_ENV=demo.",
+      "Revisar si la pantalla visible muestra margen, ocupacion, calidad y cierre publicado.",
     ]),
-    directAnswer,
+    directAnswer:
+      "Puedo orientar la comparacion, pero la conclusion oficial debe salir de los datos visibles y fuentes oficiales de cierre, no de datos DEMO.",
     suggestedNextStep:
       "Comparar cada linea por separado: crecimiento, margen, ocupacion y meta antes de tomar una decision consolidada.",
     title: "Comparacion anual consolidada",

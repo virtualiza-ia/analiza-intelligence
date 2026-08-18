@@ -52,7 +52,7 @@ for (const requiredModelText of [
   "looksLikeNavigationDump",
   "getBusinessLineComparisonSummary",
   "getSingleLineComparisonSummary",
-  "Si, pero la mejora es parcial",
+  "no uso cifras DEMO precargadas fuera del entorno demo",
   "dataStatus: \"DEMO\"",
   "/protected/overview",
   "/protected/operacion",

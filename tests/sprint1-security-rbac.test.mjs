@@ -7,7 +7,10 @@ import {
 } from "../lib/security/authorization-policy.ts";
 import { getDemoScopeForRole } from "../lib/auth/demo-scope.ts";
 import { canUseDemoFeatures } from "../lib/security/environment.ts";
-import { getMissingDatabaseConfig } from "../lib/server/database.ts";
+import {
+  assertSafePostgresRuntimeRole,
+  getMissingDatabaseConfig,
+} from "../lib/server/database.ts";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const countryId = "30000000-0000-4000-8000-000000000003";
@@ -62,7 +65,6 @@ const originalNodeEnv = process.env.NODE_ENV;
 const originalEnableDemoAdmin = process.env.ANALIZA_ENABLE_DEMO_ADMIN;
 const originalDemoSessionToken = process.env.ANALIZA_DEMO_ADMIN_SESSION_TOKEN;
 const originalDatabaseUrl = process.env.DATABASE_URL;
-const originalPostgresRlsVerified = process.env.ANALIZA_POSTGRES_RLS_VERIFIED;
 
 delete process.env.ANALIZA_APP_ENV;
 process.env.APP_ENV = "demo";
@@ -97,6 +99,16 @@ assert.equal(
   "Production NODE_ENV without explicit APP_ENV must fail closed instead of defaulting to demo.",
 );
 
+process.env.NODE_ENV = "development";
+delete process.env.APP_ENV;
+delete process.env.ANALIZA_APP_ENV;
+delete process.env.VERCEL_ENV;
+assert.equal(
+  canUseDemoFeatures(),
+  false,
+  "Local development without explicit APP_ENV=demo must fail closed instead of defaulting to demo.",
+);
+
 process.env.NODE_ENV = originalNodeEnv ?? "test";
 process.env.APP_ENV = "demo";
 process.env.ANALIZA_ENABLE_DEMO_ADMIN = "true";
@@ -118,18 +130,42 @@ assert.equal(
 process.env.NODE_ENV = "production";
 process.env.APP_ENV = "production";
 process.env.DATABASE_URL = "postgres://user:password@localhost:5432/analiza";
-delete process.env.ANALIZA_POSTGRES_RLS_VERIFIED;
-assert.deepEqual(
-  getMissingDatabaseConfig(),
-  ["ANALIZA_POSTGRES_RLS_VERIFIED"],
-  "Production PostgreSQL access must require an explicit RLS verification gate.",
-);
-
-process.env.ANALIZA_POSTGRES_RLS_VERIFIED = "true";
 assert.deepEqual(
   getMissingDatabaseConfig(),
   [],
-  "Production PostgreSQL access may proceed only after RLS verification is declared.",
+  "Database URL is sufficient for config; RLS must be verified against the actual PostgreSQL runtime role.",
+);
+
+assert.throws(
+  () =>
+    assertSafePostgresRuntimeRole({
+      current_user: "analiza_staging_app",
+      rolbypassrls: true,
+      rolsuper: false,
+    }),
+  /bypass RLS/,
+  "Runtime PostgreSQL role must be rejected when it can bypass RLS.",
+);
+
+assert.throws(
+  () =>
+    assertSafePostgresRuntimeRole({
+      current_user: "postgres",
+      rolbypassrls: false,
+      rolsuper: true,
+    }),
+  /bypass RLS/,
+  "Runtime PostgreSQL role must be rejected when it is superuser.",
+);
+
+assert.doesNotThrow(
+  () =>
+    assertSafePostgresRuntimeRole({
+      current_user: "analiza_authenticated_runtime",
+      rolbypassrls: false,
+      rolsuper: false,
+    }),
+  "Runtime PostgreSQL role without superuser or bypassrls may proceed.",
 );
 
 if (originalAppEnv === undefined) {
@@ -172,12 +208,6 @@ if (originalDatabaseUrl === undefined) {
   delete process.env.DATABASE_URL;
 } else {
   process.env.DATABASE_URL = originalDatabaseUrl;
-}
-
-if (originalPostgresRlsVerified === undefined) {
-  delete process.env.ANALIZA_POSTGRES_RLS_VERIFIED;
-} else {
-  process.env.ANALIZA_POSTGRES_RLS_VERIFIED = originalPostgresRlsVerified;
 }
 
 for (const deniedPath of [
@@ -553,16 +583,19 @@ assert(
     environment.includes('"staging"') &&
     environment.includes('"production"') &&
     environment.includes("ANALIZA_APP_ENV") &&
-    environment.includes('NODE_ENV === "production"') &&
+    environment.includes('return "production"') &&
     environment.includes('ANALIZA_ENABLE_DEMO_ADMIN === "true"') &&
     environment.includes("ANALIZA_DISABLE_DEMO_ROLE_SWITCH"),
   "Runtime environment separation must cover demo, staging and production.",
 );
 
 assert(
-  databaseHelper.includes("ANALIZA_POSTGRES_RLS_VERIFIED") &&
-    databaseHelper.includes("isProductionRuntimeEnvironment"),
-  "Production database access must fail closed until PostgreSQL/RLS has been verified.",
+  databaseHelper.includes("assertSafePostgresRuntimeRole") &&
+    databaseHelper.includes("rolbypassrls") &&
+    databaseHelper.includes("rolsuper") &&
+    databaseHelper.includes("request.jwt.claim.sub") &&
+    databaseHelper.includes("set local role"),
+  "Production database access must verify the real PostgreSQL role and propagate user context before querying.",
 );
 
 assert(

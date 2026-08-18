@@ -1,15 +1,46 @@
 import { Suspense } from "react";
 
-import { ExecutiveDashboard } from "@/components/executive-dashboard";
 import { requireProtectedPath } from "@/lib/server/authorization";
+import { getOfficialExecutiveSnapshot } from "@/lib/server/official-bi";
+import { isDemoRuntimeEnvironment } from "@/lib/security/environment";
 
-async function OverviewGate() {
-  await requireProtectedPath("/protected/overview");
+type OverviewPageProps = {
+  searchParams?: Promise<{
+    branch?: string;
+    company?: string;
+    country?: string;
+    from?: string;
+    line?: string;
+    to?: string;
+  }>;
+};
 
-  return <ExecutiveDashboard />;
+async function OverviewGate({ searchParams }: OverviewPageProps) {
+  const actor = await requireProtectedPath("/protected/overview");
+
+  if (isDemoRuntimeEnvironment()) {
+    const { ExecutiveDashboard } = await import("@/components/executive-dashboard");
+
+    return <ExecutiveDashboard />;
+  }
+
+  const params = searchParams ? await searchParams : {};
+  const snapshot = await getOfficialExecutiveSnapshot(actor, {
+    branchId: params.branch,
+    businessLineId: params.line,
+    companyId: params.company,
+    countryId: params.country,
+    periodEnd: params.to,
+    periodStart: params.from,
+  });
+  const { OfficialExecutiveDataDashboard } = await import(
+    "@/components/official-executive-data-dashboard"
+  );
+
+  return <OfficialExecutiveDataDashboard mode="overview" snapshot={snapshot} />;
 }
 
-export default function OverviewPage() {
+export default function OverviewPage({ searchParams }: OverviewPageProps) {
   return (
     <Suspense
       fallback={
@@ -18,7 +49,7 @@ export default function OverviewPage() {
         </div>
       }
     >
-      <OverviewGate />
+      <OverviewGate searchParams={searchParams} />
     </Suspense>
   );
 }
