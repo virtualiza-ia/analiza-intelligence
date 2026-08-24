@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 
-import { getPostgresPool } from "@/lib/server/database";
+import {
+  getPostgresPool,
+  resetPostgresRuntimeRole,
+} from "@/lib/server/database";
 import {
   getPasswordPolicyError,
   hashPassword,
@@ -238,6 +241,7 @@ export async function acceptUserInvitation({
   const client = await pool.connect();
 
   try {
+    await resetPostgresRuntimeRole(client);
     await client.query("begin");
 
     const invitationResult = await client.query<InvitationActivationRow>(
@@ -391,6 +395,7 @@ export async function acceptUserInvitation({
     await client.query("rollback").catch(() => undefined);
     throw error;
   } finally {
+    await resetPostgresRuntimeRole(client).catch(() => undefined);
     client.release();
   }
 }
@@ -404,57 +409,65 @@ export async function authenticateLocalUser({
 }): Promise<AuthenticatedLocalUser | null> {
   const normalizedEmail = normalizeEmail(email);
   const pool = getPostgresPool();
-  const result = await pool.query<LocalAuthUserRow>(
-    `
-      select
-        u.id,
-        u.email,
-        u.encrypted_password,
-        p.status as profile_status,
-        coalesce(p.requires_password_change, false) as requires_password_change,
-        r.key as role_key
-      from auth.users u
-      join public.profiles p on p.id = u.id
-      left join public.user_roles ur
-        on ur.user_id = p.id
-        and coalesce(ur.status, 'active') = 'active'
-        and ur.deactivated_at is null
-      left join public.roles r on r.id = ur.role_id
-      where lower(u.email) = $1
-        and p.status = 'active'
-        and p.deactivated_at is null
-        and p.deleted_at is null
-      order by
-        case r.key
-          when 'super_admin' then 1
-          when 'webmaster_admin' then 2
-          when 'ceo' then 3
-          when 'gerente_operaciones' then 4
-          when 'gerente_area' then 5
-          when 'gerente_sucursal' then 6
-          when 'usuario_operativo' then 7
-          else 8
-        end
-      limit 1
-    `,
-    [normalizedEmail],
-  );
-  const user = result.rows[0];
+  const client = await pool.connect();
 
-  if (
-    !user?.encrypted_password ||
-    user.profile_status !== "active" ||
-    !(await verifyPassword(password, user.encrypted_password))
-  ) {
-    return null;
+  try {
+    await resetPostgresRuntimeRole(client);
+    const result = await client.query<LocalAuthUserRow>(
+      `
+        select
+          u.id,
+          u.email,
+          u.encrypted_password,
+          p.status as profile_status,
+          coalesce(p.requires_password_change, false) as requires_password_change,
+          r.key as role_key
+        from auth.users u
+        join public.profiles p on p.id = u.id
+        left join public.user_roles ur
+          on ur.user_id = p.id
+          and coalesce(ur.status, 'active') = 'active'
+          and ur.deactivated_at is null
+        left join public.roles r on r.id = ur.role_id
+        where lower(u.email) = $1
+          and p.status = 'active'
+          and p.deactivated_at is null
+          and p.deleted_at is null
+        order by
+          case r.key
+            when 'super_admin' then 1
+            when 'webmaster_admin' then 2
+            when 'ceo' then 3
+            when 'gerente_operaciones' then 4
+            when 'gerente_area' then 5
+            when 'gerente_sucursal' then 6
+            when 'usuario_operativo' then 7
+            else 8
+          end
+        limit 1
+      `,
+      [normalizedEmail],
+    );
+    const user = result.rows[0];
+
+    if (
+      !user?.encrypted_password ||
+      user.profile_status !== "active" ||
+      !(await verifyPassword(password, user.encrypted_password))
+    ) {
+      return null;
+    }
+
+    return {
+      email: user.email,
+      requiresPasswordChange: user.requires_password_change === true,
+      roleKey: coerceRoleKey(user.role_key),
+      userId: user.id,
+    };
+  } finally {
+    await resetPostgresRuntimeRole(client).catch(() => undefined);
+    client.release();
   }
-
-  return {
-    email: user.email,
-    requiresPasswordChange: user.requires_password_change === true,
-    roleKey: coerceRoleKey(user.role_key),
-    userId: user.id,
-  };
 }
 
 export async function changeAuthenticatedLocalUserPassword({
@@ -480,6 +493,7 @@ export async function changeAuthenticatedLocalUserPassword({
   const client = await pool.connect();
 
   try {
+    await resetPostgresRuntimeRole(client);
     await client.query("begin");
 
     const result = await client.query<LocalPasswordChangeUserRow>(
@@ -568,6 +582,7 @@ export async function changeAuthenticatedLocalUserPassword({
     await client.query("rollback").catch(() => undefined);
     throw error;
   } finally {
+    await resetPostgresRuntimeRole(client).catch(() => undefined);
     client.release();
   }
 
@@ -599,72 +614,80 @@ function buildCurrentUserScope(row: LocalUserScopeRow): CurrentUserScope {
 
 export async function getAuthenticatedLocalUserAccess(userId: string) {
   const pool = getPostgresPool();
-  const result = await pool.query<LocalUserScopeRow>(
-    `
-      select
-        u.id,
-        u.email,
-        r.key as role_key,
-        coalesce(p.requires_password_change, false) as requires_password_change,
-        coalesce(ur.organization_id, p.organization_id) as organization_id,
-        o.name as organization_name,
-        coalesce(ur.country_id, p.default_country_id, b.country_id) as country_id,
-        c.name as country_name,
-        coalesce(ur.company_id, p.default_company_id, b.company_id) as company_id,
-        co.name as company_name,
-        coalesce(ur.operational_area_id, b.operational_area_id) as operational_area_id,
-        oa.name as operational_area_name,
-        coalesce(ur.branch_id, p.default_branch_id) as branch_id,
-        b.name as branch_name,
-        b.code as branch_code,
-        b.city as branch_city
-      from auth.users u
-      join public.profiles p on p.id = u.id
-      left join public.user_roles ur
-        on ur.user_id = p.id
-        and coalesce(ur.status, 'active') = 'active'
-        and ur.deactivated_at is null
-      left join public.roles r on r.id = ur.role_id
-      left join public.branches b
-        on b.id = coalesce(ur.branch_id, p.default_branch_id)
-      left join public.organizations o
-        on o.id = coalesce(ur.organization_id, p.organization_id)
-      left join public.countries c
-        on c.id = coalesce(ur.country_id, p.default_country_id, b.country_id)
-      left join public.companies co
-        on co.id = coalesce(ur.company_id, p.default_company_id, b.company_id)
-      left join public.operational_areas oa
-        on oa.id = coalesce(ur.operational_area_id, b.operational_area_id)
-      where u.id = $1
-        and p.status = 'active'
-        and p.deactivated_at is null
-        and p.deleted_at is null
-      order by
-        case r.key
-          when 'super_admin' then 1
-          when 'webmaster_admin' then 2
-          when 'ceo' then 3
-          when 'gerente_operaciones' then 4
-          when 'gerente_area' then 5
-          when 'gerente_sucursal' then 6
-          when 'usuario_operativo' then 7
-          else 8
-        end
-      limit 1
-    `,
-    [userId],
-  );
-  const user = result.rows[0];
+  const client = await pool.connect();
 
-  if (!user) {
-    return null;
+  try {
+    await resetPostgresRuntimeRole(client);
+    const result = await client.query<LocalUserScopeRow>(
+      `
+        select
+          u.id,
+          u.email,
+          r.key as role_key,
+          coalesce(p.requires_password_change, false) as requires_password_change,
+          coalesce(ur.organization_id, p.organization_id) as organization_id,
+          o.name as organization_name,
+          coalesce(ur.country_id, p.default_country_id, b.country_id) as country_id,
+          c.name as country_name,
+          coalesce(ur.company_id, p.default_company_id, b.company_id) as company_id,
+          co.name as company_name,
+          coalesce(ur.operational_area_id, b.operational_area_id) as operational_area_id,
+          oa.name as operational_area_name,
+          coalesce(ur.branch_id, p.default_branch_id) as branch_id,
+          b.name as branch_name,
+          b.code as branch_code,
+          b.city as branch_city
+        from auth.users u
+        join public.profiles p on p.id = u.id
+        left join public.user_roles ur
+          on ur.user_id = p.id
+          and coalesce(ur.status, 'active') = 'active'
+          and ur.deactivated_at is null
+        left join public.roles r on r.id = ur.role_id
+        left join public.branches b
+          on b.id = coalesce(ur.branch_id, p.default_branch_id)
+        left join public.organizations o
+          on o.id = coalesce(ur.organization_id, p.organization_id)
+        left join public.countries c
+          on c.id = coalesce(ur.country_id, p.default_country_id, b.country_id)
+        left join public.companies co
+          on co.id = coalesce(ur.company_id, p.default_company_id, b.company_id)
+        left join public.operational_areas oa
+          on oa.id = coalesce(ur.operational_area_id, b.operational_area_id)
+        where u.id = $1
+          and p.status = 'active'
+          and p.deactivated_at is null
+          and p.deleted_at is null
+        order by
+          case r.key
+            when 'super_admin' then 1
+            when 'webmaster_admin' then 2
+            when 'ceo' then 3
+            when 'gerente_operaciones' then 4
+            when 'gerente_area' then 5
+            when 'gerente_sucursal' then 6
+            when 'usuario_operativo' then 7
+            else 8
+          end
+        limit 1
+      `,
+      [userId],
+    );
+    const user = result.rows[0];
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      email: user.email,
+      requiresPasswordChange: user.requires_password_change === true,
+      roleKey: coerceRoleKey(user.role_key),
+      scope: buildCurrentUserScope(user),
+      userId: user.id,
+    } satisfies AuthenticatedLocalUser;
+  } finally {
+    await resetPostgresRuntimeRole(client).catch(() => undefined);
+    client.release();
   }
-
-  return {
-    email: user.email,
-    requiresPasswordChange: user.requires_password_change === true,
-    roleKey: coerceRoleKey(user.role_key),
-    scope: buildCurrentUserScope(user),
-    userId: user.id,
-  } satisfies AuthenticatedLocalUser;
 }

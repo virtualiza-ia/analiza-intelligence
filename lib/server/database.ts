@@ -137,6 +137,14 @@ export async function verifyPostgresRlsRuntime(client: PoolClient) {
   assertSafePostgresRuntimeRole(role);
 }
 
+export async function resetPostgresRuntimeRole(client: PoolClient) {
+  if (isDemoRuntimeEnvironment()) {
+    return;
+  }
+
+  await client.query("reset role");
+}
+
 export async function withPostgresRlsContext<T>(
   client: PoolClient,
   actor: AuthorizationActor,
@@ -172,5 +180,7 @@ export async function withPostgresRlsContext<T>(
   } catch (error) {
     await client.query("rollback");
     throw error;
+  } finally {
+    await resetPostgresRuntimeRole(client).catch(() => undefined);
   }
 }
