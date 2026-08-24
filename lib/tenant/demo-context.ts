@@ -405,6 +405,7 @@ export const demoBranches: BranchOption[] = [
 
 export const roleKeys: RoleKey[] = [
   "super_admin",
+  "webmaster_admin",
   "ceo",
   "gerente_operaciones",
   "gerente_area",
