@@ -13,7 +13,7 @@ export type CountryOption = {
   timeZone: string;
   dateFormat: string;
   scope?: "country" | "regional";
-  isDemo: true;
+  isDemo: boolean;
 };
 
 export type CompanyOption = {
@@ -22,7 +22,7 @@ export type CompanyOption = {
   name: string;
   unitType: "consolidado" | "fisioterapia" | "laboratorio" | "imagenes";
   isConsolidated?: true;
-  isDemo: true;
+  isDemo: boolean;
 };
 
 export type BusinessLineOption = {
@@ -32,7 +32,7 @@ export type BusinessLineOption = {
   companyId: string | null;
   unitType: CompanyOption["unitType"];
   isConsolidated?: true;
-  isDemo: true;
+  isDemo: boolean;
 };
 
 export type BranchOption = {
@@ -49,7 +49,7 @@ export type BranchOption = {
   areaZone?: string;
   isActive?: boolean;
   sourceTrace?: string;
-  isDemo: true;
+  isDemo: boolean;
 };
 
 export type OperationalAreaOption = {
@@ -63,7 +63,7 @@ export type OperationalAreaOption = {
   areaZone: string;
   businessLineCode: Exclude<BusinessLineCode, "CONSOLIDATED">;
   sourceTrace: string;
-  isDemo: true;
+  isDemo: boolean;
 };
 
 export type RoleKey =

@@ -18,8 +18,6 @@ import {
   type BranchOption,
   type CompanyOption,
   type CountryOption,
-  getBusinessLineForCompany,
-  getCompanyForBusinessLine,
   getDefaultPeriod,
 } from "@/lib/tenant/demo-context";
 import {
@@ -38,6 +36,7 @@ type ContextSelectionFormProps = {
   companies: CompanyOption[];
   businessLines: BusinessLineOption[];
   branches: BranchOption[];
+  isDemoEnvironment: boolean;
 };
 
 function readStoredContext() {
@@ -64,6 +63,7 @@ export function ContextSelectionForm({
   companies,
   businessLines,
   branches,
+  isDemoEnvironment,
 }: ContextSelectionFormProps) {
   const router = useRouter();
   const initialCountry = countries[0];
@@ -134,6 +134,10 @@ export function ContextSelectionForm({
     periodEnd.length > 0;
 
   useEffect(() => {
+    if (!isDemoEnvironment) {
+      return;
+    }
+
     const nextContext = createGlobalFilterContextFromSearchParams(
       new URLSearchParams(window.location.search),
       readStoredContext(),
@@ -145,19 +149,67 @@ export function ContextSelectionForm({
     setBranchId(nextContext.branchId);
     setPeriodStart(nextContext.periodStart);
     setPeriodEnd(nextContext.periodEnd);
-  }, []);
+  }, [isDemoEnvironment]);
+
+  if (
+    countries.length === 0 ||
+    companies.length === 0 ||
+    businessLines.length === 0
+  ) {
+    return (
+      <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-5 py-8">
+        <div className="flex flex-col gap-3">
+          <Badge className="w-fit bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+            Datos oficiales
+          </Badge>
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-muted-foreground">{userEmail}</p>
+            <h1 className="text-3xl font-semibold tracking-normal text-foreground">
+              No hay contexto oficial configurado
+            </h1>
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+              Produccion esta limpia y lista para cargar organizaciones,
+              empresas, sucursales y cierres reales autorizados.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  function businessLineForCompany(companyId: string) {
+    return (
+      businessLines.find((businessLine) => businessLine.companyId === companyId) ??
+      businessLines[0]
+    );
+  }
+
+  function companyForBusinessLine(businessLineId: string) {
+    const businessLine = businessLines.find(
+      (line) => line.id === businessLineId,
+    );
+
+    if (!businessLine || businessLine.isConsolidated || !businessLine.companyId) {
+      return companies.find((company) => company.isConsolidated) ?? companies[0];
+    }
+
+    return (
+      companies.find((company) => company.id === businessLine.companyId) ??
+      companies[0]
+    );
+  }
 
   function handleCompanyChange(nextCompanyId: string) {
     setCompanyId(nextCompanyId);
-    setBusinessLineId(getBusinessLineForCompany(nextCompanyId).id);
+    setBusinessLineId(businessLineForCompany(nextCompanyId)?.id ?? "");
     setBranchId(allBranchesValue);
   }
 
   function handleBusinessLineChange(nextBusinessLineId: string) {
-    const nextCompany = getCompanyForBusinessLine(nextBusinessLineId);
+    const nextCompany = companyForBusinessLine(nextBusinessLineId);
 
     setBusinessLineId(nextBusinessLineId);
-    setCompanyId(nextCompany.id);
+    setCompanyId(nextCompany?.id ?? "");
     setBranchId(allBranchesValue);
   }
 
@@ -177,7 +229,7 @@ export function ContextSelectionForm({
       countryName: selectedCountry.name,
       dateFrom: periodStart,
       dateTo: periodEnd,
-      isDemo: true,
+      isDemo: isDemoEnvironment,
       period: `${periodStart} a ${periodEnd}`,
       periodStart,
       periodEnd,
@@ -195,8 +247,14 @@ export function ContextSelectionForm({
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-5 py-8">
       <div className="flex flex-col gap-3">
-        <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
-          Entorno DEMO
+        <Badge
+          className={
+            isDemoEnvironment
+              ? "w-fit bg-amber-100 text-amber-800 hover:bg-amber-100"
+              : "w-fit bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
+          }
+        >
+          {isDemoEnvironment ? "Entorno DEMO" : "Datos oficiales"}
         </Badge>
         <div className="flex flex-col gap-2">
           <p className="text-sm text-muted-foreground">{userEmail}</p>
