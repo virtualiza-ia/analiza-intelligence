@@ -401,6 +401,11 @@ assert.ok(
     router.includes("PhysiotherapyVerticalDashboard"),
   "Monthly closure router must preserve Fisioterapia and add Laboratorio.",
 );
+assert.ok(
+  router.includes("requestedLine(line) ?? scopedCompanyUnit(actor)") &&
+    router.includes("getBusinessLineForCompany(actor.scope.companyId"),
+  "Monthly closure router must infer Laboratory from the user's scoped company.",
+);
 
 for (const route of [
   "app/protected/mi-sucursal/page.tsx",

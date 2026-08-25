@@ -56,11 +56,7 @@ function requestedLine(value: string | string[] | undefined) {
   return null;
 }
 
-function demoScopedCompanyUnit(actor: AuthorizationActor) {
-  if (!isDemoRuntimeEnvironment()) {
-    return null;
-  }
-
+function scopedCompanyUnit(actor: AuthorizationActor) {
   return getBusinessLineForCompany(actor.scope.companyId ?? "").unitType;
 }
 
@@ -69,7 +65,7 @@ export function MonthlyClosureRouter({
   line,
   mode,
 }: MonthlyClosureRouterProps) {
-  const selectedLine = requestedLine(line) ?? demoScopedCompanyUnit(actor);
+  const selectedLine = requestedLine(line) ?? scopedCompanyUnit(actor);
 
   if (selectedLine === "laboratorio") {
     return <LaboratoryVerticalDashboard mode={mode} />;
