@@ -271,6 +271,18 @@ for (const sensitiveCeoPath of [
   );
 }
 
+for (const duplicateExecutiveReportPath of [
+  "/protected/finanzas",
+  "/protected/metas",
+  "/protected/insights",
+]) {
+  assert.equal(
+    canAccessProtectedPath(ceo, duplicateExecutiveReportPath),
+    false,
+    `CEO must use /protected/overview instead of duplicate report route ${duplicateExecutiveReportPath}.`,
+  );
+}
+
 assert.equal(
   canAccessProtectedPath(ceo, "/protected/usuarios-permisos"),
   true,

@@ -94,7 +94,6 @@ const allRoles: RoleKey[] = [
 
 const dataReadRoles: RoleKey[] = [
   ...adminRoles,
-  "ceo",
   "gerente_operaciones",
   "gerente_area",
   "gerente_sucursal",
@@ -114,6 +113,7 @@ const ceoFocusedRoles: RoleKey[] = ["ceo"];
 const operationsFocusedRoles: RoleKey[] = ["gerente_operaciones"];
 const executiveLineReadRoles: RoleKey[] = ["ceo"];
 const adminDataRoles: RoleKey[] = [...adminRoles, "gerente_operaciones"];
+const adminFinancialReviewRoles: RoleKey[] = adminRoles;
 const deepDiagnosticRoles: RoleKey[] = [];
 
 export const navigationItems: NavigationItem[] = [
@@ -184,7 +184,7 @@ export const navigationItems: NavigationItem[] = [
     href: "/protected/finanzas",
     icon: BriefcaseBusiness,
     group: "direccion",
-    allowedRoles: ceoFocusedRoles,
+    allowedRoles: adminFinancialReviewRoles,
   },
   {
     title: "Citas por negocio",
@@ -305,7 +305,7 @@ export const navigationItems: NavigationItem[] = [
     href: "/protected/metas",
     icon: Goal,
     group: "direccion",
-    allowedRoles: ["ceo", "gerente_operaciones", "gerente_area", "gerente_sucursal"],
+    allowedRoles: ["gerente_operaciones", "gerente_area", "gerente_sucursal"],
   },
   {
     title: "Usuarios y permisos",

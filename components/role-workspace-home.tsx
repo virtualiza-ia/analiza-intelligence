@@ -122,14 +122,14 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
     inbox: [
       {
         title: "Laboratorio crece, pero margen bajo presion",
-        detail: "Validar costo de reactivos y pruebas de bajo rendimiento antes de aprobar meta.",
-        href: "/protected/finanzas",
+        detail: "Validar costo de reactivos, margen y cumplimiento desde el resumen consolidado.",
+        href: "/protected/overview",
         tone: "critical",
       },
       {
         title: "Metas sugeridas pendientes",
-        detail: "AnaliA propone escenarios conservadores; el CEO define la meta final.",
-        href: "/protected/metas",
+        detail: "AnaliA propone escenarios conservadores dentro del informe ejecutivo unico.",
+        href: "/protected/overview",
         tone: "action",
       },
       {
@@ -147,10 +147,8 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
     ],
     shortcutHrefs: [
       "/protected/overview",
-      "/protected/finanzas",
       "/protected/usuarios-permisos",
-      "/protected/insights",
-      "/protected/metas",
+      "/protected/sucursales",
     ],
   },
   gerente_operaciones: {
@@ -544,7 +542,24 @@ export function RoleWorkspaceHome({
       ];
   const visibleInbox = isDemoEnvironment
     ? workspace.inbox
-    : [
+    : activeRole === "ceo"
+      ? [
+          {
+            detail:
+              "Abrir el resumen ejecutivo para revisar salud financiera, metas, insights y riesgos en una sola lectura.",
+            href: "/protected/overview",
+            title: "Revisar informe ejecutivo unico",
+            tone: "ok" as const,
+          },
+          {
+            detail:
+              "Crear o revisar sucursales sin abrir reportes financieros duplicados.",
+            href: "/protected/usuarios-permisos",
+            title: "Gobernar sucursales y alcance",
+            tone: "action" as const,
+          },
+        ]
+      : [
         {
           detail:
             "Abrir el resumen ejecutivo para revisar cierres publicados, metas e insights autorizados.",

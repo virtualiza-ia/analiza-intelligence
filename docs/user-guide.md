@@ -85,6 +85,8 @@ It uses DEMO values only and labels them visibly. The first executive section is
 
 After the business-line summary, the executive dashboard shows financial health by line, company participation, goals vs results by company, monthly revenue, appointment status, effective occupancy, and adjusted performance. These panels read the header selector, so choosing a business unit or branch narrows the dashboard instead of leaving the same consolidated view.
 
+For the CEO, `/protected/overview` is the single executive report. Financial health, goal progress, insights, data quality, risks, and required decisions must be read there instead of exposing separate CEO menu labels for Finanzas, Metas, or Insights. This avoids two labels opening equivalent executive readings.
+
 ## Operational Views
 
 Phase 3 adds DEMO operational views:
