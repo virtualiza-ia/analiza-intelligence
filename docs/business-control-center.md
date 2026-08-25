@@ -8,6 +8,8 @@ El selector superior de linea de negocio gobierna la pantalla. Si se elige Labor
 
 Las llaves reales no deben generarse ni mostrarse en el navegador. En produccion se deben crear server-side, guardarse cifradas, mostrar solo los ultimos cuatro caracteres y registrar auditoria sin exponer secretos.
 
+Conectores e Integraciones son pantallas de administracion tecnica. Gerente de operaciones no las ve ni puede ejecutar sincronizaciones directas; mientras no exista conector aprobado, operaciones trabaja desde Importaciones.
+
 Cada plan de conector define:
 
 - endpoints por linea de negocio;
@@ -19,23 +21,23 @@ Cada plan de conector define:
 
 ## Calidad de datos por AnaliA
 
-AnaliA revisa plantillas, conectores y dashboards para sugerir mejoras por modulo. El boton `Aplicar` funciona como una accion `DEMO`: marca la recomendacion como aplicada y sube el score visual de confiabilidad.
+AnaliA revisa plantillas, fuentes, reglas de cierre y dashboards para decidir si el dato puede alimentar KPIs, metas e insights. El score no sube por hacer clic en una accion; solo cambia cuando el dato corregido vuelve a pasar reglas.
 
 Las recomendaciones se filtran por la linea activa del encabezado. Cuando una mejora afecta el modelo consolidado, puede aparecer junto a la linea seleccionada porque protege trazabilidad, aprobacion o lectura ejecutiva comun.
 
-En produccion, `Aplicar` debe crear una tarea auditada antes de modificar plantillas, modelos o dashboards. Ninguna recomendacion puede convertir datos incompletos en conclusiones finales.
+En produccion, `Crear tarea` debe crear una tarea auditada antes de modificar plantillas, fuentes, modelos o dashboards. Ninguna recomendacion puede convertir datos incompletos en conclusiones finales.
 
-Las sugerencias se enfocan en:
+La pantalla debe mostrar:
 
-- columnas obligatorias para plantillas de resultados;
-- normalizacion de estados;
-- trazabilidad de fuentes, supuestos y aprobador;
-- mejor lectura visual de operacion y salud financiera;
-- bloqueo de insights cuando falten costos, capacidad o responsables.
+- reglas evaluadas: completitud, validez, consistencia, unicidad, oportunidad y trazabilidad;
+- decision de calidad del cierre activo;
+- evidencia requerida para cerrar calidad;
+- tareas creadas para corregir fuentes o modelos;
+- bloqueo de insights cuando falten costos, capacidad, responsables o fuente trazable.
 
 ## Metas, avances, bonos y ROI
 
-La pantalla de Metas y avances presenta sugerencias por linea de negocio y sucursal. Cada sugerencia conserva:
+La pantalla de Metas y avances presenta sugerencias por linea de negocio y sucursal para los roles que aun trabajan metas como modulo separado. Gerente de operaciones usa `/protected/operacion` como informe unico de metas, avances e insights para evitar KPIs duplicados. Cada sugerencia conserva:
 
 - ingreso actual;
 - meta sugerida;

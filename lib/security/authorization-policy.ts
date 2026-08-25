@@ -65,7 +65,6 @@ const importMutationRoles: RoleKey[] = [
 const connectorMutationRoles: RoleKey[] = [
   "super_admin",
   "webmaster_admin",
-  "gerente_operaciones",
 ];
 const routeAccessAliases = new Map<string, string>([
   ["/protected/cierres/nuevo", "/protected/importaciones"],

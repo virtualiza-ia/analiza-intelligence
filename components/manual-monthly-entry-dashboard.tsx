@@ -1292,7 +1292,7 @@ export function ManualMonthlyEntryDashboard() {
   );
   const [todayIsoDate, setTodayIsoDate] = useState("2026-07-29");
   const [notice, setNotice] = useState(
-    "El formulario mensual sera la via manual principal mientras no haya conectores.",
+    "El formulario de importaciones sera la via manual principal mientras no haya fuente automatica aprobada.",
   );
 
   useEffect(() => {
@@ -1652,7 +1652,8 @@ export function ManualMonthlyEntryDashboard() {
                 </h2>
                 <p className="max-w-4xl text-base leading-7 text-muted-foreground">
                   Esta es la entrada manual que alimenta dashboards, Insights,
-                  alertas, metas y bonos mientras no existan conectores activos.
+                  alertas, metas y bonos mientras no exista fuente automatica
+                  aprobada.
                 </p>
               </div>
             </div>
@@ -1661,11 +1662,12 @@ export function ManualMonthlyEntryDashboard() {
           <aside className={cn("rounded-md border p-4", tone.soft, tone.border)}>
             <div className={cn("mb-3 flex items-center gap-2 font-medium", tone.text)}>
               <DatabaseZap className="size-4" />
-              Manual ahora, conector despues
+              Manual ahora, fuente automatica despues
             </div>
             <p className="text-sm leading-6 text-muted-foreground">
               El mismo mapa de datos servira para CRM, agenda, facturacion,
-              inventario o ERP cuando existan APIs oficiales.
+              inventario o ERP cuando exista una fuente automatica aprobada por
+              administracion.
             </p>
           </aside>
         </div>

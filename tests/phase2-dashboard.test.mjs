@@ -546,6 +546,10 @@ for (const requiredBranchDataText of [
 
 for (const requiredCapacityUiText of [
   "Pantalla de capacidad activa",
+  "Formulario para crear o editar capacidad de sucursal",
+  "Ocupacion agendada calculada",
+  "Ocupacion efectiva calculada",
+  "Capacidad exitosa calculada",
   "Filtros de capacidad",
   "Capacidad y ocupacion",
   "Atencion exitosa",

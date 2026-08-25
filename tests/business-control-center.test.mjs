@@ -76,14 +76,26 @@ for (const requiredConnectorsText of [
   }
 }
 
+for (const requiredImportText of [
+  "roleKey !== \"gerente_operaciones\"",
+  "Fuentes automaticas pendientes",
+  "Formulario de importaciones",
+]) {
+  if (!readFileSync("components/import-operations-dashboard.tsx", "utf8").includes(requiredImportText)) {
+    throw new Error(`Import operations dashboard is missing: ${requiredImportText}`);
+  }
+}
+
 for (const requiredQualityText of [
   "DataQualityAnaliaDashboard",
   "useActiveBusinessLine",
   "visibleSuggestions",
   "Calidad de datos por AnaliA",
-  "Aplicar",
+  "Crear tarea",
+  "Decision de calidad del cierre activo",
+  "Evidencia requerida para cerrar calidad",
   "Plantillas",
-  "Dashboards",
+  "Reglas bloqueantes",
   "tarea auditada",
   "sin inventar datos",
 ]) {

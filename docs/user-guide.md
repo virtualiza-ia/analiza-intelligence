@@ -12,7 +12,7 @@ Analiza Intelligence uses role-based workspaces:
 
 - Superadministrador / Webmaster: configures the platform, users, permissions, connectors, data quality and audit.
 - CEO: reads the BI executive view for Analiza and its business lines.
-- Gerente de operaciones: manages one business line, closings, quality, capacity and branch risk.
+- Gerente de operaciones: manages one business line, imports, quality, capacity, branches, lower-role users and branch risk from a single operational report.
 - Gerente de area: supervises assigned branches, explains variations and validates action plans.
 - Gerente de sucursal: completes the monthly close, reviews branch goals, alerts and pending evidence.
 - Usuario operativo: completes assigned data-entry tasks without managerial privileges.
@@ -87,6 +87,8 @@ After the business-line summary, the executive dashboard shows financial health 
 
 For the CEO, `/protected/overview` is the single executive report. Financial health, goal progress, insights, data quality, risks, and required decisions must be read there instead of exposing separate CEO menu labels for Finanzas, Metas, or Insights. This avoids two labels opening equivalent executive readings.
 
+For Gerente de operaciones, `/protected/operacion` is the single operational report for metas, avances and insights. The separate `/protected/metas` and `/protected/insights` routes are hidden and blocked for this role so the same KPIs are not repeated under different labels.
+
 ## Operational Views
 
 Phase 3 adds DEMO operational views:
@@ -96,7 +98,7 @@ Phase 3 adds DEMO operational views:
 - `/protected/sucursales`
 - `/protected/gerentes`
 
-Appointments show citas por negocio and appointment success rate by business and branch. Capacity shows prior month, current month, goal, and attendance gaps. Branches show managers, result templates, goals, sales, losses, revenue, operating costs, appointments, and data quality. Manager performance uses separated components and does not present a score when capacity or data completeness is insufficient; it also includes organization view and bonus-oriented employee performance.
+Appointments show citas por negocio and appointment success rate by business and branch. Capacity now starts with the branch capacity form used by operations when creating or editing capacity for a branch; it captures available, planned, effective and successful units, then calculates occupancy automatically. Branches show managers, result templates, goals, sales, losses, revenue, operating costs, appointments, and data quality. Manager performance uses separated components and does not present a score when capacity or data completeness is insufficient; it also includes organization view and bonus-oriented employee performance.
 
 ## Business Modules
 
@@ -134,7 +136,7 @@ For Google Workspace with app passwords, use `smtp.gmail.com`, port `587`, `SMTP
 
 ## Imports
 
-The import center guides users through connectors and manual monthly forms. Excel downloads remain as fallback, but the primary manual flow is the monthly form by business line, branch and period.
+The import center guides users through the operational import form and controlled file fallback. For Gerente de operaciones, Importaciones is the only visible data-entry entry point; the legacy Formulario mensual menu entry, Conectores and Integraciones are hidden and blocked for that role.
 
 Templates are the root of the system when no API or CRM connector is available. The minimum root templates are appointments, capacity, costs, revenue, services, professionals, targets, result templates by branch, and payroll/bonus sheets.
 
@@ -152,7 +154,7 @@ These files feed branch revenue, target, sales completion, cost of sale, margin,
 
 ## Data Quality
 
-Data quality means the system knows whether the information is complete, valid, consistent, unique, timely, and traceable. The manager no longer writes a quality score manually: AnaliA calculates it from required fields, source files, suspicious amounts, branch/period consistency, duplicates and traceability. When data is incomplete or invalid, affected dashboards show warnings and avoid conclusive insights.
+Data quality means the system knows whether the information is complete, valid, consistent, unique, timely, and traceable. The manager no longer writes a quality score manually and clicking an action cannot improve the score by itself: AnaliA calculates quality from required fields, source files, suspicious amounts, branch/period consistency, duplicates and traceability. When data is incomplete or invalid, affected dashboards show warnings, block publication when needed and avoid conclusive insights.
 
 ## Audit
 

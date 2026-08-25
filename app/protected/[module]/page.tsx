@@ -145,7 +145,7 @@ export default async function ModulePage({
   }
 
   if (module === "importaciones") {
-    return <ImportOperationsDashboard />;
+    return <ImportOperationsDashboard roleKey={actor.roleKey} />;
   }
 
   if (module === "plantillas") {

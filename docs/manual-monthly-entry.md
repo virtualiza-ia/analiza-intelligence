@@ -44,7 +44,7 @@ El formulario debe leerse como un asistente de cierre mensual, no como un tabler
 - `super_admin`: gobierna permisos globales, conectores, auditoria y seguridad del sistema.
 - `webmaster_admin`: alias historico de administrador DEMO, conservado por compatibilidad.
 - `ceo`: consulta resultados ejecutivos, decide metas finales, crea sucursales e invita roles inferiores dentro de su alcance.
-- `gerente_operaciones`: crea sucursales, crea areas operativas, asigna sucursales a areas y valida cierres dentro de su alcance.
+- `gerente_operaciones`: crea sucursales, crea areas operativas, asigna sucursales a areas, captura capacidad por sucursal y valida cierres desde Importaciones dentro de su alcance. No usa el menu heredado de Formulario mensual ni las pantallas de Conectores/Integraciones.
 - `gerente_area`: crea o sustituye gerentes de sucursal solo dentro de sus areas, supervisa el grupo de sucursales asignadas y compara disciplina, puntualidad y calidad.
 - `gerente_sucursal`: llena el cierre mensual de su sucursal y consulta sus resultados.
 - `usuario_operativo`: ayuda con carga o correccion de datos de su sucursal cuando tenga permiso.

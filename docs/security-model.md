@@ -19,7 +19,7 @@ Official Analiza roles:
 - `super_admin`: superadministrador. Administra la plataforma completa, permisos globales, gobierno de datos, conectores y seguridad.
 - `webmaster_admin`: alias historico de administrador, conservado por compatibilidad con sesiones y datos DEMO existentes.
 - `ceo`: reads the executive BI view for Analiza and all assigned business lines, countries, and branches; may invite lower roles inside its delegated scope.
-- `gerente_operaciones`: creates operational areas, creates branches, assigns branches to areas, assigns area managers, and monitors all branches in scope.
+- `gerente_operaciones`: creates operational areas, creates branches, assigns branches to areas, assigns area managers, captures branch capacity, imports operational data, and monitors all branches in scope through the unified operational report.
 - `gerente_area`: creates or assigns branch managers only within assigned operational areas, supervises a branch group, validates monthly discipline, and compares branch manager performance.
 - `gerente_sucursal`: registers the assigned branch monthly close through the controlled form and reads branch results.
 - `usuario_operativo`: loads or corrects operational data without managerial privileges when delegated.
@@ -83,7 +83,7 @@ Users and managers are deactivated with soft delete fields and history, not phys
 
 Phase 3 extends RLS to appointments, capacity, professionals, anonymous patients, and service events. Operational reads are scoped through `current_user_can_access_branch`.
 
-Write access to operational data is limited to `webmaster_admin`, `gerente_operaciones`, `gerente_area`, and the controlled monthly form path for `gerente_sucursal`. Published closes require authorization before replacement.
+Write access to operational data is limited to `webmaster_admin`, `gerente_operaciones`, `gerente_area`, and the controlled import/form path for `gerente_sucursal`. Published closes require authorization before replacement. Connector management and connector execution are reserved for `super_admin` and `webmaster_admin`; `gerente_operaciones` uses Importaciones instead of Conectores or Integraciones.
 
 Self-hosted PostgreSQL persistence also applies server-side authorization before reads and writes. Production database access requires an explicit `ANALIZA_POSTGRES_RLS_VERIFIED=true` gate after confirming that the configured database role does not bypass RLS and that deny cases fail in the target environment. This is a production readiness blocker, not a client-side control.
 

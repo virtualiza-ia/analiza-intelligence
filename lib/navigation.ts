@@ -92,15 +92,14 @@ const allRoles: RoleKey[] = [
   "viewer",
 ];
 
-const dataReadRoles: RoleKey[] = [
+const insightReadRoles: RoleKey[] = [
   ...adminRoles,
-  "gerente_operaciones",
   "gerente_area",
   "gerente_sucursal",
   "viewer",
 ];
 
-const connectorAdminRoles: RoleKey[] = [...adminRoles, "gerente_operaciones"];
+const connectorAdminRoles: RoleKey[] = adminRoles;
 
 const delegatedUserAdminRoles: RoleKey[] = [
   ...adminRoles,
@@ -265,7 +264,7 @@ export const navigationItems: NavigationItem[] = [
     href: "/protected/insights",
     icon: Lightbulb,
     group: "direccion",
-    allowedRoles: dataReadRoles,
+    allowedRoles: insightReadRoles,
   },
   {
     title: "Formulario mensual",
@@ -274,7 +273,6 @@ export const navigationItems: NavigationItem[] = [
     group: "datos",
     allowedRoles: [
       ...adminRoles,
-      "gerente_operaciones",
       "gerente_area",
       "usuario_operativo",
     ],
@@ -305,7 +303,7 @@ export const navigationItems: NavigationItem[] = [
     href: "/protected/metas",
     icon: Goal,
     group: "direccion",
-    allowedRoles: ["gerente_operaciones", "gerente_area", "gerente_sucursal"],
+    allowedRoles: ["gerente_area", "gerente_sucursal"],
   },
   {
     title: "Usuarios y permisos",

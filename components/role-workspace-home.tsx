@@ -156,8 +156,8 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
     title: "Bandeja del gerente de operaciones",
     description:
       "Entra por cierres pendientes, sucursales con riesgo, capacidad, SLA y datos faltantes.",
-    primaryHref: "/protected/resultados",
-    primaryLabel: "Ver resultados Fisioterapia",
+    primaryHref: "/protected/operacion",
+    primaryLabel: "Ver resumen operativo",
     metrics: [
       { label: "Cierres pendientes", value: "5", note: "pendientes de validar" },
       { label: "Sucursales", value: "4", note: "con riesgo operativo" },
@@ -173,7 +173,7 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
       {
         title: "Capacidad perdida",
         detail: "Detectar donde hay horas disponibles no convertidas en produccion.",
-        href: "/protected/resultados",
+        href: "/protected/capacidad",
         tone: "action",
       },
       {
@@ -184,10 +184,14 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
       },
     ],
     shortcutHrefs: [
+      "/protected/operacion",
+      "/protected/importaciones",
+      "/protected/capacidad",
       "/protected/resultados",
       "/protected/sucursales",
       "/protected/cierres",
       "/protected/calidad-datos",
+      "/protected/usuarios-permisos",
     ],
   },
   gerente_area: {

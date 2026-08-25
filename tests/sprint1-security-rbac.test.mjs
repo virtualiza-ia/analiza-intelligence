@@ -283,6 +283,35 @@ for (const duplicateExecutiveReportPath of [
   );
 }
 
+for (const operationsAllowedPath of [
+  "/protected/importaciones",
+  "/protected/cierres/nuevo",
+  "/protected/operacion",
+  "/protected/capacidad",
+  "/protected/calidad-datos",
+  "/protected/usuarios-permisos",
+]) {
+  assert.equal(
+    canAccessProtectedPath(operationsManager, operationsAllowedPath),
+    true,
+    `Operations manager must access ${operationsAllowedPath}.`,
+  );
+}
+
+for (const duplicateOperationsPath of [
+  "/protected/metas",
+  "/protected/insights",
+  "/protected/plantillas",
+  "/protected/conectores",
+  "/protected/apis",
+]) {
+  assert.equal(
+    canAccessProtectedPath(operationsManager, duplicateOperationsPath),
+    false,
+    `Operations manager must use the unified operational flow instead of ${duplicateOperationsPath}.`,
+  );
+}
+
 assert.equal(
   canAccessProtectedPath(ceo, "/protected/usuarios-permisos"),
   true,
@@ -496,8 +525,8 @@ assert.equal(
   canPerformAction(operationsManager, "connectors.run", {
     scope: { companyId, countryId, organizationId },
   }),
-  true,
-  "Operations manager must execute connector sync actions in scope.",
+  false,
+  "Operations manager must not execute connector sync actions.",
 );
 
 assert.equal(

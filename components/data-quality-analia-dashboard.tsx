@@ -130,27 +130,27 @@ function QualityRuleGrid({ rules }: { rules: DataQualityRuleResult[] }) {
   );
 }
 
-const commercialUploadRequirements = [
+const qualityEvidenceRequirements = [
   {
-    id: "doctor-sales",
-    title: "Excel doctores y montos vendidos",
+    id: "closing-source",
+    title: "Fuente del cierre activo",
     description:
-      "Doctor, especialidad, examen, monto vendido, sucursal, periodo y visitador asociado.",
-    owner: "Gerencia de operaciones Laboratorio",
+      "Archivo o carga que contiene venta, costo, volumen, sucursal, periodo y responsable.",
+    owner: "Gerencia de operaciones",
   },
   {
-    id: "medical-reps",
-    title: "Excel visitadores medicos",
+    id: "branch-catalog",
+    title: "Catalogo de sucursales",
     description:
-      "Visitador, doctores asignados, ventas del mes, zona, seguimiento y cartera activa.",
-    owner: "Gerencia comercial / Laboratorio",
+      "Codigo, pais, linea, area, gerente asignado y estado vigente de cada sucursal.",
+    owner: "Operaciones / Administracion",
   },
   {
-    id: "evaluation-email",
-    title: "Evaluaciones 360 por correo",
+    id: "correction-evidence",
+    title: "Evidencia de correccion",
     description:
-      "El equipo responde por correo/formulario anonimo y los resultados llenan automaticamente score, tema y accion.",
-    owner: "Recursos humanos / Operaciones",
+      "Soporte de valores corregidos, responsable de aprobacion y motivo del cambio.",
+    owner: "Operaciones / Auditoria",
   },
 ];
 
@@ -158,7 +158,7 @@ const automaticQualityAlerts = [
   {
     title: "Monto sospechoso",
     reason:
-      "AnaliA compara reactivos, insumos y consumibles contra venta neta, pruebas, historico y meta antes de aceptar el cierre.",
+      "Se compara contra periodo, sucursal, volumen y costo directo antes de permitir conclusiones.",
   },
   {
     title: "Sucursal o periodo no cuadran",
@@ -168,7 +168,7 @@ const automaticQualityAlerts = [
   {
     title: "Archivo comercial faltante",
     reason:
-      "Sin doctores o visitadores no se calcula rendimiento medico ni ventas mes a mes por cartera.",
+      "Si falta una fuente obligatoria, el KPI queda pendiente y no se reemplaza por cero.",
   },
   {
     title: "Duplicado o salto fuera de rango",
@@ -177,10 +177,47 @@ const automaticQualityAlerts = [
   },
 ];
 
+function QualityGatePanel({
+  blockingRuleCount,
+  warningRuleCount,
+}: {
+  blockingRuleCount: number;
+  warningRuleCount: number;
+}) {
+  const isBlocked = blockingRuleCount > 0;
+
+  return (
+    <section
+      className={cn(
+        "rounded-md border p-4 text-sm",
+        isBlocked
+          ? "border-red-200 bg-red-50 text-red-900"
+          : "border-emerald-200 bg-emerald-50 text-emerald-900",
+      )}
+    >
+      <div className="mb-2 flex items-center gap-2 font-semibold">
+        {isBlocked ? (
+          <AlertTriangle className="size-4" />
+        ) : (
+          <CheckCircle2 className="size-4" />
+        )}
+        Decision de calidad del cierre activo
+      </div>
+      <p className="leading-6">
+        {isBlocked
+          ? `No publicar ni usar insights concluyentes: hay ${blockingRuleCount} regla(s) criticas y ${warningRuleCount} advertencia(s) por resolver.`
+          : `Dato utilizable para lectura operativa: no hay reglas criticas abiertas y quedan ${warningRuleCount} advertencia(s) para seguimiento.`}
+      </p>
+    </section>
+  );
+}
+
 export function DataQualityAnaliaDashboard() {
   const activeBusinessLine = useActiveBusinessLine();
   const [context, setContext] = useState<StoredContext | null>(null);
-  const [appliedIds, setAppliedIds] = useState<Set<string>>(() => new Set());
+  const [createdTaskIds, setCreatedTaskIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, string>>({});
   const visibleSuggestions = useMemo(
     () =>
@@ -194,10 +231,10 @@ export function DataQualityAnaliaDashboard() {
     [activeBusinessLine.isConsolidated, activeBusinessLine.line],
   );
   const pendingSuggestions = visibleSuggestions.filter(
-    (suggestion) => !appliedIds.has(suggestion.id),
+    (suggestion) => !createdTaskIds.has(suggestion.id),
   );
-  const appliedCount = visibleSuggestions.filter((suggestion) =>
-    appliedIds.has(suggestion.id),
+  const createdTaskCount = visibleSuggestions.filter((suggestion) =>
+    createdTaskIds.has(suggestion.id),
   ).length;
   const qualitySnapshot = useMemo(
     () =>
@@ -233,10 +270,7 @@ export function DataQualityAnaliaDashboard() {
           ) / qualitySnapshot.lines.length,
         )
       : 0;
-  const qualityScore = useMemo(
-    () => Math.min(94, baseQualityScore + appliedCount * 2),
-    [appliedCount, baseQualityScore],
-  );
+  const qualityScore = baseQualityScore;
   const qualityLevel = getQualityLevelFromScore(qualityScore);
   const qualityRules = useMemo(() => {
     if (qualitySnapshot.lines.length === 0) {
@@ -281,6 +315,12 @@ export function DataQualityAnaliaDashboard() {
 
     return qualitySnapshot.lines.flatMap((line) => line.qualityRules);
   }, [qualitySnapshot]);
+  const blockingRuleCount = qualityRules.filter(
+    (rule) => !rule.passed && rule.severity === "critical",
+  ).length;
+  const warningRuleCount = qualityRules.filter(
+    (rule) => !rule.passed && rule.severity === "warning",
+  ).length;
 
   useEffect(() => {
     function refreshContext() {
@@ -297,8 +337,8 @@ export function DataQualityAnaliaDashboard() {
     };
   }, []);
 
-  function applySuggestion(id: string) {
-    setAppliedIds((current) => {
+  function createQualityTask(id: string) {
+    setCreatedTaskIds((current) => {
       const next = new Set(current);
       next.add(id);
       return next;
@@ -320,7 +360,7 @@ export function DataQualityAnaliaDashboard() {
             <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
               Entorno DEMO
             </Badge>
-            <Badge variant="outline">Recomendaciones aplicables por AnaliA</Badge>
+            <Badge variant="outline">Reglas del cierre activo</Badge>
             <Badge variant="outline">Filtro: {activeBusinessLine.line}</Badge>
           </div>
           <div className="flex items-center gap-3">
@@ -332,9 +372,10 @@ export function DataQualityAnaliaDashboard() {
                 Calidad de datos por AnaliA
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                AnaliA revisa plantillas, conectores y dashboards para sugerir
-                cambios que mejoren la lectura de la operacion y salud
-                financiera sin inventar datos.
+                AnaliA revisa completitud, validez, consistencia,
+                duplicados, oportunidad y trazabilidad para decidir si un
+                cierre puede alimentar KPIs, metas e insights sin inventar datos
+                ni conclusiones.
               </p>
             </div>
           </div>
@@ -343,7 +384,7 @@ export function DataQualityAnaliaDashboard() {
         <aside className="rounded-md border bg-card p-4 text-sm">
           <div className="mb-2 flex items-center gap-2 font-medium">
             <ShieldCheck className="size-4 text-primary" />
-            Puntaje de confiabilidad DEMO
+            Semaforo de calidad del cierre activo
           </div>
           <div className="text-3xl font-semibold">{qualityScore}%</div>
           <Badge
@@ -363,8 +404,8 @@ export function DataQualityAnaliaDashboard() {
           <p className="mt-2 leading-6 text-muted-foreground">
             Pais {qualitySnapshot.context.countryName}, empresa{" "}
             {qualitySnapshot.context.companyName}, sucursal{" "}
-            {qualitySnapshot.context.branchName}. No convierte datos DEMO en
-            datos reales.
+            {qualitySnapshot.context.branchName}. El puntaje sale de reglas
+            calculadas; crear tareas no cambia el dato.
           </p>
         </aside>
       </div>
@@ -374,15 +415,15 @@ export function DataQualityAnaliaDashboard() {
           {
             icon: FileSpreadsheet,
             label: "Plantillas",
-            value: `${visibleSuggestions.filter((item) => item.target === "Plantilla de resultados").length} mejoras`,
+            value: `${visibleSuggestions.filter((item) => item.target === "Plantilla de resultados").length} fuentes`,
           },
           {
             icon: BarChart3,
-            label: "Vistas",
-            value: `${visibleSuggestions.filter((item) => item.target === "Dashboard").length} lecturas`,
+            label: "Reglas bloqueantes",
+            value: `${blockingRuleCount}`,
           },
-          { icon: ClipboardCheck, label: "Aplicadas", value: `${appliedCount}` },
-          { icon: Lightbulb, label: "Pendientes", value: `${pendingSuggestions.length}` },
+          { icon: ClipboardCheck, label: "Tareas creadas", value: `${createdTaskCount}` },
+          { icon: Lightbulb, label: "Acciones pendientes", value: `${pendingSuggestions.length}` },
         ].map((metric) => {
           const Icon = metric.icon;
 
@@ -400,23 +441,29 @@ export function DataQualityAnaliaDashboard() {
 
       <QualityRuleGrid rules={qualityRules} />
 
+      <QualityGatePanel
+        blockingRuleCount={blockingRuleCount}
+        warningRuleCount={warningRuleCount}
+      />
+
       <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="rounded-md border bg-card p-4">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 text-sm font-medium">
                 <UploadCloud className="size-4 text-primary" />
-                Cargas que reemplazan el formulario de calidad
+                Evidencia requerida para cerrar calidad
               </div>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                La calidad no se captura a mano. Se alimenta con archivos,
-                evaluaciones por correo y validaciones automaticas de AnaliA.
+                La calidad no es un formulario de opinion. Se alimenta con
+                fuentes, catalogos y evidencia de correccion que expliquen cada
+                cambio antes de publicar.
               </p>
             </div>
-            <Badge variant="outline">Laboratorio primero</Badge>
+            <Badge variant="outline">Control por sucursal</Badge>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
-            {commercialUploadRequirements.map((requirement) => (
+            {qualityEvidenceRequirements.map((requirement) => (
               <label
                 className="grid gap-3 rounded-md border bg-background p-3 text-sm"
                 key={requirement.id}
@@ -482,13 +529,13 @@ export function DataQualityAnaliaDashboard() {
       <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="grid gap-3">
           {visibleSuggestions.map((suggestion) => {
-            const applied = appliedIds.has(suggestion.id);
+            const taskCreated = createdTaskIds.has(suggestion.id);
 
             return (
               <article
                 className={cn(
                   "rounded-md border bg-card p-4",
-                  applied && "border-emerald-200 bg-emerald-50",
+                  taskCreated && "border-emerald-200 bg-emerald-50",
                 )}
                 key={suggestion.id}
               >
@@ -509,12 +556,12 @@ export function DataQualityAnaliaDashboard() {
                     </p>
                   </div>
                   <Button
-                    disabled={applied}
-                    onClick={() => applySuggestion(suggestion.id)}
+                    disabled={taskCreated}
+                    onClick={() => createQualityTask(suggestion.id)}
                     type="button"
                   >
                     <Wand2 className="size-4" />
-                    {applied ? "Aplicado" : "Aplicar"}
+                    {taskCreated ? "Tarea creada" : "Crear tarea"}
                   </Button>
                 </div>
 
@@ -569,12 +616,13 @@ export function DataQualityAnaliaDashboard() {
           <div className="rounded-md border bg-card p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium">
               <CheckCircle2 className="size-4 text-primary" />
-              Lo que hace el boton Aplicar
+              Lo que hace el boton Crear tarea
             </div>
             <p className="text-sm leading-6 text-muted-foreground">
-              En DEMO marca la recomendacion como aplicada y recalcula el score
-              de confiabilidad. En produccion debe crear una tarea auditada para
-              modificar plantilla, conector o dashboard con aprobacion humana.
+              En DEMO marca que operaciones abrio una tarea. En produccion debe
+              crear una tarea auditada para modificar plantilla, fuente o
+              dashboard con aprobacion humana; el score solo cambia cuando el
+              dato corregido vuelva a pasar reglas.
             </p>
           </div>
         </aside>

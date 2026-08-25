@@ -7,6 +7,7 @@ import {
   ClipboardList,
   GitBranch,
   LineChart,
+  Lightbulb,
 } from "lucide-react";
 
 import { AnalyticsComparisonChart } from "@/components/analytics-comparison-chart";
@@ -181,6 +182,79 @@ function OperationBlockSection({ block }: { block: OperationBlock }) {
   );
 }
 
+function UnifiedOperationsReview({
+  screen,
+}: {
+  screen: ReturnType<typeof getExecutiveOperationScreen>;
+}) {
+  const leadingMetric = screen.primaryMetrics[0];
+  const riskMetric =
+    screen.primaryMetrics.find(
+      (metric) =>
+        metric.status === "critical" ||
+        metric.status === "warning" ||
+        metric.status === "pending-upload" ||
+        metric.status === "incomplete",
+    ) ?? screen.primaryMetrics[1];
+  const insight = screen.trendChart.insights[0];
+
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <div className="mb-4 grid gap-1">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Lightbulb className="size-4 text-primary" />
+          Metas, avances e insights operativos
+        </div>
+        <p className="text-xs leading-5 text-muted-foreground">
+          Esta es la lectura unica del gerente de operaciones: meta, avance,
+          brecha y accion se revisan aqui para evitar dos pantallas con los
+          mismos KPIs.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <article className="rounded-md border bg-background p-3">
+          <div className="text-xs font-medium text-muted-foreground">
+            Avance principal
+          </div>
+          <div className="mt-2 text-xl font-semibold tracking-normal">
+            {leadingMetric?.value ?? "Pendiente"}
+          </div>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {leadingMetric?.label ?? "Sin metrica disponible"}:{" "}
+            {leadingMetric?.note ?? "Esperando datos publicados."}
+          </p>
+        </article>
+
+        <article className="rounded-md border bg-background p-3">
+          <div className="text-xs font-medium text-muted-foreground">
+            Brecha a corregir
+          </div>
+          <div className="mt-2 text-xl font-semibold tracking-normal">
+            {riskMetric?.value ?? "Pendiente"}
+          </div>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {riskMetric?.label ?? "Sin alerta"}:{" "}
+            {riskMetric?.note ?? "No hay accion prioritaria registrada."}
+          </p>
+        </article>
+
+        <article className="rounded-md border bg-background p-3">
+          <div className="text-xs font-medium text-muted-foreground">
+            Insight accionable
+          </div>
+          <div className="mt-2 text-xl font-semibold tracking-normal">
+            {insight?.value ?? "Pendiente"}
+          </div>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {insight ? `${insight.label}: ${insight.note}` : "Sin insight calculable."}
+          </p>
+        </article>
+      </div>
+    </section>
+  );
+}
+
 function ComparisonTable({ rows }: { rows: OperationComparisonRow[] }) {
   return (
     <section className="rounded-md border bg-card p-4">
@@ -331,6 +405,8 @@ export function ExecutiveOperationDashboard() {
           <PrimaryMetricCard key={`${screen.slug}-${metric.label}`} metric={metric} />
         ))}
       </div>
+
+      <UnifiedOperationsReview screen={screen} />
 
       <AnalyticsComparisonChart {...screen.trendChart} />
 

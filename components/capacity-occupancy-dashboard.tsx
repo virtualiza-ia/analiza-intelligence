@@ -14,6 +14,8 @@ import {
 
 import { AnalyticsComparisonChart } from "@/components/analytics-comparison-chart";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   resolveBusinessLineSlug,
   type BusinessLineSlug,
@@ -74,6 +76,21 @@ type CapacitySelection = {
   timeSlot: string;
   attentionState: string;
   capacityType: string;
+};
+
+type CapacityFormMode = "crear" | "editar";
+
+type BranchCapacityFormState = {
+  attendedUnits: string;
+  availableUnits: string;
+  branch: string;
+  effectiveFrom: string;
+  mode: CapacityFormMode;
+  notes: string;
+  plannedUnits: string;
+  responsible: string;
+  successfulUnits: string;
+  unitLabel: string;
 };
 
 function readStoredContext() {
@@ -158,6 +175,58 @@ function getRowStatusClass(status: string) {
 
 function barWidth(value: number) {
   return `${Math.max(0, Math.min(value, 100))}%`;
+}
+
+function readPositiveNumber(value: string) {
+  const parsedValue = Number(value);
+
+  if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+    return null;
+  }
+
+  return parsedValue;
+}
+
+function formatCapacityRatio(numerator: string, denominator: string) {
+  const numeratorValue = readPositiveNumber(numerator);
+  const denominatorValue = readPositiveNumber(denominator);
+
+  if (
+    numeratorValue === null ||
+    denominatorValue === null ||
+    denominatorValue === 0
+  ) {
+    return "Pendiente";
+  }
+
+  return `${Math.round((numeratorValue / denominatorValue) * 100)}%`;
+}
+
+function createDefaultCapacityForm(
+  branchOptions: string[],
+  lineSlug: BusinessLineSlug,
+): BranchCapacityFormState {
+  const firstBranch =
+    branchOptions.find((branch) => branch !== allBranchesLabel) ??
+    "Sucursal por definir";
+
+  return {
+    attendedUnits: "",
+    availableUnits: "",
+    branch: firstBranch,
+    effectiveFrom: "2026-08-01",
+    mode: "crear",
+    notes: "",
+    plannedUnits: "",
+    responsible: "Gerente de operaciones",
+    successfulUnits: "",
+    unitLabel:
+      lineSlug === "laboratorio"
+        ? "Pruebas por mes"
+        : lineSlug === "imagenes"
+          ? "Horas de equipo por mes"
+          : "Horas clinicas por mes",
+  };
 }
 
 function CapacityMetricCard({ metric }: { metric: CapacityMetric }) {
@@ -383,6 +452,284 @@ function CapacityFilters({
           </select>
         </label>
       </div>
+    </section>
+  );
+}
+
+function BranchCapacityInputForm({
+  branchOptions,
+  lineSlug,
+}: {
+  branchOptions: string[];
+  lineSlug: BusinessLineSlug;
+}) {
+  const [form, setForm] = useState<BranchCapacityFormState>(() =>
+    createDefaultCapacityForm(branchOptions, lineSlug),
+  );
+  const [message, setMessage] = useState("");
+  const branchOptionsForForm = useMemo(
+    () => branchOptions.filter((branch) => branch !== allBranchesLabel),
+    [branchOptions],
+  );
+  const scheduledOccupancy = formatCapacityRatio(
+    form.plannedUnits,
+    form.availableUnits,
+  );
+  const effectiveOccupancy = formatCapacityRatio(
+    form.attendedUnits,
+    form.availableUnits,
+  );
+  const successfulOccupancy = formatCapacityRatio(
+    form.successfulUnits,
+    form.availableUnits,
+  );
+  const availableUnits = readPositiveNumber(form.availableUnits);
+  const plannedUnits = readPositiveNumber(form.plannedUnits);
+  const attendedUnits = readPositiveNumber(form.attendedUnits);
+  const hasImpossibleValues =
+    availableUnits !== null &&
+    ((plannedUnits !== null && plannedUnits > availableUnits) ||
+      (attendedUnits !== null && attendedUnits > availableUnits));
+
+  useEffect(() => {
+    setForm((currentForm) => {
+      const nextForm = createDefaultCapacityForm(branchOptions, lineSlug);
+
+      return {
+        ...currentForm,
+        branch: branchOptionsForForm.includes(currentForm.branch)
+          ? currentForm.branch
+          : nextForm.branch,
+        unitLabel: nextForm.unitLabel,
+      };
+    });
+  }, [branchOptions, branchOptionsForForm, lineSlug]);
+
+  function updateField(
+    key: keyof BranchCapacityFormState,
+    value: string | CapacityFormMode,
+  ) {
+    setForm((currentForm) => ({ ...currentForm, [key]: value }));
+    setMessage("");
+  }
+
+  function saveCapacityProfile() {
+    if (!form.branch || form.branch === "Sucursal por definir") {
+      setMessage("Selecciona la sucursal para registrar su capacidad.");
+      return;
+    }
+
+    if (!form.availableUnits || readPositiveNumber(form.availableUnits) === null) {
+      setMessage("Escribe la capacidad disponible con un numero valido.");
+      return;
+    }
+
+    if (hasImpossibleValues) {
+      setMessage(
+        "Revisa la ficha: lo planificado o atendido no puede superar la capacidad disponible.",
+      );
+      return;
+    }
+
+    setMessage(
+      `${form.branch}: ficha de capacidad lista para ${form.mode === "crear" ? "crear" : "editar"} con ocupacion efectiva ${effectiveOccupancy}.`,
+    );
+  }
+
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="grid gap-1">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <ClipboardList className="size-4 text-primary" />
+            Formulario para crear o editar capacidad de sucursal
+          </div>
+          <p className="max-w-4xl text-xs leading-5 text-muted-foreground">
+            La gerente de operaciones captura esta ficha por sucursal cuando la
+            crea o la actualiza. Con estos campos el sistema calcula ocupacion
+            agendada, ocupacion efectiva y capacidad exitosa sin escribir esos
+            porcentajes a mano.
+          </p>
+        </div>
+        <Badge variant="outline">Fuente: operaciones</Badge>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <label className="grid gap-1 text-xs">
+          <span className="font-medium text-muted-foreground">Accion</span>
+          <select
+            className="h-10 rounded-md border bg-background px-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+            onChange={(event) =>
+              updateField("mode", event.target.value as CapacityFormMode)
+            }
+            value={form.mode}
+          >
+            <option value="crear">Crear capacidad</option>
+            <option value="editar">Editar capacidad</option>
+          </select>
+        </label>
+
+        <label className="grid gap-1 text-xs">
+          <span className="font-medium text-muted-foreground">Sucursal</span>
+          <select
+            className="h-10 rounded-md border bg-background px-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+            onChange={(event) => updateField("branch", event.target.value)}
+            value={form.branch}
+          >
+            {branchOptionsForForm.length > 0 ? (
+              branchOptionsForForm.map((branch) => (
+                <option key={branch} value={branch}>
+                  {branch}
+                </option>
+              ))
+            ) : (
+              <option value="Sucursal por definir">Sucursal por definir</option>
+            )}
+          </select>
+        </label>
+
+        <label className="grid gap-1 text-xs">
+          <span className="font-medium text-muted-foreground">
+            Vigente desde
+          </span>
+          <Input
+            className="h-10"
+            onChange={(event) => updateField("effectiveFrom", event.target.value)}
+            type="date"
+            value={form.effectiveFrom}
+          />
+        </label>
+
+        <label className="grid gap-1 text-xs">
+          <span className="font-medium text-muted-foreground">
+            Unidad de capacidad
+          </span>
+          <Input
+            className="h-10"
+            onChange={(event) => updateField("unitLabel", event.target.value)}
+            value={form.unitLabel}
+          />
+        </label>
+
+        <label className="grid gap-1 text-xs">
+          <span className="font-medium text-muted-foreground">
+            Capacidad disponible
+          </span>
+          <Input
+            className="h-10"
+            min="0"
+            onChange={(event) => updateField("availableUnits", event.target.value)}
+            placeholder="0"
+            type="number"
+            value={form.availableUnits}
+          />
+        </label>
+
+        <label className="grid gap-1 text-xs">
+          <span className="font-medium text-muted-foreground">
+            Capacidad agendada
+          </span>
+          <Input
+            className="h-10"
+            min="0"
+            onChange={(event) => updateField("plannedUnits", event.target.value)}
+            placeholder="0"
+            type="number"
+            value={form.plannedUnits}
+          />
+        </label>
+
+        <label className="grid gap-1 text-xs">
+          <span className="font-medium text-muted-foreground">
+            Capacidad efectiva
+          </span>
+          <Input
+            className="h-10"
+            min="0"
+            onChange={(event) => updateField("attendedUnits", event.target.value)}
+            placeholder="0"
+            type="number"
+            value={form.attendedUnits}
+          />
+        </label>
+
+        <label className="grid gap-1 text-xs">
+          <span className="font-medium text-muted-foreground">
+            Capacidad exitosa
+          </span>
+          <Input
+            className="h-10"
+            min="0"
+            onChange={(event) => updateField("successfulUnits", event.target.value)}
+            placeholder="0"
+            type="number"
+            value={form.successfulUnits}
+          />
+        </label>
+
+        <label className="grid gap-1 text-xs xl:col-span-2">
+          <span className="font-medium text-muted-foreground">Responsable</span>
+          <Input
+            className="h-10"
+            onChange={(event) => updateField("responsible", event.target.value)}
+            value={form.responsible}
+          />
+        </label>
+
+        <label className="grid gap-1 text-xs xl:col-span-2">
+          <span className="font-medium text-muted-foreground">
+            Observacion de capacidad
+          </span>
+          <Input
+            className="h-10"
+            onChange={(event) => updateField("notes", event.target.value)}
+            placeholder="Ej. se agrego turno sabatino o equipo en mantenimiento"
+            value={form.notes}
+          />
+        </label>
+      </div>
+
+      <div className="mt-4 grid gap-3 rounded-md border bg-muted/40 p-3 text-sm md:grid-cols-4">
+        <div>
+          <div className="text-xs text-muted-foreground">
+            Ocupacion agendada calculada
+          </div>
+          <div className="font-semibold">{scheduledOccupancy}</div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">
+            Ocupacion efectiva calculada
+          </div>
+          <div className="font-semibold">{effectiveOccupancy}</div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">
+            Capacidad exitosa calculada
+          </div>
+          <div className="font-semibold">{successfulOccupancy}</div>
+        </div>
+        <div className="flex items-center justify-start md:justify-end">
+          <Button onClick={saveCapacityProfile} type="button">
+            <CheckCircle2 className="size-4" />
+            Guardar ficha
+          </Button>
+        </div>
+      </div>
+
+      {message || hasImpossibleValues ? (
+        <div
+          className={cn(
+            "mt-3 rounded-md border px-3 py-2 text-sm",
+            hasImpossibleValues
+              ? "border-red-200 bg-red-50 text-red-900"
+              : "border-emerald-200 bg-emerald-50 text-emerald-900",
+          )}
+        >
+          {hasImpossibleValues
+            ? "Los valores de capacidad deben conservar la regla: disponible >= agendada >= efectiva cuando aplique."
+            : message}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -762,6 +1109,11 @@ export function CapacityOccupancyDashboard() {
         filters={screen.filters}
         onChange={setSelection}
         selection={selection}
+      />
+
+      <BranchCapacityInputForm
+        branchOptions={branchOptions}
+        lineSlug={lineSlug}
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

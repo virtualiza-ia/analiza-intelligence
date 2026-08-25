@@ -45,6 +45,7 @@ import {
   type ImportFrequency,
 } from "@/lib/analytics/import-operations";
 import type { IngestionDatasetType } from "@/lib/data-ingestion/templates";
+import type { RoleKey } from "@/lib/tenant/demo-context";
 import { cn } from "@/lib/utils";
 
 const storageKey = "analiza:selected-context";
@@ -137,6 +138,9 @@ type LineageResult = {
 type ImportLineFilter = ImportBusinessLine | typeof allLines;
 type StatusFilter = BulkImportStatus | typeof allStatuses;
 type FrequencyFilter = ImportFrequency | typeof allFrequencies;
+type ImportOperationsDashboardProps = {
+  roleKey?: RoleKey;
+};
 
 const statusOrder: BulkImportStatus[] = [
   "Pendiente de carga",
@@ -865,8 +869,9 @@ function DocumentDetail({
         </div>
         <p>{importDocument.updateRule}</p>
         <p>
-          Mientras no exista conector: {importDocument.connectorFallback}. Cada
-          KPI publicado mantiene fuente, archivo, version, usuario y periodo.
+          Mientras no exista fuente automatica:{" "}
+          {importDocument.connectorFallback}. Cada KPI publicado mantiene
+          fuente, archivo, version, usuario y periodo.
         </p>
       </div>
     </aside>
@@ -1205,7 +1210,7 @@ function GovernanceSection() {
           Trazabilidad
         </div>
         <p className="text-xs leading-5">
-          Cada KPI debe conservar fuente, archivo, conector, lote, version,
+          Cada KPI debe conservar fuente, archivo, lote, version,
           transformacion, usuario y periodo antes de mostrarse como confiable.
         </p>
       </article>
@@ -1216,7 +1221,7 @@ function GovernanceSection() {
         </div>
         <p className="text-xs leading-5">
           Operaciones puede cargar y validar. El webmaster administra
-          conectores y reemplazos; el CEO ve solo datos publicados o alertas de
+          fuentes automaticas y reemplazos; el CEO ve solo datos publicados o alertas de
           calidad.
         </p>
       </article>
@@ -1224,7 +1229,9 @@ function GovernanceSection() {
   );
 }
 
-export function ImportOperationsDashboard() {
+export function ImportOperationsDashboard({
+  roleKey,
+}: ImportOperationsDashboardProps = {}) {
   const [context, setContext] = useState<StoredContext | null>(null);
   const [selectedLine, setSelectedLine] = useState<ImportLineFilter>(allLines);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(allStatuses);
@@ -1291,6 +1298,7 @@ export function ImportOperationsDashboard() {
     () => getConnectorsForLine(selectedLine),
     [selectedLine],
   );
+  const showConnectorTab = roleKey !== "gerente_operaciones";
 
   useEffect(() => {
     const currentDocumentIsVisible = filteredDocuments.some(
@@ -1617,9 +1625,9 @@ export function ImportOperationsDashboard() {
               Importaciones operativas
             </h1>
             <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
-              Centro para mantener Analiza actualizado mientras no existan
-              conectores: formulario mensual por linea de negocio, validacion,
-              historial, auditoria y respaldo por documento cuando sea necesario.
+              Centro para mantener Analiza actualizado: formulario de
+              importaciones por linea de negocio, validacion, historial,
+              auditoria y respaldo por documento cuando sea necesario.
             </p>
           </div>
         </div>
@@ -1632,8 +1640,8 @@ export function ImportOperationsDashboard() {
         tabs={[
           {
             id: "formulario-importaciones",
-            label: "Formulario mensual",
-            description: "Entrada manual principal por sucursal.",
+            label: "Formulario de importaciones",
+            description: "Entrada principal que alimenta el sistema por sucursal.",
             children: <ManualMonthlyEntryDashboard />,
           },
           {
@@ -1663,8 +1671,12 @@ export function ImportOperationsDashboard() {
                   />
                   <MetricCard
                     icon={DatabaseZap}
-                    label="Conectores pendientes"
-                    note="Mientras tanto se usa carga masiva."
+                    label={
+                      showConnectorTab
+                        ? "Conectores pendientes"
+                        : "Fuentes automaticas pendientes"
+                    }
+                    note="Mientras tanto se usa importacion manual."
                     value={`${currentSummary.pendingConnectors}`}
                   />
                   <MetricCard
@@ -1716,24 +1728,28 @@ export function ImportOperationsDashboard() {
               </>
             ),
           },
-          {
-            id: "conectores-importaciones",
-            label: "Conectores",
-            description: "APIs, credenciales y fallback manual.",
-            children: (
-              <>
-                <div className="rounded-md border bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                  Los conectores son la via automatica. Si no hay credenciales,
-                  el sistema conserva formulario mensual o carga masiva como
-                  respaldo trazable.
-                </div>
-                <ConnectorPanel
-                  connectors={connectors}
-                  onUseFallback={useFallbackDocument}
-                />
-              </>
-            ),
-          },
+          ...(showConnectorTab
+            ? [
+                {
+                  id: "conectores-importaciones",
+                  label: "Conectores",
+                  description: "APIs, credenciales y fallback manual.",
+                  children: (
+                    <>
+                      <div className="rounded-md border bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                        Los conectores son la via automatica. Si no hay
+                        credenciales, el sistema conserva el formulario de
+                        importaciones o carga masiva como respaldo trazable.
+                      </div>
+                      <ConnectorPanel
+                        connectors={connectors}
+                        onUseFallback={useFallbackDocument}
+                      />
+                    </>
+                  ),
+                },
+              ]
+            : []),
           {
             id: "historial-importaciones",
             label: "Historial y gobierno",
