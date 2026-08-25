@@ -48,8 +48,8 @@ function actor(roleKey, scope) {
 
 function assertValidKpis(closure) {
   assert.ok(
-    closure.kpiResults.length >= 18,
-    "Laboratorio must calculate the MVP KPI set after validation.",
+    closure.kpiResults.length >= 17,
+    "Laboratorio must calculate the non-duplicated MVP KPI set after validation.",
   );
 
   for (const kpi of closure.kpiResults) {
@@ -64,6 +64,7 @@ function assertValidKpis(closure) {
     "ocupacion_efectiva",
     "tasa_no_show",
     "sesiones_total",
+    "throughput",
   ]) {
     assert.ok(
       !closure.kpiResults.some((kpi) => kpi.id === forbiddenKpi),

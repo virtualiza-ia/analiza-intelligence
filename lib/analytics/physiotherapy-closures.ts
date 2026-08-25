@@ -106,6 +106,7 @@ export type PhysiotherapyKpiResult = {
   id: PhysiotherapyKpiId;
   label: string;
   formula: string;
+  reading: string;
   status: PhysiotherapyKpiStatus;
   unit: "currency" | "count" | "ratio";
   value: number | null;
@@ -323,97 +324,113 @@ const kpiMeta: Record<
   {
     label: string;
     formula: string;
+    reading: string;
     unit: PhysiotherapyKpiResult["unit"];
     requiredFields: string[];
   }
 > = {
   brecha_conversion: {
-    formula: "ocupacion_agendada - ocupacion_efectiva",
+    formula: "ocupacion agendada - ocupacion efectiva",
     label: "Brecha de conversion",
+    reading: "Diferencia entre capacidad agendada y capacidad realmente atendida. Si crece, hay agenda que no se convierte en atencion.",
     requiredFields: ["scheduledHours", "attendedHours", "availableHours"],
     unit: "ratio",
   },
   cumplimiento_venta: {
-    formula: "facturacion_neta / meta_facturacion",
+    formula: "facturacion neta / meta de facturacion",
     label: "Cumplimiento de venta",
+    reading: "Muestra el avance de la facturacion neta contra la meta aprobada del periodo.",
     requiredFields: ["revenueTotal", "target_revenue"],
     unit: "ratio",
   },
   facturacion_neta: {
-    formula: "revenueTotal",
+    formula: "facturacion neta",
     label: "Facturacion neta",
+    reading: "Venta neta validada del cierre. Es la base para cumplimiento, margen y ticket promedio.",
     requiredFields: ["revenueTotal"],
     unit: "currency",
   },
   ingreso_por_fisioterapeuta: {
-    formula: "revenueTotal / physiotherapistsActive",
+    formula: "facturacion neta / fisioterapeutas activos",
     label: "Ingreso por fisioterapeuta",
+    reading: "Promedio de facturacion neta generada por fisioterapeuta activo.",
     requiredFields: ["revenueTotal", "physiotherapistsActive"],
     unit: "currency",
   },
   ingreso_por_hora: {
-    formula: "revenueTotal / attendedHours",
+    formula: "facturacion neta / horas atendidas",
     label: "Ingreso por hora",
+    reading: "Promedio facturado por cada hora atendida. Ayuda a leer productividad financiera de la agenda cumplida.",
     requiredFields: ["revenueTotal", "attendedHours"],
     unit: "currency",
   },
   margen_contribucion: {
-    formula: "revenueTotal - directCosts",
+    formula: "facturacion neta - costos directos",
     label: "Margen de contribucion",
+    reading: "Monto que queda despues de cubrir costos directos. No descuenta gastos administrativos, financieros ni impuestos.",
     requiredFields: ["revenueTotal", "directCosts"],
     unit: "currency",
   },
   ocupacion_agendada: {
-    formula: "scheduledHours / availableHours",
+    formula: "horas agendadas / horas disponibles",
     label: "Ocupacion agendada",
+    reading: "Porcentaje de la capacidad disponible que fue comprometida por agenda.",
     requiredFields: ["scheduledHours", "availableHours"],
     unit: "ratio",
   },
   ocupacion_efectiva: {
-    formula: "attendedHours / availableHours",
+    formula: "horas atendidas / horas disponibles",
     label: "Ocupacion efectiva",
+    reading: "Porcentaje de la capacidad disponible que realmente se atendio.",
     requiredFields: ["attendedHours", "availableHours"],
     unit: "ratio",
   },
   porcentaje_margen: {
-    formula: "(revenueTotal - directCosts) / revenueTotal",
-    label: "Porcentaje de margen",
+    formula: "(facturacion neta - costos directos) / facturacion neta",
+    label: "Margen de contribucion bruto %",
+    reading: "Porcentaje de facturacion neta que queda despues de costos directos. No es margen neto porque no descuenta gastos administrativos, financieros ni impuestos.",
     requiredFields: ["revenueTotal", "directCosts"],
     unit: "ratio",
   },
   sesiones_por_paciente: {
-    formula: "sessionsTotal / patientsAttended",
+    formula: "sesiones / pacientes atendidos",
     label: "Sesiones por paciente",
+    reading: "Promedio de sesiones realizadas por paciente atendido.",
     requiredFields: ["sessionsTotal", "patientsAttended"],
     unit: "count",
   },
   sesiones_total: {
-    formula: "sessionsTotal",
+    formula: "sesiones realizadas",
     label: "Sesiones",
+    reading: "Cantidad total de sesiones realizadas en el cierre.",
     requiredFields: ["sessionsTotal"],
     unit: "count",
   },
   tasa_cancelacion: {
-    formula: "appointmentsCancelled / appointmentsScheduled",
+    formula: "citas canceladas / citas agendadas",
     label: "Tasa de cancelacion",
+    reading: "Porcentaje de citas canceladas sobre la agenda del periodo.",
     requiredFields: ["appointmentsCancelled", "appointmentsScheduled"],
     unit: "ratio",
   },
   tasa_finalizacion: {
-    formula: "appointmentsCompleted / appointmentsScheduled",
+    formula: "citas completadas / citas agendadas",
     label: "Tasa de finalizacion",
+    reading: "Porcentaje de citas agendadas que terminaron como completadas.",
     requiredFields: ["appointmentsCompleted", "appointmentsScheduled"],
     unit: "ratio",
   },
   tasa_no_show: {
-    formula: "noShowAppointments / appointmentsScheduled",
+    formula: "no-show / citas agendadas",
     label: "Tasa de no-show",
+    reading: "Porcentaje de citas en las que el paciente no asistio.",
     requiredFields: ["noShowAppointments", "appointmentsScheduled"],
     unit: "ratio",
   },
   ticket_promedio: {
-    formula: "revenueTotal / patientsAttended",
+    formula: "facturacion neta / pacientes atendidos",
     label: "Ticket promedio",
+    reading: "Promedio facturado por paciente atendido en el periodo.",
     requiredFields: ["revenueTotal", "patientsAttended"],
     unit: "currency",
   },

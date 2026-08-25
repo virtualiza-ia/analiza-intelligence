@@ -12,6 +12,7 @@ import {
   Clock3,
   Goal,
   History,
+  Info,
   Lightbulb,
   LockKeyhole,
   Save,
@@ -228,6 +229,26 @@ const targetKpiOptions: Array<{
     unit: "USD",
   },
 ];
+
+const kpiFieldLabels: Record<string, string> = {
+  appointmentsCancelled: "citas canceladas",
+  appointmentsCompleted: "citas completadas",
+  appointmentsScheduled: "citas agendadas",
+  attendedHours: "horas atendidas",
+  availableHours: "horas disponibles",
+  directCosts: "costos directos",
+  noShowAppointments: "no-show",
+  patientsAttended: "pacientes atendidos",
+  physiotherapistsActive: "fisioterapeutas activos",
+  revenueTotal: "facturacion neta",
+  scheduledHours: "horas agendadas",
+  sessionsTotal: "sesiones",
+  target_revenue: "meta de facturacion",
+};
+
+function formatKpiFieldList(fields: string[]) {
+  return fields.map((field) => kpiFieldLabels[field] ?? field).join(", ");
+}
 
 const wizardSteps = [
   "Contexto",
@@ -527,36 +548,74 @@ function TargetsList({
 }
 
 function KpiGrid({ kpis }: { kpis: PhysiotherapyKpiResult[] }) {
+  const [openKpiId, setOpenKpiId] = useState<
+    PhysiotherapyKpiResult["id"] | null
+  >(null);
+
   return (
     <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-      {kpis.map((kpi) => (
-        <article
-          className="grid min-h-36 gap-2 rounded-md border bg-card p-4"
-          key={kpi.id}
-          title={`${kpi.formula}. Requeridos: ${kpi.requiredFields.join(", ")}`}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="text-sm font-medium text-muted-foreground">
-              {kpi.label}
+      {kpis.map((kpi) => {
+        const isInfoOpen = openKpiId === kpi.id;
+        const infoId = `fisio-kpi-info-${kpi.id}`;
+
+        return (
+          <article
+            className="grid min-h-40 gap-2 rounded-md border bg-card p-4"
+            key={kpi.id}
+            title={`${kpi.formula}. Campos requeridos: ${formatKpiFieldList(kpi.requiredFields)}`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 text-sm font-medium text-muted-foreground">
+                {kpi.label}
+              </div>
+              <Badge
+                className={statusBadgeClass(
+                  kpi.status === "CALCULABLE" ? "VALIDADO" : "BLOQUEADO",
+                )}
+              >
+                {kpi.status === "CALCULABLE" ? "Calculable" : "No calculable"}
+              </Badge>
             </div>
-            <Badge
-              className={statusBadgeClass(
-                kpi.status === "CALCULABLE" ? "VALIDADO" : "BLOQUEADO",
-              )}
+            <div className="text-2xl font-semibold tracking-normal">
+              {formatUnitValue(kpi.value, kpi.unit)}
+            </div>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {kpi.status === "CALCULABLE"
+                ? kpi.formula
+                : `Falta: ${formatKpiFieldList(kpi.missingFields)}`}
+            </p>
+            <Button
+              aria-controls={infoId}
+              aria-expanded={isInfoOpen}
+              className="h-8 w-fit px-2 text-xs"
+              onClick={() =>
+                setOpenKpiId((current) => (current === kpi.id ? null : kpi.id))
+              }
+              title={`Lectura de ${kpi.label}`}
+              type="button"
+              variant={isInfoOpen ? "secondary" : "outline"}
             >
-              {kpi.status === "CALCULABLE" ? "Calculable" : "No calculable"}
-            </Badge>
-          </div>
-          <div className="text-2xl font-semibold tracking-normal">
-            {formatUnitValue(kpi.value, kpi.unit)}
-          </div>
-          <p className="text-xs leading-5 text-muted-foreground">
-            {kpi.status === "CALCULABLE"
-              ? kpi.formula
-              : `Falta: ${kpi.missingFields.join(", ")}`}
-          </p>
-        </article>
-      ))}
+              <Info className="size-3.5" />
+              Info
+            </Button>
+            {isInfoOpen ? (
+              <div
+                className="grid gap-1 rounded-md border bg-muted/40 p-3 text-xs leading-5 text-muted-foreground"
+                id={infoId}
+              >
+                <span className="font-medium text-foreground">Lectura</span>
+                <span>{kpi.reading}</span>
+                <span>
+                  Formula: <span className="text-foreground">{kpi.formula}</span>
+                </span>
+                <span>
+                  Campos: {formatKpiFieldList(kpi.requiredFields)}
+                </span>
+              </div>
+            ) : null}
+          </article>
+        );
+      })}
     </section>
   );
 }
@@ -1055,7 +1114,7 @@ export function PhysiotherapyVerticalDashboard({
         value: formatRatio(summary?.revenueCompliance),
       },
       {
-        label: "Margen",
+        label: "Margen de contribucion",
         note: "Facturacion - costos directos",
         value: formatMoney(summary?.contributionMargin),
       },

@@ -124,6 +124,7 @@ export type LaboratoryKpiResult = {
   id: LaboratoryKpiId;
   label: string;
   formula: string;
+  reading: string;
   status: LaboratoryKpiStatus;
   unit: "currency" | "count" | "ratio";
   value: number | null;
@@ -350,119 +351,143 @@ const kpiMeta: Record<
   {
     label: string;
     formula: string;
+    reading: string;
     unit: LaboratoryKpiResult["unit"];
     requiredFields: string[];
   }
 > = {
   clientes_total: {
-    formula: "clientsTotal",
+    formula: "clientes atendidos",
     label: "Clientes",
+    reading: "Cuenta clientes atendidos en el periodo. Sirve para leer volumen comercial sin exponer datos personales.",
     requiredFields: ["clientsTotal"],
     unit: "count",
   },
   costo_por_prueba: {
-    formula: "costOfSales / processedTests",
+    formula: "costo de ventas / pruebas procesadas",
     label: "Costo por prueba",
+    reading: "Indica cuanto costo directo se consume por cada prueba procesada. Si sube, revise insumos, mix de pruebas o reprocesos.",
     requiredFields: ["costOfSales", "processedTests"],
     unit: "currency",
   },
   cumplimiento_facturacion: {
-    formula: "facturacion_neta / meta_facturacion",
+    formula: "facturacion neta / meta de facturacion",
     label: "Cumplimiento de facturacion",
+    reading: "Muestra el avance de la facturacion neta contra la meta aprobada del periodo.",
     requiredFields: ["revenueTotal", "target_revenue"],
     unit: "ratio",
   },
   cumplimiento_meta_produccion: {
-    formula: "perfilesTotal / meta_produccion",
+    formula: "perfiles / meta de produccion",
     label: "Cumplimiento meta produccion",
+    reading: "Compara los perfiles procesados contra la meta operativa aprobada.",
     requiredFields: ["profilesTotal", "target_production"],
     unit: "ratio",
   },
   facturacion_neta: {
-    formula: "revenueTotal",
+    formula: "facturacion neta",
     label: "Facturacion neta",
+    reading: "Venta neta validada para el cierre. Es la base financiera para cumplimiento, margen e ingreso por prueba.",
     requiredFields: ["revenueTotal"],
     unit: "currency",
   },
   ingreso_por_prueba: {
-    formula: "revenueTotal / processedTests",
+    formula: "facturacion neta / pruebas procesadas",
     label: "Ingreso por prueba",
+    reading: "Promedio facturado por cada prueba procesada. Ayuda a leer precio, mix de servicios y descuentos.",
     requiredFields: ["revenueTotal", "processedTests"],
     unit: "currency",
   },
   margen_contribucion: {
-    formula: "revenueTotal - costOfSales",
+    formula: "facturacion neta - costo de ventas",
     label: "Margen de contribucion",
+    reading: "Monto que queda despues de cubrir costo de ventas. No descuenta gastos administrativos, financieros ni impuestos.",
     requiredFields: ["revenueTotal", "costOfSales"],
     unit: "currency",
   },
   ordenes_total: {
-    formula: "ordersTotal",
+    formula: "ordenes registradas",
     label: "Ordenes",
+    reading: "Cantidad de ordenes registradas en el cierre. Permite comparar demanda contra perfiles y pruebas.",
     requiredFields: ["ordersTotal"],
     unit: "count",
   },
   perfiles_total: {
-    formula: "profilesTotal",
+    formula: "perfiles procesados",
     label: "Perfiles",
+    reading: "Cantidad de perfiles o servicios procesados segun la plantilla actual de Laboratorio.",
     requiredFields: ["profilesTotal"],
     unit: "count",
   },
   porcentaje_margen: {
-    formula: "(revenueTotal - costOfSales) / revenueTotal",
-    label: "Porcentaje de margen",
+    formula: "(facturacion neta - costo de ventas) / facturacion neta",
+    label: "Margen de contribucion bruto %",
+    reading: "Porcentaje de facturacion neta que queda despues del costo de ventas. No es margen neto porque no descuenta gastos administrativos, financieros ni impuestos.",
     requiredFields: ["revenueTotal", "costOfSales"],
     unit: "ratio",
   },
   productividad_personal: {
-    formula: "profilesTotal / staffTotal",
+    formula: "perfiles / personal operativo",
     label: "Productividad por personal",
+    reading: "Promedio de perfiles procesados por persona operativa capturada en el cierre.",
     requiredFields: ["profilesTotal", "staffTotal"],
     unit: "count",
   },
   pruebas_por_paciente: {
-    formula: "processedTests / clientsTotal",
+    formula: "pruebas procesadas / clientes",
     label: "Pruebas por paciente",
+    reading: "Promedio de pruebas por cliente atendido. Ayuda a ver intensidad de servicio y cambios en el mix.",
     requiredFields: ["processedTests", "clientsTotal"],
     unit: "count",
   },
   pruebas_procesadas: {
-    formula: "processedTests",
+    formula: "pruebas procesadas",
     label: "Pruebas procesadas",
+    reading: "Volumen total de pruebas procesadas. Es la base de capacidad, costo e ingreso por prueba.",
     requiredFields: ["processedTests"],
     unit: "count",
   },
   tasa_rechazo: {
-    formula: "rejectedTests / processedTests",
+    formula: "pruebas rechazadas / pruebas procesadas",
     label: "Tasa de rechazo",
+    reading: "Porcentaje de pruebas rechazadas sobre lo procesado. Lectura de calidad de muestra o proceso.",
     requiredFields: ["rejectedTests", "processedTests"],
     unit: "ratio",
   },
   tasa_reproceso: {
-    formula: "reprocessedTests / processedTests",
+    formula: "pruebas reprocesadas / pruebas procesadas",
     label: "Tasa de reproceso",
+    reading: "Porcentaje de pruebas reprocesadas sobre lo procesado. Ayuda a detectar retrabajo operativo.",
     requiredFields: ["reprocessedTests", "processedTests"],
     unit: "ratio",
   },
   tat_promedio: {
-    formula: "averageTurnaroundTimeHours",
+    formula: "tiempo promedio de entrega",
     label: "TAT promedio",
+    reading: "Tiempo promedio en horas desde procesamiento hasta entrega. Mientras menor, mejor oportunidad de servicio.",
     requiredFields: ["averageTurnaroundTimeHours"],
     unit: "count",
   },
   throughput: {
-    formula: "profilesTotal",
+    formula: "perfiles procesados",
     label: "Throughput",
+    reading: "Compatibilidad con metas antiguas de throughput. La vista nueva usa Perfiles para evitar duplicidad.",
     requiredFields: ["profilesTotal"],
     unit: "count",
   },
   utilizacion_tecnica: {
-    formula: "processedTests / technicalCapacityTests",
+    formula: "pruebas procesadas / capacidad tecnica",
     label: "Utilizacion tecnica",
+    reading: "Porcentaje de capacidad tecnica utilizada. Ayuda a leer saturacion o capacidad disponible.",
     requiredFields: ["processedTests", "technicalCapacityTests"],
     unit: "ratio",
   },
 };
+
+type VisibleLaboratoryTargetableKpiId = Exclude<
+  LaboratoryTargetableKpiId,
+  "throughput"
+>;
 
 const targetableKpis: Record<
   LaboratoryTargetableKpiId,
@@ -507,6 +532,18 @@ const targetableKpis: Record<
     label: "Throughput",
     unit: "count",
   },
+};
+
+const visibleTargetableKpis: Record<
+  VisibleLaboratoryTargetableKpiId,
+  (typeof targetableKpis)[LaboratoryTargetableKpiId]
+> = {
+  facturacion_neta: targetableKpis.facturacion_neta,
+  margen_contribucion: targetableKpis.margen_contribucion,
+  perfiles_total: targetableKpis.perfiles_total,
+  productividad_personal: targetableKpis.productividad_personal,
+  tasa_rechazo: targetableKpis.tasa_rechazo,
+  tat_promedio: targetableKpis.tat_promedio,
 };
 
 const inputFieldNames: Array<keyof LaboratoryClosureInputs> = [
@@ -1003,7 +1040,6 @@ function calculateKpis(
       ratio(inputs.profilesTotal, staffTotal),
       productivityFields,
     ),
-    kpiResult("throughput", inputs.profilesTotal, profilesFields),
     kpiResult(
       "cumplimiento_meta_produccion",
       productionAttainment,
@@ -1105,7 +1141,7 @@ function calculateTargetComparisons(
   closure: LaboratoryClosure,
   targets: LaboratoryTarget[],
 ): LaboratoryTargetComparison[] {
-  return Object.entries(targetableKpis).map(([rawKpiId, definition]) => {
+  return Object.entries(visibleTargetableKpis).map(([rawKpiId, definition]) => {
     const kpiId = rawKpiId as LaboratoryTargetableKpiId;
     const actualValue = getKpiValue(kpis, kpiId);
     const target = getClosureTarget(targets, closure, kpiId);
@@ -1555,10 +1591,6 @@ function createSeedTargets(
     },
     {
       kpiId: "perfiles_total",
-      targetValue: Math.round(inputs.profilesTotal * 1.04),
-    },
-    {
-      kpiId: "throughput",
       targetValue: Math.round(inputs.profilesTotal * 1.04),
     },
     {
@@ -2253,7 +2285,7 @@ function buildRollupComparisons(
   closures: LaboratoryClosure[],
   targets: LaboratoryTarget[],
 ) {
-  return Object.entries(targetableKpis).map(([rawKpiId, definition]) => {
+  return Object.entries(visibleTargetableKpis).map(([rawKpiId, definition]) => {
     const kpiId = rawKpiId as LaboratoryTargetableKpiId;
     const targetValue = aggregateTargetValue(closures, targets, kpiId);
     const actualValue = aggregateKpiValue(closures, kpiId);
@@ -4471,5 +4503,5 @@ export async function upsertLaboratoryTarget(
 }
 
 export function getLaboratoryTargetDefinitions() {
-  return targetableKpis;
+  return visibleTargetableKpis;
 }

@@ -133,6 +133,7 @@ export type ImagingKpiResult = {
   id: ImagingKpiId;
   label: string;
   formula: string;
+  reading: string;
   status: ImagingKpiStatus;
   unit: "currency" | "count" | "ratio";
   value: number | null;
@@ -364,139 +365,162 @@ const kpiMeta: Record<
   {
     label: string;
     formula: string;
+    reading: string;
     unit: ImagingKpiResult["unit"];
     requiredFields: string[];
   }
 > = {
   clientes_total: {
-    formula: "clientsTotal",
+    formula: "clientes atendidos",
     label: "Clientes",
+    reading: "Cuenta clientes atendidos en el periodo. Sirve para leer volumen sin exponer datos personales.",
     requiredFields: ["clientsTotal"],
     unit: "count",
   },
   costo_por_estudio: {
-    formula: "costOfSales / estudios_realizados",
+    formula: "costo de ventas / estudios realizados",
     label: "Costo por estudio",
+    reading: "Indica cuanto costo directo se consume por cada estudio realizado.",
     requiredFields: ["costOfSales", "modalidad_estudios"],
     unit: "currency",
   },
   cumplimiento_facturacion: {
-    formula: "facturacion_neta / meta_facturacion",
+    formula: "facturacion neta / meta de facturacion",
     label: "Cumplimiento de facturacion",
+    reading: "Muestra el avance de la facturacion neta contra la meta aprobada del periodo.",
     requiredFields: ["revenueTotal", "target_revenue"],
     unit: "ratio",
   },
   facturacion_neta: {
-    formula: "revenueTotal",
+    formula: "facturacion neta",
     label: "Facturacion neta",
+    reading: "Venta neta validada del cierre. Es la base para cumplimiento, margen e ingreso por estudio.",
     requiredFields: ["revenueTotal"],
     unit: "currency",
   },
   ingreso_por_estudio: {
-    formula: "revenueTotal / estudios_realizados",
+    formula: "facturacion neta / estudios realizados",
     label: "Ingreso por estudio",
+    reading: "Promedio facturado por cada estudio realizado. Ayuda a leer precio y mix de modalidades.",
     requiredFields: ["revenueTotal", "modalidad_estudios"],
     unit: "currency",
   },
   informes_pendientes: {
-    formula: "pendingReports",
+    formula: "informes pendientes",
     label: "Informes pendientes",
+    reading: "Cantidad de informes aun pendientes. Mientras menor, menor riesgo de atraso en entrega y facturacion.",
     requiredFields: ["pendingReports"],
     unit: "count",
   },
   margen_contribucion: {
-    formula: "revenueTotal - costOfSales",
+    formula: "facturacion neta - costo de ventas",
     label: "Margen de contribucion",
+    reading: "Monto que queda despues de cubrir costo de ventas. No descuenta gastos administrativos, financieros ni impuestos.",
     requiredFields: ["revenueTotal", "costOfSales"],
     unit: "currency",
   },
   ordenes_total: {
-    formula: "ordersTotal",
+    formula: "ordenes registradas",
     label: "Ordenes",
+    reading: "Cantidad de ordenes registradas en el cierre.",
     requiredFields: ["ordersTotal"],
     unit: "count",
   },
   estudios_por_modalidad: {
-    formula: "sum(modalidad_estudios)",
+    formula: "suma de estudios por modalidad",
     label: "Estudios por modalidad",
+    reading: "Volumen de estudios agrupado por modalidad. Permite identificar donde se concentra la demanda.",
     requiredFields: ["modalidad_estudios"],
     unit: "count",
   },
   estudios_por_paciente: {
-    formula: "estudios_realizados / clientsTotal",
+    formula: "estudios realizados / clientes",
     label: "Estudios por paciente",
+    reading: "Promedio de estudios por cliente atendido.",
     requiredFields: ["modalidad_estudios", "clientsTotal"],
     unit: "count",
   },
   estudios_realizados: {
-    formula: "sum(modalidad_estudios)",
+    formula: "suma de estudios por modalidad",
     label: "Estudios realizados",
+    reading: "Volumen total de estudios realizados en el periodo.",
     requiredFields: ["modalidad_estudios"],
     unit: "count",
   },
   mix_modalidades: {
-    formula: "max(modalidad_estudios) / sum(modalidad_estudios)",
+    formula: "modalidad principal / total de estudios",
     label: "Mix de modalidad principal",
+    reading: "Porcentaje que representa la modalidad de mayor volumen sobre el total de estudios.",
     requiredFields: ["modalidad_estudios"],
     unit: "ratio",
   },
   porcentaje_margen: {
-    formula: "(revenueTotal - costOfSales) / revenueTotal",
-    label: "Porcentaje de margen",
+    formula: "(facturacion neta - costo de ventas) / facturacion neta",
+    label: "Margen de contribucion bruto %",
+    reading: "Porcentaje de facturacion neta que queda despues del costo de ventas. No es margen neto porque no descuenta gastos administrativos, financieros ni impuestos.",
     requiredFields: ["revenueTotal", "costOfSales"],
     unit: "ratio",
   },
   productividad: {
-    formula: "estudios_realizados / staffTotal",
+    formula: "estudios realizados / personal operativo",
     label: "Productividad por personal",
+    reading: "Promedio de estudios realizados por persona operativa capturada en el cierre.",
     requiredFields: ["modalidad_estudios", "staffTotal"],
     unit: "count",
   },
   tasa_cancelacion: {
-    formula: "cancelledStudies / scheduledStudies",
+    formula: "estudios cancelados / estudios agendados",
     label: "Tasa de cancelacion",
+    reading: "Porcentaje de estudios cancelados sobre la agenda del periodo.",
     requiredFields: ["cancelledStudies", "scheduledStudies"],
     unit: "ratio",
   },
   tasa_finalizacion: {
-    formula: "estudios_realizados / scheduledStudies",
+    formula: "estudios realizados / estudios agendados",
     label: "Tasa de finalizacion",
+    reading: "Porcentaje de estudios agendados que fueron realizados.",
     requiredFields: ["modalidad_estudios", "scheduledStudies"],
     unit: "ratio",
   },
   tasa_no_show: {
-    formula: "noShowStudies / scheduledStudies",
+    formula: "no-show / estudios agendados",
     label: "Tasa de no-show",
+    reading: "Porcentaje de estudios agendados en los que el paciente no asistio.",
     requiredFields: ["noShowStudies", "scheduledStudies"],
     unit: "ratio",
   },
   downtime_rate: {
-    formula: "equipmentDowntimeHours / equipmentAvailableHours",
+    formula: "horas de equipo detenido / horas disponibles de equipo",
     label: "Downtime de equipos",
+    reading: "Porcentaje de tiempo disponible que el equipo estuvo detenido.",
     requiredFields: ["equipmentDowntimeHours", "equipmentAvailableHours"],
     unit: "ratio",
   },
   tat_informe: {
-    formula: "averageReportTatHours",
+    formula: "tiempo promedio de informe",
     label: "TAT informe",
+    reading: "Tiempo promedio en horas para completar informes.",
     requiredFields: ["averageReportTatHours"],
     unit: "count",
   },
   tat_realizacion: {
-    formula: "averageOrderToStudyHours",
+    formula: "tiempo promedio de orden a realizacion",
     label: "TAT orden a realizacion",
+    reading: "Tiempo promedio en horas desde la orden hasta la realizacion del estudio.",
     requiredFields: ["averageOrderToStudyHours"],
     unit: "count",
   },
   utilizacion_equipo: {
-    formula: "equipmentUsedHours / equipmentAvailableHours",
+    formula: "horas utilizadas de equipo / horas disponibles de equipo",
     label: "Utilizacion de equipo",
+    reading: "Porcentaje de horas disponibles de equipo que fueron utilizadas.",
     requiredFields: ["equipmentUsedHours", "equipmentAvailableHours"],
     unit: "ratio",
   },
   utilizacion_modalidad: {
-    formula: "modalidad_horas_utilizadas / modalidad_horas_disponibles",
+    formula: "horas utilizadas por modalidad / horas disponibles por modalidad",
     label: "Utilizacion por modalidad",
+    reading: "Porcentaje de capacidad utilizada por modalidad. Queda no calculable hasta capturar horas por modalidad.",
     requiredFields: ["modalityCapacityHours"],
     unit: "ratio",
   },

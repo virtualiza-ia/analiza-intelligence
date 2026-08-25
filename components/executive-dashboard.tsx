@@ -271,7 +271,7 @@ function buildCommandCenterMetrics(lines: BusinessLineDashboard[]) {
   return [
     {
       detail: "Facturacion neta validada para el alcance filtrado.",
-      formula: "sum(net_billing)",
+      formula: "suma de facturacion neta",
       label: "Ingresos",
       source: "Capa BI semantica DEMO",
       state: getMetricState(targetFulfillment, 0.85, 0.95),
@@ -281,7 +281,7 @@ function buildCommandCenterMetrics(lines: BusinessLineDashboard[]) {
     },
     {
       detail: "Mide avance contra meta aprobada del periodo.",
-      formula: "net_billing / revenue_target",
+      formula: "facturacion neta / meta de facturacion",
       label: "Cumplimiento meta",
       source: "Metas DEMO versionadas",
       state: getMetricState(targetFulfillment, 0.85, 0.95),
@@ -290,9 +290,9 @@ function buildCommandCenterMetrics(lines: BusinessLineDashboard[]) {
       variation: `${formatCurrency(Math.max(totals.revenueTarget - totals.revenue, 0))} brecha`,
     },
     {
-      detail: "No equivale a utilidad neta; excluye gastos incompletos.",
-      formula: "(net_billing - direct_costs) / net_billing",
-      label: "Margen de contribucion",
+      detail: "Porcentaje bruto/de contribucion. No equivale a utilidad neta; excluye gastos administrativos, financieros e impuestos.",
+      formula: "(facturacion neta - costos directos) / facturacion neta",
+      label: "Margen de contribucion bruto %",
       source: "Finanzas DEMO reconciliadas",
       state: getMetricState(contributionMarginRate, 0.25, 0.35),
       target: "Meta por unidad pendiente",
@@ -301,7 +301,7 @@ function buildCommandCenterMetrics(lines: BusinessLineDashboard[]) {
     },
     {
       detail: "Personas atendidas o clientes anonimizados por fuente.",
-      formula: "count(distinct anonymous_patient_or_customer_id)",
+      formula: "clientes o pacientes unicos anonimizados",
       label: "Pacientes/clientes atendidos",
       source: "Servicios DEMO",
       state: "neutral",
@@ -310,7 +310,7 @@ function buildCommandCenterMetrics(lines: BusinessLineDashboard[]) {
     },
     {
       detail: "Capacidad comprometida por agenda o plan tecnico.",
-      formula: "scheduled_capacity / available_capacity",
+      formula: "capacidad agendada / capacidad disponible",
       label: "Ocupacion agendada",
       source: "Capacidad DEMO",
       state: getMetricState(scheduledOccupancy, 0.7, 0.82),
@@ -319,7 +319,7 @@ function buildCommandCenterMetrics(lines: BusinessLineDashboard[]) {
     },
     {
       detail: "Capacidad realmente atendida o procesada.",
-      formula: "completed_capacity / available_capacity",
+      formula: "capacidad completada / capacidad disponible",
       label: "Ocupacion efectiva",
       source: "Capacidad DEMO",
       state: getMetricState(effectiveOccupancy, 0.62, 0.75),
@@ -328,7 +328,7 @@ function buildCommandCenterMetrics(lines: BusinessLineDashboard[]) {
     },
     {
       detail: "Citas, ordenes o estudios completados sin mezclar unidades clinicas.",
-      formula: "sum(completed_operational_units)",
+      formula: "suma de unidades operativas completadas",
       label: "Citas completadas",
       source: "Operacion DEMO",
       state: "neutral",
@@ -337,7 +337,7 @@ function buildCommandCenterMetrics(lines: BusinessLineDashboard[]) {
     },
     {
       detail: "No-show aplica solo donde existe agenda formal.",
-      formula: "no_show / scheduled_appointments",
+      formula: "no-show / citas agendadas",
       label: "No-show",
       source: "Citas DEMO",
       state: getInverseMetricState(noShowRate, 0.08, 0.04),
@@ -346,7 +346,7 @@ function buildCommandCenterMetrics(lines: BusinessLineDashboard[]) {
     },
     {
       detail: "Unidades disponibles derivadas de agenda y capacidad cargada.",
-      formula: "available_capacity - scheduled_capacity",
+      formula: "capacidad disponible - capacidad agendada",
       label: "Capacidad disponible",
       source: "Capacidad DEMO",
       state: capacityAvailable > 0 ? "amarillo" : "neutral",
@@ -355,7 +355,7 @@ function buildCommandCenterMetrics(lines: BusinessLineDashboard[]) {
     },
     {
       detail: "Facturacion neta menos cobros conciliados.",
-      formula: "net_billing - collections",
+      formula: "facturacion neta - cobros conciliados",
       label: "Cuentas por cobrar",
       source: "Cobros DEMO",
       state:
@@ -978,7 +978,7 @@ function ExecutiveStatusTable({ lines }: { lines: BusinessLineDashboard[] }) {
               <th className="py-2 pr-4 font-medium">Linea</th>
               <th className="py-2 pr-4 font-medium">Ingresos</th>
               <th className="py-2 pr-4 font-medium">Crecimiento</th>
-              <th className="py-2 pr-4 font-medium">Margen</th>
+              <th className="py-2 pr-4 font-medium">Margen bruto %</th>
               <th className="py-2 pr-4 font-medium">Ocupacion</th>
               <th className="py-2 pr-4 font-medium">Pacientes</th>
               <th className="py-2 pr-4 font-medium">Ticket</th>
@@ -1091,7 +1091,7 @@ function BusinessLineSummaryCard({ line }: { line: BusinessLineDashboard }) {
 
       <div className="grid gap-2 text-sm text-muted-foreground">
         <div className="flex items-center justify-between gap-3">
-          <span>Margen</span>
+          <span>Margen bruto %</span>
           <span className="font-medium text-foreground">
             {formatPercent(line.marginRate)}
           </span>
