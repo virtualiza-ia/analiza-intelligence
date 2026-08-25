@@ -11,7 +11,7 @@ import { ExecutiveOperationDashboard } from "@/components/executive-operation-da
 import { ImagingPresentationDashboard } from "@/components/imaging-presentation-dashboard";
 import { ImportOperationsDashboard } from "@/components/import-operations-dashboard";
 import { LaboratoryPresentationDashboard } from "@/components/laboratory-presentation-dashboard";
-import { ManualMonthlyEntryDashboard } from "@/components/manual-monthly-entry-dashboard";
+import { MonthlyClosureRouter } from "@/components/monthly-closure-router";
 import { OperationsModule } from "@/components/operations-modules";
 import { PatientFlowDemandDashboard } from "@/components/patient-flow-demand-dashboard";
 import { PhysiotherapyPresentationDashboard } from "@/components/physiotherapy-presentation-dashboard";
@@ -149,10 +149,14 @@ export default async function ModulePage({
   }
 
   if (module === "plantillas") {
+    const resolvedSearchParams = searchParams ? await searchParams : {};
+
     return (
-      <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
-        <ManualMonthlyEntryDashboard />
-      </section>
+      <MonthlyClosureRouter
+        actor={actor}
+        line={resolvedSearchParams.line}
+        mode="new-closure"
+      />
     );
   }
 

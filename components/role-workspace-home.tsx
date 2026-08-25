@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -494,6 +495,7 @@ export function RoleWorkspaceHome({
   isDemoEnvironment,
   roleKey,
 }: RoleWorkspaceHomeProps) {
+  const searchParams = useSearchParams();
   const [activeRole, setActiveRole] = useState<RoleKey>(roleKey);
 
   useEffect(() => {
@@ -574,6 +576,24 @@ export function RoleWorkspaceHome({
 
       return visibleNavigation.some((visible) => visible.href === item.href);
     });
+
+  function hrefWithCurrentContext(href: string) {
+    const serializedParams = searchParams.toString();
+
+    if (!serializedParams || !href.startsWith("/protected")) {
+      return href;
+    }
+
+    const [pathname, rawQuery = ""] = href.split("?");
+    const nextParams = new URLSearchParams(serializedParams);
+
+    for (const [key, value] of new URLSearchParams(rawQuery)) {
+      nextParams.set(key, value);
+    }
+
+    const nextQuery = nextParams.toString();
+    return nextQuery ? `${pathname}?${nextQuery}` : pathname;
+  }
 
   return (
     <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
@@ -659,7 +679,7 @@ export function RoleWorkspaceHome({
                     "grid gap-2 rounded-md border p-4 transition-colors hover:bg-accent/40",
                     toneClass(item.tone),
                   )}
-                  href={item.href}
+                  href={hrefWithCurrentContext(item.href)}
                   key={item.title}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -680,7 +700,7 @@ export function RoleWorkspaceHome({
           <div className="rounded-md border bg-card p-4">
             <div className="mb-3 text-sm font-medium">Acceso recomendado</div>
             <Button asChild className="w-full justify-between">
-              <Link href={workspace.primaryHref}>
+              <Link href={hrefWithCurrentContext(workspace.primaryHref)}>
                 {workspace.primaryLabel}
                 <ArrowRight className="size-4" />
               </Link>
@@ -696,7 +716,7 @@ export function RoleWorkspaceHome({
                 return (
                   <Link
                     className="flex h-10 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                    href={item.href}
+                    href={hrefWithCurrentContext(item.href)}
                     key={item.href}
                   >
                     <Icon className="size-4" />

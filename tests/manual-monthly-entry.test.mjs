@@ -96,8 +96,9 @@ assert(
 );
 assert(
   modulePage.includes('module === "plantillas"') &&
-    modulePage.includes("ManualMonthlyEntryDashboard"),
-  "The Plantillas route must render the manual monthly dashboard.",
+    modulePage.includes("MonthlyClosureRouter") &&
+    modulePage.includes('mode="new-closure"'),
+  "The Plantillas route must render the same monthly closure router as the unique line form.",
 );
 assert(
   navigation.includes('title: "Formulario mensual"') &&
