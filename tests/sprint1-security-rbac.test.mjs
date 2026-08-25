@@ -494,6 +494,7 @@ const sourceChecks = [
   "app/api/auth/demo-role/route.ts",
   "app/api/auth/demo-session/route.ts",
   "app/forbidden/page.tsx",
+  "app/auth/login/page.tsx",
   "app/login/page.tsx",
   "components/app-sidebar.tsx",
   "components/business-module-dashboard.tsx",
@@ -514,6 +515,7 @@ const modulePage = readFileSync("app/protected/[module]/page.tsx", "utf8");
 const inviteRoute = readFileSync("app/api/users/invite/route.ts", "utf8");
 const analiaRoute = readFileSync("app/api/analia-chat/route.ts", "utf8");
 const demoSessionRoute = readFileSync("app/api/auth/demo-session/route.ts", "utf8");
+const authLoginPage = readFileSync("app/auth/login/page.tsx", "utf8");
 const loginAliasPage = readFileSync("app/login/page.tsx", "utf8");
 const loginForm = readFileSync("components/login-form.tsx", "utf8");
 const sessionProxy = readFileSync("lib/supabase/proxy.ts", "utf8");
@@ -630,7 +632,8 @@ assert(
 );
 
 assert(
-  loginAliasPage.includes("enableLocalDemoLogin={isDemoAdminEnabled()}") &&
+  authLoginPage.includes("enableLocalDemoLogin={isDemoAdminEnabled()}") &&
+    loginAliasPage.includes('redirect("/auth/login")') &&
     loginForm.includes("Entorno DEMO local") &&
     loginForm.includes("/api/auth/demo-session") &&
     loginForm.includes("Direccion / Super Admin") &&

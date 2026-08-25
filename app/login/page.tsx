@@ -1,6 +1,5 @@
-import { LoginForm } from "@/components/login-form";
-import { isDemoAdminEnabled } from "@/lib/auth/demo-admin";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <LoginForm enableLocalDemoLogin={isDemoAdminEnabled()} />;
+  redirect("/auth/login");
 }
