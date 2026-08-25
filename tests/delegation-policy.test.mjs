@@ -8,6 +8,7 @@ import {
   canCreateBranch,
   canCreateRole,
   canInviteUser,
+  getCreatableRoles,
   getInitialBranchStatus,
   getRoleHierarchyLevel,
   roleHierarchy,
@@ -17,6 +18,8 @@ const migrationPath =
   "supabase/migrations/20260729000200_delegated_user_hierarchy.sql";
 const ceoBranchGovernanceMigrationPath =
   "supabase/migrations/20260825000100_ceo_branch_governance.sql";
+const ceoUserDelegationMigrationPath =
+  "supabase/migrations/20260825000200_ceo_user_delegation.sql";
 const seedPath = "supabase/seed.sql";
 const contextDataPath = "lib/tenant/demo-context.ts";
 const usersComponentPath = "components/business-module-dashboard.tsx";
@@ -24,6 +27,7 @@ const usersComponentPath = "components/business-module-dashboard.tsx";
 for (const file of [
   migrationPath,
   ceoBranchGovernanceMigrationPath,
+  ceoUserDelegationMigrationPath,
   seedPath,
   contextDataPath,
   usersComponentPath,
@@ -34,6 +38,10 @@ for (const file of [
 const migration = readFileSync(migrationPath, "utf8");
 const ceoBranchGovernanceMigration = readFileSync(
   ceoBranchGovernanceMigrationPath,
+  "utf8",
+);
+const ceoUserDelegationMigration = readFileSync(
+  ceoUserDelegationMigrationPath,
   "utf8",
 );
 const seed = readFileSync(seedPath, "utf8");
@@ -142,6 +150,24 @@ assert.equal(
   }),
   true,
   "CEO should create branches inside its business line scope.",
+);
+
+assert.equal(
+  canInviteUser(ceoActor, areaTarget),
+  true,
+  "CEO should create area managers in scope.",
+);
+
+assert.deepEqual(
+  getCreatableRoles("ceo"),
+  [
+    "gerente_operaciones",
+    "gerente_area",
+    "gerente_sucursal",
+    "usuario_operativo",
+    "viewer",
+  ],
+  "CEO must have lower roles available in user creation.",
 );
 
 assert.equal(
@@ -265,6 +291,18 @@ for (const requiredCeoBranchSql of [
   if (!ceoBranchGovernanceMigration.includes(requiredCeoBranchSql)) {
     throw new Error(
       `CEO branch governance migration is missing: ${requiredCeoBranchSql}`,
+    );
+  }
+}
+
+for (const requiredCeoDelegationSql of [
+  "where r.key = 'ceo'",
+  "hierarchy_level = excluded.hierarchy_level",
+  "can_invite = excluded.can_invite",
+]) {
+  if (!ceoUserDelegationMigration.includes(requiredCeoDelegationSql)) {
+    throw new Error(
+      `CEO user delegation migration is missing: ${requiredCeoDelegationSql}`,
     );
   }
 }

@@ -286,16 +286,13 @@ for (const duplicateExecutiveReportPath of [
 assert.equal(
   canAccessProtectedPath(ceo, "/protected/usuarios-permisos"),
   true,
-  "CEO must access governed branch creation without gaining user delegation.",
+  "CEO must access governed branch and user creation.",
 );
 
 for (const sensitiveAction of [
   "imports.upload",
   "imports.publish",
   "imports.rollback",
-  "users.invite",
-  "users.change_role",
-  "users.change_scope",
   "connectors.manage",
   "connectors.run",
 ]) {
@@ -312,6 +309,40 @@ for (const sensitiveAction of [
     }),
     false,
     `CEO read-only line access must not grant ${sensitiveAction}.`,
+  );
+}
+
+for (const userDelegationAction of [
+  "users.invite",
+  "users.change_role",
+  "users.change_scope",
+  "users.activate",
+  "users.deactivate",
+]) {
+  assert.equal(
+    canPerformAction(ceo, userDelegationAction, {
+      roleKey: "gerente_area",
+      scope: {
+        companyId,
+        countryId,
+        operationalAreaId: areaId,
+        organizationId,
+      },
+    }),
+    true,
+    `CEO must be able to delegate lower user roles with ${userDelegationAction}.`,
+  );
+  assert.equal(
+    canPerformAction(ceo, userDelegationAction, {
+      roleKey: "ceo",
+      scope: {
+        companyId,
+        countryId,
+        organizationId,
+      },
+    }),
+    false,
+    `CEO must not delegate equal or higher roles with ${userDelegationAction}.`,
   );
 }
 

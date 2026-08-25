@@ -71,7 +71,7 @@ export const roleHierarchy: RoleHierarchyEntry[] = [
   {
     roleKey: "ceo",
     hierarchyLevel: 90,
-    canCreateUsers: false,
+    canCreateUsers: true,
     canCreateBranches: true,
     canCreateOperationalAreas: false,
     canManageGlobalPermissions: false,
@@ -139,7 +139,7 @@ const standardRoleCreation: Record<RoleKey, RoleKey[]> = {
     "usuario_operativo",
     "viewer",
   ],
-  ceo: [],
+  ceo: ["gerente_operaciones", "gerente_area", "gerente_sucursal", "usuario_operativo", "viewer"],
   gerente_operaciones: ["gerente_area", "gerente_sucursal", "usuario_operativo", "viewer"],
   gerente_area: ["gerente_sucursal", "usuario_operativo", "viewer"],
   gerente_sucursal: ["usuario_operativo", "viewer"],

@@ -18,7 +18,7 @@ Official Analiza roles:
 
 - `super_admin`: superadministrador. Administra la plataforma completa, permisos globales, gobierno de datos, conectores y seguridad.
 - `webmaster_admin`: alias historico de administrador, conservado por compatibilidad con sesiones y datos DEMO existentes.
-- `ceo`: reads the executive BI view for Analiza and all assigned business lines, countries, and branches.
+- `ceo`: reads the executive BI view for Analiza and all assigned business lines, countries, and branches; may invite lower roles inside its delegated scope.
 - `gerente_operaciones`: creates operational areas, creates branches, assigns branches to areas, assigns area managers, and monitors all branches in scope.
 - `gerente_area`: creates or assigns branch managers only within assigned operational areas, supervises a branch group, validates monthly discipline, and compares branch manager performance.
 - `gerente_sucursal`: registers the assigned branch monthly close through the controlled form and reads branch results.
