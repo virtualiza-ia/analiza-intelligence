@@ -95,10 +95,10 @@ assert(
   "Import operations must render the manual monthly dashboard.",
 );
 assert(
-  modulePage.includes('module === "plantillas"') &&
+  modulePage.includes('module === "importaciones" || module === "plantillas"') &&
     modulePage.includes("MonthlyClosureRouter") &&
     modulePage.includes('mode="new-closure"'),
-  "The Plantillas route must render the same monthly closure router as the unique line form.",
+  "The import and template routes must render the same monthly closure router as the unique line form.",
 );
 assert(
   navigation.includes('title: "Formulario mensual"') &&

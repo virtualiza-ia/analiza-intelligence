@@ -127,7 +127,7 @@ const requiredNavigationTitles = [
   "Laboratorio",
   "Imagenes",
   "Insights",
-  "Importaciones",
+  "Carga de cierre mensual",
   "Formulario mensual",
   "Conectores",
   "Calidad de datos",

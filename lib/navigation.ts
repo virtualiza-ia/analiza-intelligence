@@ -12,7 +12,6 @@ import {
   Goal,
   HeartPulse,
   ImagePlus,
-  Import,
   KeyRound,
   LayoutDashboard,
   Lightbulb,
@@ -114,12 +113,6 @@ const ceoFocusedRoles: RoleKey[] = ["ceo"];
 const operationsFocusedRoles: RoleKey[] = ["gerente_operaciones"];
 const executiveLineReadRoles: RoleKey[] = ["ceo"];
 const adminDataRoles: RoleKey[] = [...adminRoles, "gerente_operaciones"];
-const importMutationRoles: RoleKey[] = [
-  ...adminRoles,
-  "gerente_operaciones",
-  "gerente_area",
-  "usuario_operativo",
-];
 const deepDiagnosticRoles: RoleKey[] = [];
 
 export const navigationItems: NavigationItem[] = [
@@ -273,11 +266,15 @@ export const navigationItems: NavigationItem[] = [
     allowedRoles: dataReadRoles,
   },
   {
-    title: "Importaciones",
+    title: "Carga de cierre mensual",
     href: "/protected/importaciones",
-    icon: Import,
+    icon: ClipboardCheck,
     group: "datos",
-    allowedRoles: importMutationRoles,
+    allowedRoles: [
+      ...adminRoles,
+      "gerente_operaciones",
+      "gerente_area",
+    ],
   },
   {
     title: "Formulario mensual",
