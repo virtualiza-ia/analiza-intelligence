@@ -23,6 +23,7 @@ const importOperations = readWorkspaceFile("lib/analytics/import-operations.ts")
 const managedBranches = readWorkspaceFile("lib/tenant/managed-branch-records.ts");
 const demoContext = readWorkspaceFile("lib/tenant/demo-context.ts");
 const modulePage = readWorkspaceFile("app/protected/[module]/page.tsx");
+const newClosurePage = readWorkspaceFile("app/protected/cierres/nuevo/page.tsx");
 const navigation = readWorkspaceFile("lib/navigation.ts");
 const packageJson = readWorkspaceFile("package.json");
 const documentationExists = existsSync(join(root, "docs/manual-monthly-entry.md"));
@@ -95,15 +96,22 @@ assert(
   "Import operations must render the manual monthly dashboard.",
 );
 assert(
-  modulePage.includes('module === "importaciones" || module === "plantillas"') &&
-    modulePage.includes("MonthlyClosureRouter") &&
-    modulePage.includes('mode="new-closure"'),
-  "The import and template routes must render the same monthly closure router as the unique line form.",
+  modulePage.includes('module === "importaciones"') &&
+    modulePage.includes("ImportOperationsDashboard") &&
+    modulePage.includes('module === "plantillas"') &&
+    modulePage.includes("MonthlyClosureRouter"),
+  "Importaciones must render the import dashboard while Plantillas keeps the monthly router.",
 );
 assert(
-  navigation.includes('title: "Formulario mensual"') &&
-    navigation.includes('href: "/protected/plantillas"'),
-  "Navigation must expose the monthly form where Plantillas used to be.",
+  newClosurePage.includes('from "next/navigation"') &&
+    newClosurePage.includes("redirect(`/protected/importaciones"),
+  "The legacy new closure route must redirect to Importaciones.",
+);
+assert(
+  navigation.includes('title: "Importaciones"') &&
+    navigation.includes('href: "/protected/importaciones"') &&
+    !navigation.includes('title: "Nuevo cierre mensual"'),
+  "Navigation must expose Importaciones instead of Nuevo cierre mensual.",
 );
 assert(
   importOperations.includes("manualMonthlyFormSteps") &&

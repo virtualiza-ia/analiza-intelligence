@@ -67,6 +67,9 @@ const connectorMutationRoles: RoleKey[] = [
   "webmaster_admin",
   "gerente_operaciones",
 ];
+const routeAccessAliases = new Map<string, string>([
+  ["/protected/cierres/nuevo", "/protected/importaciones"],
+]);
 
 function normalizePathname(pathname: string) {
   const [pathOnly = "/"] = pathname.split("?");
@@ -100,16 +103,18 @@ export function canAccessProtectedPath(
   pathname: string,
 ) {
   const normalizedPathname = normalizePathname(pathname);
+  const accessPathname =
+    routeAccessAliases.get(normalizedPathname) ?? normalizedPathname;
 
-  if (protectedBasePaths.has(normalizedPathname)) {
+  if (protectedBasePaths.has(accessPathname)) {
     return true;
   }
 
   if (isSuperAdministrator(actor.roleKey)) {
-    return normalizedPathname.startsWith("/protected");
+    return accessPathname.startsWith("/protected");
   }
 
-  const navigationItem = findNavigationItemForPath(normalizedPathname);
+  const navigationItem = findNavigationItemForPath(accessPathname);
 
   if (!navigationItem) {
     return false;

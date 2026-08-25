@@ -414,7 +414,6 @@ assert.ok(
 
 for (const route of [
   "app/protected/mi-sucursal/page.tsx",
-  "app/protected/cierres/nuevo/page.tsx",
   "app/protected/cierres/page.tsx",
   "app/protected/resultados/page.tsx",
 ]) {
@@ -423,6 +422,12 @@ for (const route of [
     `${route} must resolve the active monthly closing vertical.`,
   );
 }
+assert.ok(
+  readWorkspaceFile("app/protected/cierres/nuevo/page.tsx").includes(
+    "redirect(`/protected/importaciones",
+  ),
+  "The legacy new closure page must redirect to Importaciones.",
+);
 
 for (const dashboard of [
   "components/goals-advances-dashboard.tsx",

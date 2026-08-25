@@ -12,6 +12,7 @@ import {
   Goal,
   HeartPulse,
   ImagePlus,
+  Import,
   KeyRound,
   LayoutDashboard,
   Lightbulb,
@@ -124,15 +125,16 @@ export const navigationItems: NavigationItem[] = [
     allowedRoles: ["gerente_sucursal"],
   },
   {
-    title: "Nuevo cierre mensual",
-    href: "/protected/cierres/nuevo",
-    icon: ClipboardCheck,
+    title: "Importaciones",
+    href: "/protected/importaciones",
+    icon: Import,
     group: "operacion",
     allowedRoles: [
       ...adminRoles,
       "gerente_operaciones",
       "gerente_area",
       "gerente_sucursal",
+      "usuario_operativo",
     ],
   },
   {
@@ -264,17 +266,6 @@ export const navigationItems: NavigationItem[] = [
     icon: Lightbulb,
     group: "direccion",
     allowedRoles: dataReadRoles,
-  },
-  {
-    title: "Carga de cierre mensual",
-    href: "/protected/importaciones",
-    icon: ClipboardCheck,
-    group: "datos",
-    allowedRoles: [
-      ...adminRoles,
-      "gerente_operaciones",
-      "gerente_area",
-    ],
   },
   {
     title: "Formulario mensual",

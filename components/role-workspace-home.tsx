@@ -237,7 +237,7 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
     title: "Bandeja del gerente de sucursal",
     description:
       "Muestra solo lo que necesita completar o explicar: cierre mensual, metas, alertas y evidencias.",
-    primaryHref: "/protected/cierres/nuevo",
+    primaryHref: "/protected/importaciones",
     primaryLabel: "Completar cierre mensual",
     metrics: [
       { label: "Cierre", value: "33%", note: "DEMO completado" },
@@ -248,7 +248,7 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
       {
         title: "Completar cierre de julio",
         detail: "Ingresar resultados, costos, capacidad y observaciones antes de publicar.",
-        href: "/protected/cierres/nuevo",
+        href: "/protected/importaciones",
         tone: "critical",
       },
       {
@@ -266,7 +266,7 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
     ],
     shortcutHrefs: [
       "/protected/mi-sucursal",
-      "/protected/cierres/nuevo",
+      "/protected/importaciones",
       "/protected/cierres",
       "/protected/resultados",
       "/protected/metas",

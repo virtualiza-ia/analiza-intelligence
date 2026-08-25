@@ -1,8 +1,4 @@
-import { Suspense } from "react";
-import { connection } from "next/server";
-
-import { MonthlyClosureRouter } from "@/components/monthly-closure-router";
-import { requireProtectedPath } from "@/lib/server/authorization";
+import { redirect } from "next/navigation";
 
 type NewClosurePageProps = {
   searchParams?: Promise<{
@@ -10,33 +6,26 @@ type NewClosurePageProps = {
   }>;
 };
 
-async function NewClosureGate({
-  searchParams,
-}: {
-  searchParams?: NewClosurePageProps["searchParams"];
-}) {
-  await connection();
+function readFirstParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
 
-  const params = searchParams ? await searchParams : {};
-  const actor = await requireProtectedPath("/protected/cierres/nuevo");
-
-  return (
-    <MonthlyClosureRouter actor={actor} line={params.line} mode="new-closure" />
-  );
+  return value;
 }
 
-export default function NewClosurePage({
+export default async function NewClosurePage({
   searchParams,
 }: NewClosurePageProps) {
-  return (
-    <Suspense
-      fallback={
-        <div className="mx-auto w-full max-w-5xl px-5 py-10 text-sm text-muted-foreground">
-          Cargando formulario...
-        </div>
-      }
-    >
-      <NewClosureGate searchParams={searchParams} />
-    </Suspense>
-  );
+  const params = searchParams ? await searchParams : {};
+  const line = readFirstParam(params.line);
+  const query = new URLSearchParams();
+
+  if (line) {
+    query.set("line", line);
+  }
+
+  const queryString = query.toString();
+
+  redirect(`/protected/importaciones${queryString ? `?${queryString}` : ""}`);
 }

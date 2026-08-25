@@ -9,6 +9,7 @@ import { CrmConnectorsDashboard } from "@/components/crm-connectors-dashboard";
 import { DataQualityAnaliaDashboard } from "@/components/data-quality-analia-dashboard";
 import { ExecutiveOperationDashboard } from "@/components/executive-operation-dashboard";
 import { ImagingPresentationDashboard } from "@/components/imaging-presentation-dashboard";
+import { ImportOperationsDashboard } from "@/components/import-operations-dashboard";
 import { LaboratoryPresentationDashboard } from "@/components/laboratory-presentation-dashboard";
 import { MonthlyClosureRouter } from "@/components/monthly-closure-router";
 import { OperationsModule } from "@/components/operations-modules";
@@ -143,7 +144,11 @@ export default async function ModulePage({
     return <InsightsIntelligenceDashboard />;
   }
 
-  if (module === "importaciones" || module === "plantillas") {
+  if (module === "importaciones") {
+    return <ImportOperationsDashboard />;
+  }
+
+  if (module === "plantillas") {
     const resolvedSearchParams = searchParams ? await searchParams : {};
 
     return (

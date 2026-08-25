@@ -2,7 +2,7 @@
 
 ## Decision
 
-La via manual principal para actualizar Analiza Intelligence sera un formulario mensual por linea de negocio, sucursal y periodo. Este formulario vive en `/protected/plantillas`, con etiqueta de menu `Formulario mensual`, reemplazando la antigua biblioteca de descargas Excel. El flujo de Excel queda como respaldo para migraciones, reemplazos especiales o fuentes que todavia no esten cubiertas por el formulario.
+La via manual principal para actualizar Analiza Intelligence sera Importaciones, con un formulario mensual por linea de negocio, sucursal y periodo. Este acceso vive en `/protected/importaciones`, con etiqueta de menu `Importaciones`, y reemplaza la entrada separada de `Nuevo cierre mensual`. La ruta heredada `/protected/cierres/nuevo` debe redirigir a Importaciones para evitar dos caminos de captura. El flujo de Excel queda como respaldo para migraciones, reemplazos especiales o fuentes que todavia no esten cubiertas por el formulario.
 
 ## Alcance
 
