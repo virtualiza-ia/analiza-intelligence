@@ -16,6 +16,8 @@ type InvitationRow = {
   id: string;
 };
 
+const assignmentTrackedRoles: RoleKey[] = ["gerente_area", "gerente_sucursal"];
+
 export type CreateInvitationInput = {
   appUrl: string;
   actorUserId: string;
@@ -214,6 +216,39 @@ export async function createUserInvitation({
         }),
       ],
     );
+
+    if (assignmentTrackedRoles.includes(roleKey)) {
+      await client.query(
+        `
+          insert into public.assignment_history (
+            organization_id,
+            actor_user_id,
+            entity_table,
+            entity_id,
+            action,
+            previous_scope,
+            next_scope,
+            reason
+          )
+          values ($1, $2, 'user_invitations', $3, 'manager_assignment.invited', '{}'::jsonb, $4::jsonb, $5)
+        `,
+        [
+          organizationId,
+          auditableActorUserId,
+          invitation.id,
+          JSON.stringify({
+            branch_id: nullableUuid(scope.branchId),
+            company_id: nullableUuid(scope.companyId),
+            country_id: nullableUuid(scope.countryId),
+            invited_email_domain: email.split("@")[1] ?? "unknown",
+            invited_role: roleKey,
+            operational_area_id: nullableUuid(scope.operationalAreaId),
+            status: "pending_invitation",
+          }),
+          "Invitacion para nombramiento de gerente con alcance operativo controlado.",
+        ],
+      );
+    }
 
     await client.query("commit");
 

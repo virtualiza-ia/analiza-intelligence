@@ -69,6 +69,28 @@ function jsonError(error: string, status: number, missingConfig: string[] = []) 
   return NextResponse.json({ error, missingConfig, ok: false }, { status });
 }
 
+function getMissingScopeError(roleKey: RoleKey, scope: ScopeBoundary) {
+  if (roleKey === "gerente_area" && !scope.operationalAreaId) {
+    return "Selecciona la gerencia de area para invitar este gerente.";
+  }
+
+  if (roleKey === "gerente_sucursal") {
+    if (!scope.operationalAreaId) {
+      return "Selecciona la gerencia de area para invitar este gerente.";
+    }
+
+    if (!scope.branchId) {
+      return "Selecciona la sucursal para invitar este gerente.";
+    }
+  }
+
+  if (roleKey === "usuario_operativo" && !scope.branchId) {
+    return "Selecciona la sucursal para invitar este usuario.";
+  }
+
+  return null;
+}
+
 export async function POST(request: Request) {
   const actor = await getCurrentAuthorizationActor();
 
@@ -124,6 +146,12 @@ export async function POST(request: Request) {
 
   if (!targetScope) {
     return jsonError("El alcance de la invitacion no esta completo.", 400);
+  }
+
+  const missingScopeError = getMissingScopeError(payload.roleKey, targetScope);
+
+  if (missingScopeError) {
+    return jsonError(missingScopeError, 400);
   }
 
   if (

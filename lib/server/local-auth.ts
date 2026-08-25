@@ -86,6 +86,16 @@ type LocalPasswordChangeUserRow = {
   profile_status: string | null;
 };
 
+type ManagerAssignmentRow = {
+  id: string;
+  status: string | null;
+};
+
+const managerAssignmentRoleKeys = new Set<RoleKey>([
+  "gerente_area",
+  "gerente_sucursal",
+]);
+
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
@@ -225,6 +235,171 @@ async function grantScopedAccess(
   }
 }
 
+async function activateManagerAssignment(
+  client: PoolClient,
+  userId: string,
+  invitation: InvitationActivationRow,
+) {
+  const roleKey = coerceRoleKey(invitation.role_key);
+
+  if (!managerAssignmentRoleKeys.has(roleKey)) {
+    return;
+  }
+
+  const assignmentValues = [
+    userId,
+    invitation.invited_role_id,
+    invitation.organization_id,
+    invitation.country_id,
+    invitation.company_id,
+    invitation.operational_area_id,
+    invitation.branch_id,
+  ];
+  const existingAssignmentResult = await client.query<ManagerAssignmentRow>(
+    `
+      select id, status
+      from public.manager_assignments
+      where profile_id = $1
+        and role_id = $2
+        and organization_id = $3
+        and country_id is not distinct from $4
+        and company_id is not distinct from $5
+        and operational_area_id is not distinct from $6
+        and branch_id is not distinct from $7
+        and deactivated_at is null
+      order by created_at desc
+      limit 1
+    `,
+    assignmentValues,
+  );
+  const existingAssignment = existingAssignmentResult.rows[0];
+  const assignmentMetadata = JSON.stringify({
+    invitation_id: invitation.id,
+    source: "invitation-activation",
+  });
+  const nextScope = {
+    branch_id: invitation.branch_id,
+    company_id: invitation.company_id,
+    country_id: invitation.country_id,
+    operational_area_id: invitation.operational_area_id,
+    profile_id: userId,
+    role_key: roleKey,
+    status: "active",
+  };
+  const assignmentId = existingAssignment
+    ? existingAssignment.id
+    : (
+        await client.query<{ id: string }>(
+          `
+            insert into public.manager_assignments (
+              organization_id,
+              profile_id,
+              role_id,
+              country_id,
+              company_id,
+              operational_area_id,
+              branch_id,
+              assigned_by,
+              status,
+              starts_at,
+              metadata
+            )
+            values ($1, $2, $3, $4, $5, $6, $7, $8, 'active', now(), $9::jsonb)
+            returning id
+          `,
+          [
+            invitation.organization_id,
+            userId,
+            invitation.invited_role_id,
+            invitation.country_id,
+            invitation.company_id,
+            invitation.operational_area_id,
+            invitation.branch_id,
+            invitation.invited_by,
+            assignmentMetadata,
+          ],
+        )
+      ).rows[0]?.id;
+
+  if (!assignmentId) {
+    throw new Error("No se pudo activar la asignacion del gerente.");
+  }
+
+  if (existingAssignment) {
+    await client.query(
+      `
+        update public.manager_assignments
+        set status = 'active',
+            starts_at = coalesce(starts_at, now()),
+            ends_at = null,
+            assigned_by = coalesce(assigned_by, $2),
+            metadata = metadata || $3::jsonb
+        where id = $1
+      `,
+      [assignmentId, invitation.invited_by, assignmentMetadata],
+    );
+  }
+
+  await client.query(
+    `
+      insert into public.assignment_history (
+        organization_id,
+        actor_user_id,
+        entity_table,
+        entity_id,
+        action,
+        previous_scope,
+        next_scope,
+        reason
+      )
+      values ($1, $2, 'manager_assignments', $3, $4, $5::jsonb, $6::jsonb, $7)
+    `,
+    [
+      invitation.organization_id,
+      invitation.invited_by,
+      assignmentId,
+      existingAssignment?.status === "active"
+        ? "manager_assignment.reconfirmed"
+        : "manager_assignment.activated",
+      JSON.stringify({
+        invitation_id: invitation.id,
+        status: existingAssignment?.status ?? "pending_invitation",
+      }),
+      JSON.stringify(nextScope),
+      "Activacion de gerente al aceptar invitacion segura.",
+    ],
+  );
+
+  await client.query(
+    `
+      insert into public.audit_logs (
+        organization_id,
+        actor_user_id,
+        action,
+        entity_table,
+        entity_id,
+        country_id,
+        company_id,
+        branch_id,
+        metadata
+      )
+      values ($1, $2, $3, 'manager_assignments', $4, $5, $6, $7, $8::jsonb)
+    `,
+    [
+      invitation.organization_id,
+      invitation.invited_by,
+      existingAssignment?.status === "active"
+        ? "manager_assignment.reconfirmed"
+        : "manager_assignment.activated",
+      assignmentId,
+      invitation.country_id,
+      invitation.company_id,
+      invitation.branch_id,
+      JSON.stringify(nextScope),
+    ],
+  );
+}
+
 export async function acceptUserInvitation({
   email,
   password,
@@ -339,6 +514,7 @@ export async function acceptUserInvitation({
 
     await ensureActiveUserRole(client, user.id, invitation);
     await grantScopedAccess(client, user.id, invitation);
+    await activateManagerAssignment(client, user.id, invitation);
 
     await client.query(
       `

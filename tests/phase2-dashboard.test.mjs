@@ -284,6 +284,8 @@ for (const requiredSidebarText of [
 
 for (const requiredRoleHomeText of [
   "Bandeja de trabajo",
+  "Jerarquia de roles",
+  "Alta de sucursal por linea",
   "Lectura en 10 segundos",
   "Que necesita decidir o completar este rol ahora",
   "Acceso recomendado",

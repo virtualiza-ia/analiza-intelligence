@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   BarChart3,
+  Building2,
   CheckCircle2,
   ClipboardList,
   LineChart,
@@ -47,6 +48,8 @@ const roleStorageKey = "analiza:demo-role";
 const roleChangeEvent = "analiza:role-change";
 const demoUsersStorageKey = "analiza:demo-users";
 const revokedDemoUserEmails = new Set(["info@tuvetsv.com"]);
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type StoredContext = {
   countryName: string;
@@ -59,8 +62,10 @@ type StoredContext = {
 };
 
 type BusinessModuleDashboardProps = {
+  allowDemoRoleSwitch: boolean;
   enableDemoFixtures?: boolean;
   module: string;
+  roleKey: RoleKey;
 };
 
 type DemoManagedUser = {
@@ -87,6 +92,19 @@ type InviteUserApiResponse = {
   missingConfig?: string[];
   ok?: boolean;
   status?: "sent";
+};
+
+type CreateBranchApiResponse = {
+  branch?: {
+    code: string;
+    id: string;
+    name: string;
+    status: string;
+  };
+  error?: string;
+  missingConfig?: string[];
+  ok?: boolean;
+  status?: "created";
 };
 
 const businessHealth = [
@@ -156,9 +174,19 @@ function readStoredContext() {
   }
 }
 
-function readActiveDemoRole(): RoleKey {
+function readActiveDashboardRole({
+  allowDemoRoleSwitch,
+  fallbackRole,
+}: {
+  allowDemoRoleSwitch: boolean;
+  fallbackRole: RoleKey;
+}): RoleKey {
   if (typeof window === "undefined") {
-    return "super_admin";
+    return fallbackRole;
+  }
+
+  if (!allowDemoRoleSwitch) {
+    return fallbackRole;
   }
 
   const storedRole = window.localStorage.getItem(roleStorageKey);
@@ -167,7 +195,7 @@ function readActiveDemoRole(): RoleKey {
     return storedRole as RoleKey;
   }
 
-  return "super_admin";
+  return fallbackRole;
 }
 
 function readDemoUsers(enableDemoFixtures: boolean) {
@@ -207,6 +235,10 @@ function persistDemoUsers(users: DemoManagedUser[]) {
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function isUuid(value: string) {
+  return uuidPattern.test(value);
 }
 
 function buildScopeBoundary({
@@ -280,6 +312,43 @@ function readInviteUserApiResponse(value: unknown): InviteUserApiResponse {
     missingConfig,
     ok: response.ok === true,
     status: response.status === "sent" ? "sent" : undefined,
+  };
+}
+
+function readCreateBranchApiResponse(value: unknown): CreateBranchApiResponse {
+  if (typeof value !== "object" || value === null) {
+    return {};
+  }
+
+  const response = value as Record<string, unknown>;
+  const branch =
+    typeof response.branch === "object" && response.branch !== null
+      ? (response.branch as Record<string, unknown>)
+      : null;
+  const missingConfig = Array.isArray(response.missingConfig)
+    ? response.missingConfig.filter(
+        (configName): configName is string => typeof configName === "string",
+      )
+    : undefined;
+
+  return {
+    branch:
+      branch !== null &&
+      typeof branch?.code === "string" &&
+      typeof branch.id === "string" &&
+      typeof branch.name === "string" &&
+      typeof branch.status === "string"
+        ? {
+            code: branch.code,
+            id: branch.id,
+            name: branch.name,
+            status: branch.status,
+          }
+        : undefined,
+    error: typeof response.error === "string" ? response.error : undefined,
+    missingConfig,
+    ok: response.ok === true,
+    status: response.status === "created" ? "created" : undefined,
   };
 }
 
@@ -506,13 +575,17 @@ function ModuleRows({ config }: { config: ModuleConfig }) {
 }
 
 function UsersAndPermissionsManager({
+  allowDemoRoleSwitch,
   context,
   enableDemoFixtures,
+  roleKey: initialRoleKey,
 }: {
+  allowDemoRoleSwitch: boolean;
   context: StoredContext | null;
   enableDemoFixtures: boolean;
+  roleKey: RoleKey;
 }) {
-  const [activeRole, setActiveRole] = useState<RoleKey>("super_admin");
+  const [activeRole, setActiveRole] = useState<RoleKey>(initialRoleKey);
   const [users, setUsers] = useState<DemoManagedUser[]>(
     enableDemoFixtures ? initialDemoUsers : [],
   );
@@ -524,6 +597,15 @@ function UsersAndPermissionsManager({
   const [areaScope, setAreaScope] = useState(allAreaScope);
   const [branchScope, setBranchScope] = useState(allBranchScope);
   const [isInviting, setIsInviting] = useState(false);
+  const [branchName, setBranchName] = useState("");
+  const [branchCode, setBranchCode] = useState("");
+  const [branchCity, setBranchCity] = useState("");
+  const [branchReason, setBranchReason] = useState("");
+  const [branchCountryScope, setBranchCountryScope] = useState(allCountryScope);
+  const [branchBusinessScope, setBranchBusinessScope] = useState(allBusinessScope);
+  const [branchAreaScope, setBranchAreaScope] = useState(allAreaScope);
+  const [isCreatingBranch, setIsCreatingBranch] = useState(false);
+  const [branchMessage, setBranchMessage] = useState("");
   const [message, setMessage] = useState("");
 
   const businessOptions = useMemo(
@@ -561,6 +643,25 @@ function UsersAndPermissionsManager({
         })),
     ],
     [businessScope, countryScope],
+  );
+  const branchAreaOptions = useMemo(
+    () => [
+      { label: allAreaScope, value: allAreaScope },
+      ...demoOperationalAreas
+        .filter(
+          (area) =>
+            isUuid(area.id) &&
+            (branchCountryScope === allCountryScope ||
+              area.countryId === branchCountryScope) &&
+            (branchBusinessScope === allBusinessScope ||
+              area.companyId === branchBusinessScope),
+        )
+        .map((area) => ({
+          label: `${area.name} · ${getBusinessScopeLabel(area.companyId)}`,
+          value: area.id,
+        })),
+    ],
+    [branchBusinessScope, branchCountryScope],
   );
   const branchOptions = useMemo(
     () => [
@@ -648,12 +749,27 @@ function UsersAndPermissionsManager({
       countryScope: actorCountryScope,
     }),
   );
+  const branchCreationScope = buildScopeBoundary({
+    areaScope: branchAreaScope,
+    branchScope: allBranchScope,
+    businessScope: branchBusinessScope,
+    countryScope: branchCountryScope,
+  });
+  const canCreateSelectedBranch =
+    branchCountryScope !== allCountryScope &&
+    branchBusinessScope !== allBusinessScope &&
+    canCreateBranch(actor, branchCreationScope);
 
   useEffect(() => {
     setUsers(readDemoUsers(enableDemoFixtures));
 
     function refreshRole() {
-      setActiveRole(readActiveDemoRole());
+      setActiveRole(
+        readActiveDashboardRole({
+          allowDemoRoleSwitch,
+          fallbackRole: initialRoleKey,
+        }),
+      );
     }
 
     refreshRole();
@@ -664,21 +780,25 @@ function UsersAndPermissionsManager({
       window.removeEventListener("storage", refreshRole);
       window.removeEventListener(roleChangeEvent, refreshRole);
     };
-  }, [enableDemoFixtures]);
+  }, [allowDemoRoleSwitch, enableDemoFixtures, initialRoleKey]);
 
   useEffect(() => {
     if (context?.countryName) {
-      setCountryScope(
+      const contextCountry =
         countryOptions.find((country) => country.label === context.countryName)
-          ?.value ?? allCountryScope,
-      );
+          ?.value ?? allCountryScope;
+
+      setCountryScope(contextCountry);
+      setBranchCountryScope(contextCountry);
     }
 
     if (context?.companyName) {
-      setBusinessScope(
+      const contextBusiness =
         businessOptions.find((business) => business.label === context.companyName)
-          ?.value ?? allBusinessScope,
-      );
+          ?.value ?? allBusinessScope;
+
+      setBusinessScope(contextBusiness);
+      setBranchBusinessScope(contextBusiness);
     }
 
     if (context?.branchName) {
@@ -712,6 +832,85 @@ function UsersAndPermissionsManager({
       setBranchScope(allBranchScope);
     }
   }, [branchOptions, branchScope]);
+
+  useEffect(() => {
+    if (!branchAreaOptions.some((area) => area.value === branchAreaScope)) {
+      setBranchAreaScope(allAreaScope);
+    }
+  }, [branchAreaOptions, branchAreaScope]);
+
+  async function createBranch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const normalizedName = branchName.trim();
+    const normalizedCode = branchCode.trim().toUpperCase().replace(/\s+/g, "-");
+    const normalizedCity = branchCity.trim();
+    const normalizedReason = branchReason.trim();
+
+    if (!canCreateSelectedBranch) {
+      setBranchMessage("Selecciona pais y linea dentro de tu alcance autorizado.");
+      return;
+    }
+
+    if (!normalizedName || !normalizedCode) {
+      setBranchMessage("Completa nombre y codigo de la sucursal.");
+      return;
+    }
+
+    if (normalizedReason.length < 10) {
+      setBranchMessage("Agrega una razon de alta para que quede historial.");
+      return;
+    }
+
+    setIsCreatingBranch(true);
+
+    try {
+      const response = await fetch("/api/branches", {
+        body: JSON.stringify({
+          city: normalizedCity,
+          code: normalizedCode,
+          name: normalizedName,
+          reason: normalizedReason,
+          scope: branchCreationScope,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const branchResult = readCreateBranchApiResponse(
+        await response.json().catch(() => null),
+      );
+
+      if (!response.ok || !branchResult.ok) {
+        const missingConfig =
+          branchResult.missingConfig && branchResult.missingConfig.length > 0
+            ? ` Variables pendientes: ${branchResult.missingConfig.join(", ")}.`
+            : "";
+
+        throw new Error(
+          `${branchResult.error ?? "No se pudo crear la sucursal."}${missingConfig}`,
+        );
+      }
+
+      setBranchName("");
+      setBranchCode("");
+      setBranchCity("");
+      setBranchReason("");
+      setBranchAreaScope(allAreaScope);
+      setBranchMessage(
+        branchResult.branch
+          ? `Sucursal ${branchResult.branch.name} creada como pendiente de gerente. Historial registrado.`
+          : "Sucursal creada como pendiente de gerente. Historial registrado.",
+      );
+    } catch (error) {
+      setBranchMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo crear la sucursal.",
+      );
+    } finally {
+      setIsCreatingBranch(false);
+    }
+  }
 
   async function createDemoUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -958,6 +1157,148 @@ function UsersAndPermissionsManager({
 
   return (
     <section className="grid min-w-0 gap-5">
+      <form
+        className="grid min-w-0 gap-5 rounded-md border bg-card p-4"
+        onSubmit={createBranch}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="grid gap-2">
+            <div className="flex items-center gap-2 text-lg font-semibold tracking-normal">
+              <Building2 className="size-5 text-primary" />
+              Alta de sucursal
+            </div>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+              Crea sucursales por pais y linea de negocio con estado pendiente
+              de gerente e historial operativo.
+            </p>
+          </div>
+          <Badge variant={canCreateBranchesForScope ? "outline" : "secondary"}>
+            {canCreateBranchesForScope ? "Alta habilitada" : "Solo lectura"}
+          </Badge>
+        </div>
+
+        {!canCreateBranchesForScope ? (
+          <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+            <LockKeyhole className="mt-0.5 size-4 shrink-0" />
+            Tu rol actual no tiene delegacion para crear sucursales.
+          </div>
+        ) : null}
+
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          <label className="grid min-w-0 gap-2 text-sm">
+            <span className="font-medium">Pais</span>
+            <select
+              className={formSelectClassName}
+              disabled={!canCreateBranchesForScope}
+              onChange={(event) => setBranchCountryScope(event.target.value)}
+              value={branchCountryScope}
+            >
+              {countryOptions.map((country) => (
+                <option key={country.value} value={country.value}>
+                  {country.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid min-w-0 gap-2 text-sm">
+            <span className="font-medium">Linea de negocio</span>
+            <select
+              className={formSelectClassName}
+              disabled={!canCreateBranchesForScope}
+              onChange={(event) => setBranchBusinessScope(event.target.value)}
+              value={branchBusinessScope}
+            >
+              {businessOptions.map((business) => (
+                <option key={business.value} value={business.value}>
+                  {business.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid min-w-0 gap-2 text-sm">
+            <span className="font-medium">Gerencia de area</span>
+            <select
+              className={formSelectClassName}
+              disabled={!canCreateBranchesForScope}
+              onChange={(event) => setBranchAreaScope(event.target.value)}
+              value={branchAreaScope}
+            >
+              {branchAreaOptions.map((area) => (
+                <option key={area.value} value={area.value}>
+                  {area.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid min-w-0 gap-2 text-sm">
+            <span className="font-medium">Codigo</span>
+            <Input
+              className="h-10"
+              disabled={!canCreateBranchesForScope}
+              onChange={(event) => setBranchCode(event.target.value)}
+              placeholder="LAB-ESCALON"
+              value={branchCode}
+            />
+          </label>
+
+          <label className="grid min-w-0 gap-2 text-sm xl:col-span-2">
+            <span className="font-medium">Nombre de sucursal</span>
+            <Input
+              className="h-10"
+              disabled={!canCreateBranchesForScope}
+              onChange={(event) => setBranchName(event.target.value)}
+              placeholder="Laboratorio Escalon"
+              value={branchName}
+            />
+          </label>
+
+          <label className="grid min-w-0 gap-2 text-sm xl:col-span-2">
+            <span className="font-medium">Ciudad</span>
+            <Input
+              className="h-10"
+              disabled={!canCreateBranchesForScope}
+              onChange={(event) => setBranchCity(event.target.value)}
+              placeholder="San Salvador"
+              value={branchCity}
+            />
+          </label>
+
+          <label className="grid min-w-0 gap-2 text-sm xl:col-span-4">
+            <span className="font-medium">Razon de alta</span>
+            <textarea
+              className="min-h-24 w-full min-w-0 rounded-md border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+              disabled={!canCreateBranchesForScope}
+              onChange={(event) => setBranchReason(event.target.value)}
+              placeholder="Apertura aprobada para operar esta linea de negocio"
+              value={branchReason}
+            />
+          </label>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+          {branchMessage ? (
+            <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+              {branchMessage}
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              Estado inicial: pendiente de gerente.
+            </span>
+          )}
+
+          <Button
+            disabled={!canCreateSelectedBranch || isCreatingBranch}
+            type="submit"
+          >
+            <Building2 className="size-4" />
+            {isCreatingBranch ? "Creando..." : "Crear sucursal"}
+          </Button>
+        </div>
+      </form>
+
       <form
         className="grid min-w-0 gap-5 rounded-md border bg-card p-4"
         onSubmit={createDemoUser}
@@ -1279,8 +1620,10 @@ function UsersAndPermissionsManager({
 }
 
 export function BusinessModuleDashboard({
+  allowDemoRoleSwitch,
   enableDemoFixtures = true,
   module,
+  roleKey,
 }: BusinessModuleDashboardProps) {
   const [context, setContext] = useState<StoredContext | null>(null);
   const config = moduleConfigs[module];
@@ -1348,8 +1691,10 @@ export function BusinessModuleDashboard({
 
       {module === "usuarios-permisos" ? (
         <UsersAndPermissionsManager
+          allowDemoRoleSwitch={allowDemoRoleSwitch}
           context={context}
           enableDemoFixtures={enableDemoFixtures}
+          roleKey={roleKey}
         />
       ) : null}
 

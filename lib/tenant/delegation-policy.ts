@@ -72,7 +72,7 @@ export const roleHierarchy: RoleHierarchyEntry[] = [
     roleKey: "ceo",
     hierarchyLevel: 90,
     canCreateUsers: false,
-    canCreateBranches: false,
+    canCreateBranches: true,
     canCreateOperationalAreas: false,
     canManageGlobalPermissions: false,
   },
@@ -215,6 +215,7 @@ export function canCreateBranch(actor: DelegationActor, targetScope: ScopeBounda
 
   return (
     isSuperAdministrator(actor.roleKey) ||
+    actor.roleKey === "ceo" ||
     actor.roleKey === "gerente_operaciones"
   );
 }

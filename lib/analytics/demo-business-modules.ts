@@ -470,11 +470,11 @@ export const moduleConfigs: Record<string, ModuleConfig> = {
   },
   "usuarios-permisos": {
     title: "Usuarios y permisos",
-    audience: "Superadministrador y delegacion gerencial",
+    audience: "CEO, superadministrador y delegacion gerencial",
     description:
-      "Jerarquia Analiza BI: superadministrador, gerente de operaciones, gerente de area, gerente de sucursal, usuario operativo y viewer. El acceso depende de rol y alcance.",
+      "Jerarquia Analiza BI: superadministrador, webmaster, CEO, gerente de operaciones, gerente de area, gerente de sucursal, usuario operativo y viewer. El acceso depende de rol y alcance.",
     metrics: [
-      { label: "Roles jerarquicos", value: "6", note: "niveles definidos", tone: "positive" },
+      { label: "Roles jerarquicos", value: "8", note: "niveles definidos", tone: "positive" },
       { label: "Creacion", value: "Invitacion", note: "sin contrasena manual", tone: "positive" },
       { label: "Alcance", value: "Area + sucursal", note: "RLS obligatorio", tone: "positive" },
       { label: "Desactivacion", value: "Soft delete", note: "con auditoria", tone: "warning" },

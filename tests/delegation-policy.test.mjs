@@ -15,12 +15,15 @@ import {
 
 const migrationPath =
   "supabase/migrations/20260729000200_delegated_user_hierarchy.sql";
+const ceoBranchGovernanceMigrationPath =
+  "supabase/migrations/20260825000100_ceo_branch_governance.sql";
 const seedPath = "supabase/seed.sql";
 const contextDataPath = "lib/tenant/demo-context.ts";
 const usersComponentPath = "components/business-module-dashboard.tsx";
 
 for (const file of [
   migrationPath,
+  ceoBranchGovernanceMigrationPath,
   seedPath,
   contextDataPath,
   usersComponentPath,
@@ -29,6 +32,10 @@ for (const file of [
 }
 
 const migration = readFileSync(migrationPath, "utf8");
+const ceoBranchGovernanceMigration = readFileSync(
+  ceoBranchGovernanceMigrationPath,
+  "utf8",
+);
 const seed = readFileSync(seedPath, "utf8");
 const contextData = readFileSync(contextDataPath, "utf8");
 const usersComponent = readFileSync(usersComponentPath, "utf8");
@@ -47,6 +54,16 @@ const operationsActor = {
     companyId,
   },
   userId: "ops-user",
+};
+
+const ceoActor = {
+  roleKey: "ceo",
+  scope: {
+    organizationId,
+    countryId,
+    companyId,
+  },
+  userId: "ceo-user",
 };
 
 const areaActor = {
@@ -115,6 +132,16 @@ assert.equal(
   canCreateBranch(operationsActor, areaTarget.scope),
   true,
   "Operations manager should create branches in scope.",
+);
+
+assert.equal(
+  canCreateBranch(ceoActor, {
+    companyId,
+    countryId,
+    organizationId,
+  }),
+  true,
+  "CEO should create branches inside its business line scope.",
 );
 
 assert.equal(
@@ -230,6 +257,18 @@ for (const requiredSqlText of [
   }
 }
 
+for (const requiredCeoBranchSql of [
+  "where r.key = 'ceo'",
+  "p.key = 'branches.manage'",
+  "array['ceo', 'gerente_operaciones']",
+]) {
+  if (!ceoBranchGovernanceMigration.includes(requiredCeoBranchSql)) {
+    throw new Error(
+      `CEO branch governance migration is missing: ${requiredCeoBranchSql}`,
+    );
+  }
+}
+
 for (const hierarchyText of [
   "('super_admin', 100, true)",
   "('gerente_operaciones', 80, true)",
@@ -255,6 +294,9 @@ for (const requiredContextText of [
 }
 
 for (const requiredUserUiText of [
+  "Alta de sucursal",
+  "/api/branches",
+  "pendiente de gerente",
   "Invitar usuario",
   "Selecciona la gerencia de area",
   "Selecciona la sucursal",

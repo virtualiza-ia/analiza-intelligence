@@ -5,9 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
+  Building2,
   CheckCircle2,
   ClipboardList,
   Clock3,
+  Network,
+  ShieldCheck,
+  UsersRound,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +25,11 @@ import {
   roleKeys,
   type RoleKey,
 } from "@/lib/tenant/demo-context";
+import {
+  getCreatableRoles,
+  roleHierarchy,
+  type RoleHierarchyEntry,
+} from "@/lib/tenant/delegation-policy";
 import { cn } from "@/lib/utils";
 
 const roleStorageKey = "analiza:demo-role";
@@ -123,6 +132,12 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
         tone: "action",
       },
       {
+        title: "Alta de sucursal por linea",
+        detail: "Crear una nueva sucursal por pais y linea de negocio con historial.",
+        href: "/protected/usuarios-permisos",
+        tone: "action",
+      },
+      {
         title: "Sucursales con excepciones",
         detail: "Ver top de sucursales que requieren accion, no el ranking completo.",
         href: "/protected/sucursales",
@@ -132,6 +147,7 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
     shortcutHrefs: [
       "/protected/overview",
       "/protected/finanzas",
+      "/protected/usuarios-permisos",
       "/protected/insights",
       "/protected/metas",
     ],
@@ -353,6 +369,126 @@ function toneIcon(tone: WorkspaceItem["tone"]) {
   return CheckCircle2;
 }
 
+const orderedRoleHierarchy = [...roleHierarchy].sort(
+  (firstRole, secondRole) =>
+    secondRole.hierarchyLevel - firstRole.hierarchyLevel,
+);
+
+function getHierarchyCapabilities(entry: RoleHierarchyEntry) {
+  const capabilities: string[] = [];
+
+  if (entry.canManageGlobalPermissions) {
+    capabilities.push("Permisos globales");
+  }
+
+  if (entry.canCreateBranches) {
+    capabilities.push("Crea sucursales");
+  }
+
+  if (entry.canCreateOperationalAreas) {
+    capabilities.push("Crea areas");
+  }
+
+  if (entry.canCreateUsers) {
+    capabilities.push("Invita usuarios");
+  }
+
+  return capabilities.length > 0 ? capabilities : ["Solo lectura"];
+}
+
+function RoleHierarchyPanel({ activeRole }: { activeRole: RoleKey }) {
+  const creatableRoles = getCreatableRoles(activeRole, {
+    canInviteOperationalUsers: activeRole === "gerente_sucursal",
+  });
+  const activeEntry = roleHierarchy.find((entry) => entry.roleKey === activeRole);
+  const activeCapabilities = activeEntry
+    ? getHierarchyCapabilities(activeEntry)
+    : ["Solo lectura"];
+
+  return (
+    <section className="grid gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Network className="size-4 text-primary" />
+          Jerarquia de roles
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {activeCapabilities.map((capability) => (
+            <Badge key={capability} variant="outline">
+              {capability}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {orderedRoleHierarchy.map((entry) => {
+          const isActiveRole = entry.roleKey === activeRole;
+          const capabilities = getHierarchyCapabilities(entry);
+
+          return (
+            <article
+              className={cn(
+                "grid min-h-[148px] gap-3 rounded-md border bg-card p-4",
+                isActiveRole && "border-primary bg-primary/5 shadow-sm",
+              )}
+              key={entry.roleKey}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="grid gap-1">
+                  <div className="text-sm font-semibold">
+                    {demoRoleProfiles[entry.roleKey].label}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Nivel {entry.hierarchyLevel}
+                  </div>
+                </div>
+                {isActiveRole ? <Badge>Actual</Badge> : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {capabilities.map((capability) => (
+                  <Badge
+                    className="bg-muted text-muted-foreground hover:bg-muted"
+                    key={capability}
+                  >
+                    {capability}
+                  </Badge>
+                ))}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-3 rounded-md border bg-card p-4 text-sm leading-6 md:grid-cols-3">
+        <div className="flex gap-2">
+          <ShieldCheck className="mt-1 size-4 shrink-0 text-primary" />
+          <span>
+            <strong>Rol activo:</strong> {demoRoleProfiles[activeRole].label}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <UsersRound className="mt-1 size-4 shrink-0 text-primary" />
+          <span>
+            <strong>Puede invitar:</strong>{" "}
+            {creatableRoles.length > 0
+              ? creatableRoles.map((role) => demoRoleProfiles[role].label).join(", ")
+              : "sin delegacion"}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <Building2 className="mt-1 size-4 shrink-0 text-primary" />
+          <span>
+            <strong>Sucursales:</strong>{" "}
+            {activeEntry?.canCreateBranches ? "alta habilitada" : "solo lectura"}
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function RoleWorkspaceHome({
   allowDemoRoleSwitch,
   isDemoEnvironment,
@@ -477,6 +613,8 @@ export function RoleWorkspaceHome({
           </div>
         </aside>
       </div>
+
+      <RoleHierarchyPanel activeRole={activeRole} />
 
       <section className="grid gap-3">
         <div className="text-sm font-medium">Lectura en 10 segundos</div>

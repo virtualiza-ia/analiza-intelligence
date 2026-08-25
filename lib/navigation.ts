@@ -105,6 +105,7 @@ const connectorAdminRoles: RoleKey[] = [...adminRoles, "gerente_operaciones"];
 
 const delegatedUserAdminRoles: RoleKey[] = [
   ...adminRoles,
+  "ceo",
   "gerente_operaciones",
   "gerente_area",
 ];

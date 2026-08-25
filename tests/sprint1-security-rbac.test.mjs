@@ -259,7 +259,6 @@ for (const executiveLinePath of [
 for (const sensitiveCeoPath of [
   "/protected/cierres/nuevo",
   "/protected/importaciones",
-  "/protected/usuarios-permisos",
   "/protected/auditoria",
   "/protected/conectores",
   "/protected/apis",
@@ -271,6 +270,12 @@ for (const sensitiveCeoPath of [
     `CEO direct line read access must not grant sensitive route ${sensitiveCeoPath}.`,
   );
 }
+
+assert.equal(
+  canAccessProtectedPath(ceo, "/protected/usuarios-permisos"),
+  true,
+  "CEO must access governed branch creation without gaining user delegation.",
+);
 
 for (const sensitiveAction of [
   "imports.upload",
@@ -403,6 +408,14 @@ assert.equal(
   }),
   true,
   "Operations manager must create branches in scope.",
+);
+
+assert.equal(
+  canPerformAction(ceo, "branches.create", {
+    scope: { companyId, countryId, organizationId },
+  }),
+  true,
+  "CEO must create branches in an authorized business line scope.",
 );
 
 assert.equal(
