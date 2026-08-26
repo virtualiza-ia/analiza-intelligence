@@ -1,6 +1,5 @@
 import {
   elSalvadorBranchResultTemplates,
-  elSalvadorTemplateSummary,
   type ElSalvadorBranchResultTemplate,
 } from "./el-salvador-result-templates.ts";
 import { safeDivide, type BusinessLineCode } from "./kpi-registry.ts";
@@ -120,6 +119,7 @@ export type SemanticLine = {
   periodEnd: string;
   sourceNote: string;
   sourceVersion: string;
+  sourceTemplates?: ElSalvadorBranchResultTemplate[];
   qualityScore: number;
   qualityLevel: QualityLevel;
   qualityRules: DataQualityRuleResult[];
@@ -520,13 +520,17 @@ function daysInMonth(dateValue: string) {
 }
 
 export function getPeriodScale(context: GlobalFilterContext) {
-  const days = getInclusiveDays(context.periodStart, context.periodEnd);
+  return getPeriodScaleForDates(context.periodStart, context.periodEnd);
+}
+
+function getPeriodScaleForDates(periodStart: string, periodEnd: string) {
+  const days = getInclusiveDays(periodStart, periodEnd);
 
   if (days === null) {
     return null;
   }
 
-  return Math.max(0.03, Math.min(days / daysInMonth(context.periodStart), 1));
+  return Math.max(0.03, Math.min(days / daysInMonth(periodStart), 1));
 }
 
 function allocateBreakdown(
@@ -976,25 +980,39 @@ function buildBaseLineFacts(context: GlobalFilterContext, scale: number): Semant
 function buildLaboratoryLineFromTemplates(
   context: GlobalFilterContext,
   scale: number,
+  templates: ElSalvadorBranchResultTemplate[] = elSalvadorBranchResultTemplates,
+  scopeName = "El Salvador",
 ): SemanticLine {
+  const totalActualRevenue = templates.reduce(
+    (sum, branch) => sum + branch.actualRevenue,
+    0,
+  );
+  const totalCostOfSale = templates.reduce(
+    (sum, branch) => sum + branch.costOfSale,
+    0,
+  );
+  const totalRevenueTarget = templates.reduce(
+    (sum, branch) => sum + branch.revenueTarget,
+    0,
+  );
   const labOperations = scaleOperations(
     {
       cancelledAppointments: 0,
-      completedAppointments: elSalvadorBranchResultTemplates.reduce(
+      completedAppointments: templates.reduce(
         (sum, branch) => sum + branch.rowCounts.salesRows,
         0,
       ),
       noShows: 0,
-      patientCount: elSalvadorBranchResultTemplates.reduce(
+      patientCount: templates.reduce(
         (sum, branch) => sum + branch.rowCounts.customerRows,
         0,
       ),
       rescheduledAppointments: 0,
-      scheduledAppointments: elSalvadorBranchResultTemplates.reduce(
+      scheduledAppointments: templates.reduce(
         (sum, branch) => sum + branch.rowCounts.salesRows,
         0,
       ),
-      serviceVolume: elSalvadorBranchResultTemplates.reduce(
+      serviceVolume: templates.reduce(
         (sum, branch) => sum + branch.rowCounts.customerRows,
         0,
       ),
@@ -1010,27 +1028,30 @@ function buildLaboratoryLineFromTemplates(
         { label: "Convenios", share: 0.15 },
         { label: "Domicilio", share: 0.08 },
       ],
-      collections: roundMoney(elSalvadorTemplateSummary.totalActualRevenue * 0.91),
-      directCost: roundMoney(elSalvadorTemplateSummary.totalCostOfSale),
-      grossBilling: roundMoney(elSalvadorTemplateSummary.totalActualRevenue),
+      collections: roundMoney(totalActualRevenue * 0.91),
+      directCost: roundMoney(totalCostOfSale),
+      grossBilling: roundMoney(totalActualRevenue),
       paymentShares: [
         { label: "Tarjeta", share: 0.44 },
         { label: "Efectivo", share: 0.33 },
         { label: "Transferencia", share: 0.13 },
         { label: "Pago mixto", share: 0.1 },
       ],
-      periodPrevious: 196400,
-      priorYear: 184900,
-      target: roundMoney(elSalvadorTemplateSummary.totalRevenueTarget),
+      periodPrevious: roundMoney(totalActualRevenue * 0.96),
+      priorYear: roundMoney(totalActualRevenue * 0.89),
+      target: roundMoney(totalRevenueTarget),
       tickets: labOperations.patientCount,
     }),
     scale,
     labOperations.patientCount,
   );
-  const qualityScore = Math.round(elSalvadorTemplateSummary.averageDataQuality);
+  const qualityScore = Math.round(
+    templates.reduce((sum, branch) => sum + branch.dataQualityScore, 0) /
+      Math.max(templates.length, 1),
+  );
   const issues = Array.from(
     new Set(
-      elSalvadorBranchResultTemplates.flatMap((branch) =>
+      templates.flatMap((branch) =>
         branch.validationFlags.slice(0, 1),
       ),
     ),
@@ -1048,7 +1069,7 @@ function buildLaboratoryLineFromTemplates(
     key: "laboratorio",
     managerName: "Gerencia operaciones Laboratorio",
     monthlyRevenue: makeMonthlyRevenue(labFinance.netBilling, scale),
-    occupancyByBranch: elSalvadorBranchResultTemplates.map((branch) => ({
+    occupancyByBranch: templates.map((branch) => ({
       label: branch.city,
       value: branch.dataQualityScore,
     })),
@@ -1065,10 +1086,14 @@ function buildLaboratoryLineFromTemplates(
       sourceConnected: true,
     }),
     qualityScore,
-    scopeName: "El Salvador",
+    scopeName,
     shortName: "Laboratorio",
-    sourceNote: "Plantillas SV DEMO",
+    sourceNote:
+      templates.length === elSalvadorBranchResultTemplates.length
+        ? "Plantillas SV DEMO"
+        : "Plantillas SV DEMO por area",
     sourceVersion: "sv-result-templates-2026-06",
+    sourceTemplates: templates,
     capacity: {
       availableUnits: scaleValue(45000, scale),
       cancellationRate: null,
@@ -1209,6 +1234,29 @@ function matchesTemplateBranch(
   );
 }
 
+function isBranchScopedContext(context: GlobalFilterContext) {
+  return !isAllFilterValue(context.branchId) || !isAllFilterValue(context.branchName);
+}
+
+function templateMatchesOperationalArea(
+  template: ElSalvadorBranchResultTemplate,
+  context: GlobalFilterContext,
+) {
+  if (context.operationalAreaId === allOperationalAreasValue) {
+    return true;
+  }
+
+  const areaText = normalizeFilterText(
+    `${context.operationalAreaId} ${context.operationalAreaName}`,
+  );
+  const areaManagerText = normalizeFilterText(template.areaManager);
+
+  return (
+    areaManagerText.length > 0 &&
+    (areaText.includes(areaManagerText) || areaManagerText.includes(areaText))
+  );
+}
+
 function hasUnsupportedGranularFilter(context: GlobalFilterContext) {
   return (
     context.professionalId !== allProfessionalsValue ||
@@ -1239,12 +1287,16 @@ function lineMatchesContext(line: SemanticLine, context: GlobalFilterContext) {
 function filterLinesForContext(
   lines: SemanticLine[],
   context: GlobalFilterContext,
+  options: { ignoreOperationalArea?: boolean } = {},
 ) {
   if (context.countryId !== "__regional__" && context.countryId !== countryElSalvadorId) {
     return [];
   }
 
-  if (context.operationalAreaId !== allOperationalAreasValue) {
+  if (
+    !options.ignoreOperationalArea &&
+    context.operationalAreaId !== allOperationalAreasValue
+  ) {
     const areaName = normalizeFilterText(context.operationalAreaName);
     lines = lines.filter((line) =>
       normalizeFilterText(line.scopeName).includes(areaName) ||
@@ -1266,7 +1318,7 @@ function buildLinesForContext(context: GlobalFilterContext) {
     return [];
   }
 
-  if (!isAllFilterValue(context.branchId) || !isAllFilterValue(context.branchName)) {
+  if (isBranchScopedContext(context)) {
     const template = elSalvadorBranchResultTemplates.find((branch) =>
       matchesTemplateBranch(branch, context),
     );
@@ -1275,10 +1327,32 @@ function buildLinesForContext(context: GlobalFilterContext) {
       return filterLinesForContext(
         [buildLaboratoryBranchLine(template, context, scale)],
         context,
+        { ignoreOperationalArea: true },
       );
     }
 
     return [];
+  }
+
+  if (context.operationalAreaId !== allOperationalAreasValue) {
+    const templates = elSalvadorBranchResultTemplates.filter((template) =>
+      templateMatchesOperationalArea(template, context),
+    );
+    const areaLines =
+      templates.length > 0
+        ? [
+            buildLaboratoryLineFromTemplates(
+              context,
+              scale,
+              templates,
+              context.operationalAreaName,
+            ),
+          ]
+        : [];
+
+    return filterLinesForContext(areaLines, context, {
+      ignoreOperationalArea: true,
+    });
   }
 
   return filterLinesForContext(buildBaseLineFacts(context, scale), context);
@@ -1415,21 +1489,29 @@ function enrichExecutiveBranchRows(rows: ExecutiveBranchRow[]) {
 function buildBranchRows(lines: SemanticLine[]): ExecutiveBranchRow[] {
   const rows = lines.flatMap((line) => {
     if (line.key === "laboratorio" && line.branchId === allBranchesValue) {
-      return elSalvadorBranchResultTemplates.map((branch) => ({
-        alert:
-          branch.dataQualityScore < 70
-            ? insufficientExecutiveDataMessage
-            : branch.validationFlags[0] ?? "Plantilla DEMO conciliada.",
-        branch: branch.branchName,
-        company: line.companyName,
-        contributionMarginRate: branch.marginRate,
-        effectiveOccupancy: branch.dataQualityScore / 100,
-        manager: branch.manager,
-        qualityLevel: qualityLevelFromScore(branch.dataQualityScore),
-        qualityScore: branch.dataQualityScore,
-        revenue: branch.actualRevenue,
-        targetFulfillment: safeDivide(branch.actualRevenue, branch.revenueTarget),
-      }));
+      const scale = getPeriodScaleForDates(line.periodStart, line.periodEnd) ?? 1;
+      const templates = line.sourceTemplates ?? elSalvadorBranchResultTemplates;
+
+      return templates.map((branch) => {
+        const revenue = scaleValue(branch.actualRevenue, scale);
+        const target = scaleValue(branch.revenueTarget, scale);
+
+        return {
+          alert:
+            branch.dataQualityScore < 70
+              ? insufficientExecutiveDataMessage
+              : branch.validationFlags[0] ?? "Plantilla DEMO conciliada.",
+          branch: branch.branchName,
+          company: line.companyName,
+          contributionMarginRate: branch.marginRate,
+          effectiveOccupancy: branch.dataQualityScore / 100,
+          manager: branch.manager,
+          qualityLevel: qualityLevelFromScore(branch.dataQualityScore),
+          qualityScore: branch.dataQualityScore,
+          revenue,
+          targetFulfillment: safeDivide(revenue, target),
+        };
+      });
     }
 
     return [

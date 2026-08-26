@@ -126,6 +126,32 @@ const labBranchHalfMonth = getExecutiveBiSnapshot({
   periodEnd: "2026-07-15",
   periodStart: "2026-07-01",
 });
+const labAllHalfMonth = getExecutiveBiSnapshot({
+  branchId: allBranchesValue,
+  businessLineId: labLine,
+  companyId: labCompany,
+  countryId: countryElSalvador,
+  periodEnd: "2026-07-15",
+  periodStart: "2026-07-01",
+});
+const managedBranchWithLoadedResults = getExecutiveBiSnapshot({
+  branchId: "managed-sv-laboratory-ss-santa-tecla-l011",
+  businessLineId: labLine,
+  companyId: labCompany,
+  countryId: countryElSalvador,
+  periodEnd: "2026-07-31",
+  periodStart: "2026-07-01",
+});
+const loadedLaboratoryArea = getExecutiveBiSnapshot({
+  branchId: allBranchesValue,
+  businessLineId: labLine,
+  companyId: labCompany,
+  countryId: countryElSalvador,
+  operationalAreaId:
+    "managed-area-sv-laboratory-centro-ana-maria-rivera-monroy",
+  periodEnd: "2026-07-31",
+  periodStart: "2026-07-01",
+});
 const escalonWithoutLoadedResults = getExecutiveBiSnapshot({
   branchId: "managed-sv-laboratory-ss-escalon-l001",
   businessLineId: labLine,
@@ -143,6 +169,30 @@ assert.ok(
   labBranchHalfMonth.lines[0].finance.netBilling <
     labBranch.lines[0].finance.netBilling,
   "Date range must recalculate BI facts.",
+);
+assert.ok(
+  labAllHalfMonth.branchRows[0].revenue < labAll.branchRows[0].revenue,
+  "Date range must recalculate executive branch rows.",
+);
+assert.equal(managedBranchWithLoadedResults.lines.length, 1);
+assert.equal(
+  managedBranchWithLoadedResults.lines[0].branchName,
+  "SS - Santa Tecla - L011",
+);
+assert.ok(
+  managedBranchWithLoadedResults.lines[0].finance.netBilling <
+    labAll.lines[0].finance.netBilling,
+  "Managed branch filters must resolve loaded laboratory templates.",
+);
+assert.equal(loadedLaboratoryArea.lines.length, 1);
+assert.equal(
+  loadedLaboratoryArea.lines[0].scopeName,
+  "Centro - Ana Maria Rivera Monroy",
+);
+assert.ok(
+  loadedLaboratoryArea.branchRows.length > 0 &&
+    loadedLaboratoryArea.branchRows.length <= labAll.branchRows.length,
+  "Loaded area filters must keep only matching laboratory branch rows.",
 );
 assert.equal(escalonWithoutLoadedResults.lines.length, 0);
 assert.equal(escalonWithoutLoadedResults.noDataReason, semanticMessages.noData);
