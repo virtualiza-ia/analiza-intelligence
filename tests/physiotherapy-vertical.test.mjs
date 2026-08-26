@@ -433,6 +433,23 @@ assert.deepEqual(
   "Branch manager navigation must keep one branch report and avoid duplicated goals/insights tabs.",
 );
 
+for (const verticalDashboard of [
+  readWorkspaceFile("components/physiotherapy-vertical-dashboard.tsx"),
+  readWorkspaceFile("components/laboratory-vertical-dashboard.tsx"),
+  readWorkspaceFile("components/imaging-vertical-dashboard.tsx"),
+]) {
+  assert.ok(
+    verticalDashboard.includes('const showTargets = mode === "targets";'),
+    "Branch home must not render the full targets block as a duplicated section.",
+  );
+  assert.ok(
+    verticalDashboard.includes(
+      'const showInsights = mode === "insights" || mode === "overview";',
+    ),
+    "Branch home must not render the full insights block as a duplicated section.",
+  );
+}
+
 const loginForm = readWorkspaceFile("components/login-form.tsx");
 const sidebar = readWorkspaceFile("components/app-sidebar.tsx");
 assert.ok(

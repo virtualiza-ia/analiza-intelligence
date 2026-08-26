@@ -1383,8 +1383,8 @@ export function ImagingVerticalDashboard({
   const showHome = mode === "branch-home";
   const showResults = ["branch-home", "results", "operations", "overview"].includes(mode);
   const showHistory = ["history", "branch-home"].includes(mode);
-  const showTargets = mode === "targets" || showHome;
-  const showInsights = mode === "insights" || showHome || mode === "overview";
+  const showTargets = mode === "targets";
+  const showInsights = mode === "insights" || mode === "overview";
   const wizardProgress = Math.round(
     ((activeStep + 1) / wizardSteps.length) * 100,
   );
