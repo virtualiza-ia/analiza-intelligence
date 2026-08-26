@@ -3,23 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  BarChart3,
-  Bot,
-  CheckCircle2,
-  ClipboardCheck,
-  FileSpreadsheet,
+  ClipboardList,
   Lightbulb,
-  ShieldCheck,
-  UploadCloud,
-  Wand2,
+  SearchCheck,
+  TrendingUp,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  analiaQualitySuggestions,
-  type AnaliaQualitySuggestion,
-} from "@/lib/analytics/business-control-center";
 import { useActiveBusinessLine } from "@/hooks/use-active-business-line";
 import {
   globalContextChangeEvent as contextChangeEvent,
@@ -27,7 +17,6 @@ import {
 } from "@/lib/analytics/global-filters";
 import {
   getExecutiveBiSnapshot,
-  getQualityLevelFromScore,
   semanticMessages,
   type DataQualityRuleResult,
 } from "@/lib/analytics/semantic-bi";
@@ -55,6 +44,19 @@ type StoredContext = {
   serviceId?: string;
 };
 
+type ReviewFinding = {
+  detail: string;
+  severity: "Alta" | "Media" | "Baja";
+  source: string;
+  title: string;
+};
+
+type CollectionSuggestion = {
+  benefit: string;
+  collect: string;
+  title: string;
+};
+
 function readStoredContext() {
   const rawContext =
     window.localStorage.getItem(storageKey) ??
@@ -73,169 +75,106 @@ function readStoredContext() {
   }
 }
 
-function priorityClass(priority: AnaliaQualitySuggestion["priority"]) {
-  if (priority === "Alta") {
-    return "bg-red-100 text-red-800 hover:bg-red-100";
-  }
-
-  if (priority === "Media") {
-    return "bg-amber-100 text-amber-800 hover:bg-amber-100";
-  }
-
-  return "bg-emerald-100 text-emerald-800 hover:bg-emerald-100";
-}
-
-function ProgressBar({ value }: { value: number }) {
-  return (
-    <div className="h-2 rounded-full bg-muted">
-      <div
-        className="h-2 rounded-full bg-primary"
-        style={{ width: `${Math.max(6, Math.min(value, 100))}%` }}
-      />
-    </div>
-  );
-}
-
-function qualityRuleClass(rule: DataQualityRuleResult) {
-  if (rule.severity === "critical" || !rule.passed) {
+function severityClass(severity: ReviewFinding["severity"]) {
+  if (severity === "Alta") {
     return "border-red-200 bg-red-50 text-red-900";
   }
 
-  if (rule.severity === "warning") {
+  if (severity === "Media") {
     return "border-amber-200 bg-amber-50 text-amber-900";
   }
 
-  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  return "border-sky-200 bg-sky-50 text-sky-900";
 }
 
-function QualityRuleGrid({ rules }: { rules: DataQualityRuleResult[] }) {
-  return (
-    <section className="rounded-md border bg-card p-4">
-      <div className="mb-4 flex items-center gap-2 text-sm font-medium">
-        <ShieldCheck className="size-4 text-primary" />
-        Reglas de calidad del filtro activo
-      </div>
-      <div className="grid gap-3 md:grid-cols-5">
-        {rules.map((rule) => (
-          <article
-            className={cn("rounded-md border p-3 text-sm", qualityRuleClass(rule))}
-            key={rule.dimension}
-          >
-            <div className="font-semibold">{rule.label}</div>
-            <p className="mt-2 text-xs leading-5">{rule.message}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
+function ruleSeverity(rule: DataQualityRuleResult): ReviewFinding["severity"] {
+  if (rule.severity === "critical" || !rule.passed) {
+    return "Alta";
+  }
+
+  if (rule.severity === "warning") {
+    return "Media";
+  }
+
+  return "Baja";
 }
 
-const qualityEvidenceRequirements = [
-  {
-    id: "closing-source",
-    title: "Fuente del cierre activo",
-    description:
-      "Archivo o carga que contiene venta, costo, volumen, sucursal, periodo y responsable.",
-    owner: "Gerencia de operaciones",
-  },
-  {
-    id: "branch-catalog",
-    title: "Catalogo de sucursales",
-    description:
-      "Codigo, pais, linea, area, gerente asignado y estado vigente de cada sucursal.",
-    owner: "Operaciones / Administracion",
-  },
-  {
-    id: "correction-evidence",
-    title: "Evidencia de correccion",
-    description:
-      "Soporte de valores corregidos, responsable de aprobacion y motivo del cambio.",
-    owner: "Operaciones / Auditoria",
-  },
-];
+function buildRuleFindings(rules: DataQualityRuleResult[]) {
+  return rules
+    .filter((rule) => !rule.passed)
+    .slice(0, 5)
+    .map(
+      (rule): ReviewFinding => ({
+        detail: rule.message,
+        severity: ruleSeverity(rule),
+        source: "Regla automatica",
+        title: rule.label,
+      }),
+    );
+}
 
-const automaticQualityAlerts = [
+const defaultFindings: ReviewFinding[] = [
   {
-    title: "Monto sospechoso",
-    reason:
-      "Se compara contra periodo, sucursal, volumen y costo directo antes de permitir conclusiones.",
+    detail:
+      "Revisar ventas o costos que suben mucho contra lo habitual de la misma sucursal y periodo.",
+    severity: "Media",
+    source: "Comparacion mensual",
+    title: "Monto demasiado alto o bajo",
   },
   {
+    detail:
+      "Confirmar cuando el archivo trae una sucursal, linea de negocio o mes diferente al filtro seleccionado.",
+    severity: "Alta",
+    source: "Importaciones",
     title: "Sucursal o periodo no cuadran",
-    reason:
-      "Si el archivo dice un mes y la hoja interna trae otro, queda en alerta hasta que alguien lo corrija o lo autorice.",
   },
   {
-    title: "Archivo comercial faltante",
-    reason:
-      "Si falta una fuente obligatoria, el KPI queda pendiente y no se reemplaza por cero.",
+    detail:
+      "Buscar ordenes, pacientes, perfiles o estudios repetidos antes de alimentar resultados.",
+    severity: "Media",
+    source: "Validacion de duplicados",
+    title: "Registros duplicados",
   },
   {
-    title: "Duplicado o salto fuera de rango",
-    reason:
-      "El agente revisa duplicados, cambios bruscos contra el mes anterior y valores imposibles antes de alimentar dashboards.",
+    detail:
+      "No completar con cero si falta costo, capacidad, produccion o trazabilidad del archivo.",
+    severity: "Alta",
+    source: "Campos obligatorios",
+    title: "Datos incompletos",
   },
 ];
 
-function QualityGatePanel({
-  blockingRuleCount,
-  warningRuleCount,
-}: {
-  blockingRuleCount: number;
-  warningRuleCount: number;
-}) {
-  const isBlocked = blockingRuleCount > 0;
-
-  return (
-    <section
-      className={cn(
-        "rounded-md border p-4 text-sm",
-        isBlocked
-          ? "border-red-200 bg-red-50 text-red-900"
-          : "border-emerald-200 bg-emerald-50 text-emerald-900",
-      )}
-    >
-      <div className="mb-2 flex items-center gap-2 font-semibold">
-        {isBlocked ? (
-          <AlertTriangle className="size-4" />
-        ) : (
-          <CheckCircle2 className="size-4" />
-        )}
-        Decision de calidad del cierre activo
-      </div>
-      <p className="leading-6">
-        {isBlocked
-          ? `No publicar ni usar insights concluyentes: hay ${blockingRuleCount} regla(s) criticas y ${warningRuleCount} advertencia(s) por resolver.`
-          : `Dato utilizable para lectura operativa: no hay reglas criticas abiertas y quedan ${warningRuleCount} advertencia(s) para seguimiento.`}
-      </p>
-    </section>
-  );
-}
+const collectionSuggestions: CollectionSuggestion[] = [
+  {
+    benefit: "Mejorar margen real y detectar costos que explican baja utilidad.",
+    collect: "Costo directo por prueba, sesion o estudio.",
+    title: "Costo por servicio",
+  },
+  {
+    benefit: "Medir ocupacion real y saber si una sucursal puede recibir mas demanda.",
+    collect: "Capacidad disponible, capacidad usada y horas perdidas.",
+    title: "Capacidad por sucursal",
+  },
+  {
+    benefit: "Separar baja venta por falta de demanda, no-show o problema de agenda.",
+    collect: "Cancelaciones, no-show y tiempos de espera.",
+    title: "Agenda y asistencia",
+  },
+  {
+    benefit: "Detectar problemas de calidad tecnica antes de que afecten costos o bonos.",
+    collect: "Reprocesos, rechazos, repeticiones y motivos.",
+    title: "Errores operativos",
+  },
+  {
+    benefit: "Comparar desempeno por gerente sin mezclar sucursales ni periodos.",
+    collect: "Gerente responsable, area, sucursal y fecha de vigencia.",
+    title: "Responsables vigentes",
+  },
+];
 
 export function DataQualityAnaliaDashboard() {
   const activeBusinessLine = useActiveBusinessLine();
   const [context, setContext] = useState<StoredContext | null>(null);
-  const [createdTaskIds, setCreatedTaskIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [uploadedFiles, setUploadedFiles] = useState<Record<string, string>>({});
-  const visibleSuggestions = useMemo(
-    () =>
-      activeBusinessLine.isConsolidated
-        ? analiaQualitySuggestions
-        : analiaQualitySuggestions.filter(
-            (suggestion) =>
-              suggestion.line === activeBusinessLine.line ||
-              suggestion.line === "Consolidado",
-          ),
-    [activeBusinessLine.isConsolidated, activeBusinessLine.line],
-  );
-  const pendingSuggestions = visibleSuggestions.filter(
-    (suggestion) => !createdTaskIds.has(suggestion.id),
-  );
-  const createdTaskCount = visibleSuggestions.filter((suggestion) =>
-    createdTaskIds.has(suggestion.id),
-  ).length;
   const qualitySnapshot = useMemo(
     () =>
       getExecutiveBiSnapshot({
@@ -261,52 +200,21 @@ export function DataQualityAnaliaDashboard() {
       }),
     [context],
   );
-  const baseQualityScore =
-    qualitySnapshot.lines.length > 0
-      ? Math.round(
-          qualitySnapshot.lines.reduce(
-            (sum, line) => sum + line.qualityScore,
-            0,
-          ) / qualitySnapshot.lines.length,
-        )
-      : 0;
-  const qualityScore = baseQualityScore;
-  const qualityLevel = getQualityLevelFromScore(qualityScore);
   const qualityRules = useMemo(() => {
     if (qualitySnapshot.lines.length === 0) {
       return [
         {
           dimension: "completeness",
-          label: "Completitud",
+          label: "Datos faltantes",
           message: qualitySnapshot.noDataReason ?? semanticMessages.noData,
           passed: false,
           severity: "critical",
         },
         {
-          dimension: "validity",
-          label: "Validez",
-          message: semanticMessages.notCalculable,
-          passed: false,
-          severity: "critical",
-        },
-        {
           dimension: "consistency",
-          label: "Consistencia",
-          message: semanticMessages.insufficientExecutiveData,
-          passed: false,
-          severity: "critical",
-        },
-        {
-          dimension: "uniqueness",
-          label: "Unicidad",
-          message: "Duplicados no evaluables sin fuente cargada.",
-          passed: false,
-          severity: "warning",
-        },
-        {
-          dimension: "timeliness",
-          label: "Oportunidad",
-          message: "Periodo sin fuente disponible.",
+          label: "Informacion sin comparar",
+          message:
+            "No hay fuente suficiente para comparar contra el comportamiento habitual.",
           passed: false,
           severity: "warning",
         },
@@ -315,12 +223,18 @@ export function DataQualityAnaliaDashboard() {
 
     return qualitySnapshot.lines.flatMap((line) => line.qualityRules);
   }, [qualitySnapshot]);
-  const blockingRuleCount = qualityRules.filter(
-    (rule) => !rule.passed && rule.severity === "critical",
-  ).length;
-  const warningRuleCount = qualityRules.filter(
-    (rule) => !rule.passed && rule.severity === "warning",
-  ).length;
+  const ruleFindings = buildRuleFindings(qualityRules);
+  const visibleFindings =
+    ruleFindings.length > 0
+      ? [...ruleFindings, ...defaultFindings].slice(0, 6)
+      : defaultFindings;
+  const selectedScope = [
+    qualitySnapshot.context.countryName,
+    qualitySnapshot.context.companyName,
+    qualitySnapshot.context.branchName,
+  ]
+    .filter(Boolean)
+    .join(" / ");
 
   useEffect(() => {
     function refreshContext() {
@@ -337,45 +251,26 @@ export function DataQualityAnaliaDashboard() {
     };
   }, []);
 
-  function createQualityTask(id: string) {
-    setCreatedTaskIds((current) => {
-      const next = new Set(current);
-      next.add(id);
-      return next;
-    });
-  }
-
-  function registerUploadedFile(id: string, fileName: string) {
-    setUploadedFiles((current) => ({
-      ...current,
-      [id]: fileName,
-    }));
-  }
-
   return (
     <section className="flex w-full min-w-0 flex-col gap-6 px-4 py-6 lg:px-6">
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="grid gap-3">
           <div className="flex flex-wrap gap-2">
-            <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
-              Entorno DEMO
-            </Badge>
-            <Badge variant="outline">Reglas del cierre activo</Badge>
             <Badge variant="outline">Filtro: {activeBusinessLine.line}</Badge>
+            <Badge variant="outline">Lectura para todos los roles</Badge>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-md border bg-card">
-              <Bot className="size-5 text-primary" />
+              <SearchCheck className="size-5 text-primary" />
             </div>
             <div>
               <h1 className="text-3xl font-semibold tracking-normal">
-                Calidad de datos por AnaliA
+                Calidad de datos
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                AnaliA revisa completitud, validez, consistencia,
-                duplicados, oportunidad y trazabilidad para decidir si un
-                cierre puede alimentar KPIs, metas e insights sin inventar datos
-                ni conclusiones.
+                Esta seccion muestra datos que el sistema sugiere revisar:
+                valores que no cuadran, faltantes, duplicados o montos demasiado
+                exagerados para lo habitual.
               </p>
             </div>
           </div>
@@ -383,249 +278,73 @@ export function DataQualityAnaliaDashboard() {
 
         <aside className="rounded-md border bg-card p-4 text-sm">
           <div className="mb-2 flex items-center gap-2 font-medium">
-            <ShieldCheck className="size-4 text-primary" />
-            Semaforo de calidad del cierre activo
+            <ClipboardList className="size-4 text-primary" />
+            Alcance revisado
           </div>
-          <div className="text-3xl font-semibold">{qualityScore}%</div>
-          <Badge
-            className={cn(
-              "mt-2 w-fit",
-              qualityLevel === "Confiable" &&
-                "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
-              qualityLevel === "Revisar" &&
-                "bg-amber-100 text-amber-800 hover:bg-amber-100",
-              qualityLevel === "Insuficiente" &&
-                "bg-red-100 text-red-800 hover:bg-red-100",
-            )}
-          >
-            {qualityLevel}
-          </Badge>
-          <ProgressBar value={qualityScore} />
-          <p className="mt-2 leading-6 text-muted-foreground">
-            Pais {qualitySnapshot.context.countryName}, empresa{" "}
-            {qualitySnapshot.context.companyName}, sucursal{" "}
-            {qualitySnapshot.context.branchName}. El puntaje sale de reglas
-            calculadas; crear tareas no cambia el dato.
+          <p className="leading-6 text-muted-foreground">
+            {selectedScope || "Filtro consolidado"}. El sistema no corrige el
+            dato solo; senala lo que conviene confirmar antes de publicar o
+            usar en decisiones.
           </p>
         </aside>
       </div>
 
-      <section className="grid gap-3 md:grid-cols-4">
-        {[
-          {
-            icon: FileSpreadsheet,
-            label: "Plantillas",
-            value: `${visibleSuggestions.filter((item) => item.target === "Plantilla de resultados").length} fuentes`,
-          },
-          {
-            icon: BarChart3,
-            label: "Reglas bloqueantes",
-            value: `${blockingRuleCount}`,
-          },
-          { icon: ClipboardCheck, label: "Tareas creadas", value: `${createdTaskCount}` },
-          { icon: Lightbulb, label: "Acciones pendientes", value: `${pendingSuggestions.length}` },
-        ].map((metric) => {
-          const Icon = metric.icon;
-
-          return (
-            <article className="rounded-md border bg-card p-4" key={metric.label}>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Icon className="size-4 text-primary" />
-                {metric.label}
-              </div>
-              <div className="mt-2 text-2xl font-semibold">{metric.value}</div>
-            </article>
-          );
-        })}
-      </section>
-
-      <QualityRuleGrid rules={qualityRules} />
-
-      <QualityGatePanel
-        blockingRuleCount={blockingRuleCount}
-        warningRuleCount={warningRuleCount}
-      />
-
-      <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
-        <div className="rounded-md border bg-card p-4">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <UploadCloud className="size-4 text-primary" />
-                Evidencia requerida para cerrar calidad
-              </div>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                La calidad no es un formulario de opinion. Se alimenta con
-                fuentes, catalogos y evidencia de correccion que expliquen cada
-                cambio antes de publicar.
-              </p>
-            </div>
-            <Badge variant="outline">Control por sucursal</Badge>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {qualityEvidenceRequirements.map((requirement) => (
-              <label
-                className="grid gap-3 rounded-md border bg-background p-3 text-sm"
-                key={requirement.id}
-              >
-                <span className="flex items-center gap-2 font-semibold">
-                  <FileSpreadsheet className="size-4 text-primary" />
-                  {requirement.title}
-                </span>
-                <span className="min-h-14 text-xs leading-5 text-muted-foreground">
-                  {requirement.description}
-                </span>
-                <input
-                  accept=".xlsx,.xls,.csv"
-                  className="block w-full cursor-pointer rounded-md border bg-card text-xs file:mr-3 file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-medium file:text-primary-foreground"
-                  onChange={(event) =>
-                    registerUploadedFile(
-                      requirement.id,
-                      event.target.files?.[0]?.name ?? "",
-                    )
-                  }
-                  type="file"
-                />
-                <span className="text-xs text-muted-foreground">
-                  {uploadedFiles[requirement.id]
-                    ? `Listo: ${uploadedFiles[requirement.id]}`
-                    : `Responsable: ${requirement.owner}`}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <aside className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <div className="mb-3 flex items-center gap-2 font-medium">
-            <AlertTriangle className="size-4" />
-            Regla de calidad automatica
-          </div>
-          <p className="leading-6">
-            Si AnaliA detecta un monto sospechoso, no debe esconderlo ni
-            aprobarlo sola: muestra la razon, bloquea conclusiones fuertes y
-            pide validacion humana con trazabilidad.
-          </p>
-        </aside>
-      </section>
-
       <section className="rounded-md border bg-card p-4">
-        <div className="mb-4 flex items-center gap-2 text-sm font-medium">
-          <ShieldCheck className="size-4 text-primary" />
-          Alertas automaticas que AnaliA revisa
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <AlertTriangle className="size-4 text-primary" />
+              Datos que el sistema sugiere revisar
+            </div>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+              Prioriza lo que puede afectar KPIs, bonos, cierres o lectura de
+              gerencia.
+            </p>
+          </div>
+          <Badge variant="outline">{visibleFindings.length} senales</Badge>
         </div>
-        <div className="grid gap-3 md:grid-cols-4">
-          {automaticQualityAlerts.map((alert) => (
-            <article className="rounded-md border bg-background p-3" key={alert.title}>
-              <div className="text-sm font-semibold">{alert.title}</div>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                {alert.reason}
-              </p>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {visibleFindings.map((finding) => (
+            <article
+              className={cn("rounded-md border p-4", severityClass(finding.severity))}
+              key={`${finding.title}-${finding.source}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold">{finding.title}</h2>
+                <Badge variant="secondary">{finding.severity}</Badge>
+              </div>
+              <p className="mt-3 text-sm leading-6">{finding.detail}</p>
+              <p className="mt-3 text-xs opacity-80">Fuente: {finding.source}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
-        <div className="grid gap-3">
-          {visibleSuggestions.map((suggestion) => {
-            const taskCreated = createdTaskIds.has(suggestion.id);
-
-            return (
-              <article
-                className={cn(
-                  "rounded-md border bg-card p-4",
-                  taskCreated && "border-emerald-200 bg-emerald-50",
-                )}
-                key={suggestion.id}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge className={priorityClass(suggestion.priority)}>
-                        {suggestion.priority}
-                      </Badge>
-                      <Badge variant="outline">{suggestion.line}</Badge>
-                      <Badge variant="outline">{suggestion.target}</Badge>
-                    </div>
-                    <h2 className="mt-3 text-lg font-semibold">
-                      {suggestion.module}: {suggestion.issue}
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {suggestion.suggestedChange}
-                    </p>
-                  </div>
-                  <Button
-                    disabled={taskCreated}
-                    onClick={() => createQualityTask(suggestion.id)}
-                    type="button"
-                  >
-                    <Wand2 className="size-4" />
-                    {taskCreated ? "Tarea creada" : "Crear tarea"}
-                  </Button>
-                </div>
-
-                <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
-                  <div className="rounded-md border bg-background p-3">
-                    <div className="font-medium">Impacto esperado</div>
-                    <p className="mt-1 text-muted-foreground">
-                      {suggestion.expectedImpact}
-                    </p>
-                  </div>
-                  <div className="rounded-md border bg-background p-3">
-                    <div className="font-medium">Vistas afectadas</div>
-                    <p className="mt-1 text-muted-foreground">
-                      {suggestion.affectedDashboards.join(", ")}
-                    </p>
-                  </div>
-                  <div className="rounded-md border bg-background p-3">
-                    <div className="font-medium">Trazabilidad</div>
-                    <p className="mt-1 text-muted-foreground">
-                      {suggestion.sourceTrace}
-                    </p>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+      <section className="rounded-md border bg-card p-4">
+        <div className="mb-4 flex items-center gap-2 text-sm font-medium">
+          <Lightbulb className="size-4 text-primary" />
+          Datos que podríamos recopilar
         </div>
-
-        <aside className="grid gap-3">
-          <div className="rounded-md border bg-card p-4">
-            <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-              <Lightbulb className="size-4 text-primary" />
-              Insights para mejorar lectura
-            </div>
-            <div className="grid gap-3 text-sm leading-6 text-muted-foreground">
-              <p>
-                En plantillas de resultados, separar venta, costo directo,
-                gasto operativo y utilidad para que Finanzas no duplique
-                informacion de Operacion.
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {collectionSuggestions.map((suggestion) => (
+            <article
+              className="rounded-md border bg-background p-4"
+              key={suggestion.title}
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <TrendingUp className="size-4 text-primary" />
+                {suggestion.title}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                Recopilar: {suggestion.collect}
               </p>
-              <p>
-                En dashboards operativos, mostrar primero grafica, meta y
-                brecha; dejar texto largo solo como detalle expandible.
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                Obtener: {suggestion.benefit}
               </p>
-              <p>
-                En Salud financiera, bloquear conclusiones si faltan costos
-                variables, costos fijos o trazabilidad de sucursal.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-md border bg-card p-4">
-            <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-              <CheckCircle2 className="size-4 text-primary" />
-              Lo que hace el boton Crear tarea
-            </div>
-            <p className="text-sm leading-6 text-muted-foreground">
-              En DEMO marca que operaciones abrio una tarea. En produccion debe
-              crear una tarea auditada para modificar plantilla, fuente o
-              dashboard con aprobacion humana; el score solo cambia cuando el
-              dato corregido vuelva a pasar reglas.
-            </p>
-          </div>
-        </aside>
+            </article>
+          ))}
+        </div>
       </section>
     </section>
   );

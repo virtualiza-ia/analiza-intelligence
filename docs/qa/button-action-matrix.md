@@ -45,7 +45,7 @@ Estado de cierre:
 | Usuarios y permisos `/protected/usuarios-permisos` | CEO, Operaciones | Alta de sucursal | Crea sucursal por pais, linea y area opcional; nace pendiente de gerente y queda bloqueada para datos hasta aceptar gerente de sucursal | Cubierto por tests de delegacion, invitaciones, upload y build | PASS | - |
 | Importaciones `/protected/importaciones` | Roles autorizados | Descargar plantilla, subir, validar, publicar, rollback, reemplazar, lineage, fallback | Respeta permisos y audita flujo sin mezclar produccion | Cubierto por ingestion/connectors tests | PASS | - |
 | Conectores `/protected/conectores` | Admin | Test, sync, copiar endpoint | Ejecuta server-side sin secretos frontend | Cubierto por connector tests/build | PASS | - |
-| Calidad datos `/protected/calidad-datos` | Operaciones/admin | Aplicar sugerencia | Mantiene trazabilidad y alcance | Cubierto por data-quality tests existentes | PASS | - |
+| Calidad datos `/protected/calidad-datos` | Todos los roles con acceso | Revisar alertas y sugerencias | Muestra datos que no cuadran, datos exagerados y campos utiles por recopilar | Cubierto por data-quality tests existentes | PASS | - |
 | Mi cuenta `/protected/configuracion` | Todos | Guardar perfil | Actualiza perfil si editable; demo bloquea edicion sensible | Cubierto por executive readiness tests | PASS | - |
 | Logout | Todos | Salir desde sidebar/rutas | Cierra sesion y `/protected` vuelve a exigir auth | Cubierto por RBAC/security tests | PASS | - |
 | Browser | Todos | Back/forward/refresh | Mantiene contexto o rehidrata desde URL/storage sin datos pegados | Validado en smoke visual principal y filtros | PASS | - |

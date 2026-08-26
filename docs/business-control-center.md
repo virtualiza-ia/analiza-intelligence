@@ -19,21 +19,21 @@ Cada plan de conector define:
 - pasos de conexion;
 - documentos masivos alternativos cuando no exista API viable.
 
-## Calidad de datos por AnaliA
+## Calidad de datos
 
-AnaliA revisa plantillas, fuentes, reglas de cierre y dashboards para decidir si el dato puede alimentar KPIs, metas e insights. El score no sube por hacer clic en una accion; solo cambia cuando el dato corregido vuelve a pasar reglas.
+La pantalla de Calidad de datos es una lectura simple para todos los roles. Muestra `Datos que el sistema sugiere revisar`: valores que no cuadran, datos faltantes, duplicados o montos demasiado altos o bajos contra lo habitual.
 
-Las recomendaciones se filtran por la linea activa del encabezado. Cuando una mejora afecta el modelo consolidado, puede aparecer junto a la linea seleccionada porque protege trazabilidad, aprobacion o lectura ejecutiva comun.
+La revision se filtra por la linea activa del encabezado y por el alcance seleccionado. El sistema no corrige el dato automaticamente; solo senala lo que conviene confirmar antes de publicar KPIs, bonos, cierres o informes de gerencia.
 
-En produccion, `Crear tarea` debe crear una tarea auditada antes de modificar plantillas, fuentes, modelos o dashboards. Ninguna recomendacion puede convertir datos incompletos en conclusiones finales.
+La misma pantalla incluye `Datos que podríamos recopilar`, una lista corta de campos utiles y el beneficio esperado de capturarlos, por ejemplo costos por servicio, capacidad por sucursal, agenda, errores operativos y responsables vigentes.
 
 La pantalla debe mostrar:
 
-- reglas evaluadas: completitud, validez, consistencia, unicidad, oportunidad y trazabilidad;
-- decision de calidad del cierre activo;
-- evidencia requerida para cerrar calidad;
-- tareas creadas para corregir fuentes o modelos;
-- bloqueo de insights cuando falten costos, capacidad, responsables o fuente trazable.
+- datos que el sistema sugiere revisar;
+- severidad alta, media o baja;
+- fuente de la alerta;
+- sugerencias sencillas de datos adicionales que podrian recopilarse;
+- lo que se obtendria al recopilar esos datos.
 
 ## Metas, avances, bonos y ROI
 

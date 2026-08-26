@@ -346,7 +346,8 @@ for (const requiredText of [
 
 assert.ok(financialDashboard.includes("Margen contribucion"));
 assert.ok(capacityDashboard.includes("CapacityNoDataState"));
-assert.ok(dataQualityDashboard.includes("Reglas de calidad del filtro activo"));
+assert.ok(dataQualityDashboard.includes("Datos que el sistema sugiere revisar"));
+assert.ok(dataQualityDashboard.includes("Datos que podríamos recopilar"));
 assert.ok(branchNetworkDashboard.includes('useState<SortKey>("normalizedPerformanceScore")'));
 assert.ok(branchNetworkDashboard.includes("Puntaje comparable"));
 assert.ok(branchNetworkDashboard.includes("Base comparable"));
