@@ -318,6 +318,32 @@ assert.equal(
   "CEO must access governed branch and user creation.",
 );
 
+for (const branchManagerAllowedPath of [
+  "/protected/mi-sucursal",
+  "/protected/importaciones",
+  "/protected/cierres",
+  "/protected/resultados",
+  "/protected/configuracion",
+]) {
+  assert.equal(
+    canAccessProtectedPath(branchManager, branchManagerAllowedPath),
+    true,
+    `Branch manager must access ${branchManagerAllowedPath}.`,
+  );
+}
+
+for (const duplicateBranchManagerPath of [
+  "/protected/gerentes",
+  "/protected/metas",
+  "/protected/insights",
+]) {
+  assert.equal(
+    canAccessProtectedPath(branchManager, duplicateBranchManagerPath),
+    false,
+    `Branch manager must use /protected/mi-sucursal instead of ${duplicateBranchManagerPath}.`,
+  );
+}
+
 for (const sensitiveAction of [
   "imports.upload",
   "imports.publish",

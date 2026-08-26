@@ -21,7 +21,7 @@ Official Analiza roles:
 - `ceo`: reads the executive BI view for Analiza and all assigned business lines, countries, and branches; may invite lower roles inside its delegated scope.
 - `gerente_operaciones`: creates operational areas, creates branches, assigns branches to areas, assigns area managers, captures branch capacity, imports operational data, and monitors all branches in scope through the unified operational report.
 - `gerente_area`: creates or assigns branch managers only within assigned operational areas, supervises a branch group, validates monthly discipline, and compares branch manager performance.
-- `gerente_sucursal`: registers the assigned branch monthly close through the controlled form and reads branch results.
+- `gerente_sucursal`: registers the assigned branch monthly close through the controlled form and reads branch results, goals, progress, insights and evidence from `/protected/mi-sucursal` instead of separate goal, insight or bonus modules.
 - `usuario_operativo`: loads or corrects operational data without managerial privileges when delegated.
 - `viewer`: reads only authorized dashboards and records.
 

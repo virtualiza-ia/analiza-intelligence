@@ -112,13 +112,17 @@ for (const requiredRole of [
   '"ceo"',
   '"gerente_operaciones"',
   '"gerente_area"',
-  '"gerente_sucursal"',
 ]) {
   assert.ok(
     managerBonusNavigation.includes(requiredRole),
     `Manager bonus navigation is missing read access for ${requiredRole}.`,
   );
 }
+
+assert.ok(
+  !managerBonusNavigation.includes('"gerente_sucursal"'),
+  "Branch manager must not see the manager bonus module.",
+);
 
 assert.ok(
   packageJson.includes("tests/bonus-workflow.test.mjs"),

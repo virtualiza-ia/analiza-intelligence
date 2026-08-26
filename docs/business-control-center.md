@@ -37,7 +37,7 @@ La pantalla debe mostrar:
 
 ## Metas, avances, bonos y ROI
 
-La pantalla de Metas y avances presenta sugerencias por linea de negocio y sucursal para los roles que aun trabajan metas como modulo separado. Gerente de operaciones usa `/protected/operacion` como informe unico de metas, avances e insights para evitar KPIs duplicados. Cada sugerencia conserva:
+La pantalla de Metas y avances presenta sugerencias por linea de negocio y sucursal para los roles que aun trabajan metas como modulo separado. Gerente de operaciones usa `/protected/operacion` y Gerente de sucursal usa `/protected/mi-sucursal` como informes unicos de metas, avances e insights para evitar KPIs duplicados. Cada sugerencia conserva:
 
 - ingreso actual;
 - meta sugerida;

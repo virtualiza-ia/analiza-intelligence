@@ -14,7 +14,7 @@ Analiza Intelligence uses role-based workspaces:
 - CEO: reads the BI executive view for Analiza and its business lines.
 - Gerente de operaciones: manages one business line, imports, quality, capacity, branches, lower-role users and branch risk from a single operational report.
 - Gerente de area: supervises assigned branches, explains variations and validates action plans.
-- Gerente de sucursal: completes the monthly close, reviews branch goals, alerts and pending evidence.
+- Gerente de sucursal: completes the monthly close and reads branch goals, alerts and pending evidence from one branch report.
 - Usuario operativo: completes assigned data-entry tasks without managerial privileges.
 - Viewer: reads authorized information only.
 
@@ -89,6 +89,8 @@ For the CEO, `/protected/overview` is the single executive report. Financial hea
 
 For Gerente de operaciones, `/protected/operacion` is the single operational report for metas, avances and insights. The separate `/protected/metas` and `/protected/insights` routes are hidden and blocked for this role so the same KPIs are not repeated under different labels.
 
+For Gerente de sucursal, `/protected/mi-sucursal` is the single branch report for closure status, results, goals, progress, insights and evidence. The separate `/protected/metas`, `/protected/insights` and `/protected/gerentes` routes are hidden and blocked for this role so the same KPIs and manager views are not duplicated.
+
 ## Operational Views
 
 Phase 3 adds DEMO operational views:
@@ -98,7 +100,7 @@ Phase 3 adds DEMO operational views:
 - `/protected/sucursales`
 - `/protected/gerentes`
 
-Appointments show citas por negocio and appointment success rate by business and branch. Capacity now starts with the branch capacity form used by operations when creating or editing capacity for a branch; it captures available, planned, effective and successful units, then calculates occupancy automatically. Branches show managers, result templates, goals, sales, losses, revenue, operating costs, appointments, and data quality. Manager performance uses separated components and does not present a score when capacity or data completeness is insufficient; it also includes organization view and bonus-oriented employee performance.
+Appointments show citas por negocio and appointment success rate by business and branch. Capacity now starts with the branch capacity form used by operations when creating or editing capacity for a branch; it captures available, planned, effective and successful units, then calculates occupancy automatically. Branches show managers, result templates, goals, sales, losses, revenue, operating costs, appointments, and data quality. Manager performance uses separated components and does not present a score when capacity or data completeness is insufficient; it also includes organization view and bonus-oriented employee performance for area, operations, CEO and administrator roles. Gerente de sucursal does not open the manager bonus module.
 
 ## Business Modules
 

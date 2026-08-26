@@ -32,8 +32,6 @@ Mi sucursal
 Nuevo cierre mensual
 Historial de cierres
 Resultados
-Metas
-Insights
 Mi cuenta
 ```
 
@@ -43,8 +41,6 @@ Rutas conceptuales:
 - `/protected/cierres/nuevo`
 - `/protected/cierres`
 - `/protected/resultados`
-- `/protected/metas`
-- `/protected/insights`
 
 ### Gerente de Area
 
@@ -143,7 +139,7 @@ Deben vivir como administracion, datos o soporte, visibles solo para roles autor
 
 ## Reglas de navegacion
 
-- El Gerente de Sucursal debe ver primero su cierre y resultados, no importaciones.
+- El Gerente de Sucursal debe ver primero su cierre y resultados, con metas e insights dentro de `Mi sucursal` en lugar de pestanas duplicadas.
 - El Gerente de Area debe ver primero estado de cierres y sucursales de su area.
 - El Gerente de Operaciones debe ver primero areas, cierres y calidad.
 - El CEO debe ver primero resultado ejecutivo y decisiones.

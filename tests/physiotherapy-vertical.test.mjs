@@ -428,12 +428,9 @@ assert.deepEqual(
     "/protected/importaciones",
     "/protected/cierres",
     "/protected/resultados",
-    "/protected/gerentes",
-    "/protected/insights",
-    "/protected/metas",
     "/protected/configuracion",
   ],
-  "Branch manager navigation must stay focused on closure flow plus own bonus review.",
+  "Branch manager navigation must keep one branch report and avoid duplicated goals/insights tabs.",
 );
 
 const loginForm = readWorkspaceFile("components/login-form.tsx");

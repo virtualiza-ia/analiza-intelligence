@@ -95,7 +95,6 @@ const allRoles: RoleKey[] = [
 const insightReadRoles: RoleKey[] = [
   ...adminRoles,
   "gerente_area",
-  "gerente_sucursal",
   "viewer",
 ];
 
@@ -221,7 +220,6 @@ export const navigationItems: NavigationItem[] = [
       "ceo",
       "gerente_operaciones",
       "gerente_area",
-      "gerente_sucursal",
     ],
   },
   {
@@ -303,7 +301,7 @@ export const navigationItems: NavigationItem[] = [
     href: "/protected/metas",
     icon: Goal,
     group: "direccion",
-    allowedRoles: ["gerente_area", "gerente_sucursal"],
+    allowedRoles: ["gerente_area"],
   },
   {
     title: "Usuarios y permisos",

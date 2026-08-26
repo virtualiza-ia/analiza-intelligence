@@ -238,7 +238,7 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
     badge: "Mi sucursal",
     title: "Bandeja del gerente de sucursal",
     description:
-      "Muestra solo lo que necesita completar o explicar: cierre mensual, metas, alertas y evidencias.",
+      "Muestra solo lo que necesita completar o explicar: cierre mensual, resultados, alertas y evidencias de su sucursal.",
     primaryHref: "/protected/importaciones",
     primaryLabel: "Completar cierre mensual",
     metrics: [
@@ -260,9 +260,9 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
         tone: "action",
       },
       {
-        title: "Revisar metas propias",
-        detail: "Ver avance de la sucursal y brecha contra meta del mes.",
-        href: "/protected/metas",
+        title: "Revisar lectura de mi sucursal",
+        detail: "Ver avance, brecha contra meta e insights dentro de una sola vista.",
+        href: "/protected/mi-sucursal",
         tone: "ok",
       },
     ],
@@ -271,8 +271,6 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
       "/protected/importaciones",
       "/protected/cierres",
       "/protected/resultados",
-      "/protected/metas",
-      "/protected/insights",
     ],
   },
   usuario_operativo: {
@@ -563,29 +561,46 @@ export function RoleWorkspaceHome({
             tone: "action" as const,
           },
         ]
-      : [
-        {
-          detail:
-            "Abrir el resumen ejecutivo para revisar cierres publicados, metas e insights autorizados.",
-          href: "/protected/overview",
-          title: "Revisar resultados oficiales",
-          tone: "ok" as const,
-        },
-        {
-          detail:
-            "Confirmar que las metas activas tengan aprobacion antes de usarlas para cumplimiento.",
-          href: "/protected/metas",
-          title: "Validar metas aprobadas",
-          tone: "action" as const,
-        },
-        {
-          detail:
-            "Atender primero los insights de cierres publicados con mayor severidad.",
-          href: "/protected/insights",
-          title: "Priorizar insights oficiales",
-          tone: "action" as const,
-        },
-      ];
+      : activeRole === "gerente_sucursal"
+        ? [
+            {
+              detail:
+                "Abrir la vista de sucursal para revisar cierre publicado, metas, brecha e insights sin duplicar pestanas.",
+              href: "/protected/mi-sucursal",
+              title: "Revisar informe unico de sucursal",
+              tone: "ok" as const,
+            },
+            {
+              detail:
+                "Completar o corregir el cierre mensual autorizado para la sucursal asignada.",
+              href: "/protected/importaciones",
+              title: "Actualizar datos de mi sucursal",
+              tone: "action" as const,
+            },
+          ]
+        : [
+            {
+              detail:
+                "Abrir el resumen ejecutivo para revisar cierres publicados, metas e insights autorizados.",
+              href: "/protected/overview",
+              title: "Revisar resultados oficiales",
+              tone: "ok" as const,
+            },
+            {
+              detail:
+                "Confirmar que las metas activas tengan aprobacion antes de usarlas para cumplimiento.",
+              href: "/protected/metas",
+              title: "Validar metas aprobadas",
+              tone: "action" as const,
+            },
+            {
+              detail:
+                "Atender primero los insights de cierres publicados con mayor severidad.",
+              href: "/protected/insights",
+              title: "Priorizar insights oficiales",
+              tone: "action" as const,
+            },
+          ];
   const shortcutItems = workspace.shortcutHrefs
     .map((href) => navigationItems.find((item) => item.href === href))
     .filter((item): item is (typeof navigationItems)[number] => {

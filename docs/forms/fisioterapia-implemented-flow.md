@@ -6,18 +6,16 @@ Vertical 1 implements the Fisioterapia monthly closing flow end to end for DEMO 
 
 The implemented chain is:
 
-Gerente de Sucursal -> Nuevo cierre mensual -> Formulario Fisioterapia -> Validacion server-side -> Preview -> Publicacion -> KPIs automaticos -> Meta vs Real -> Insights -> Dashboard Sucursal -> Consolidacion Gerente Area, Gerente Operaciones y CEO.
+Gerente de Sucursal -> Importaciones -> Formulario Fisioterapia -> Validacion server-side -> Preview -> Publicacion -> KPIs automaticos -> Meta vs Real -> Insights -> Dashboard Sucursal -> Consolidacion Gerente Area, Gerente Operaciones y CEO.
 
 ## User Experience By Role
 
 ### Gerente de Sucursal
 
-- `/protected/mi-sucursal`: home focused on one assigned Fisioterapia branch.
+- `/protected/mi-sucursal`: home focused on one assigned Fisioterapia branch, including goals, progress, insights and evidence in one place.
 - `/protected/cierres/nuevo`: creates or resumes the current monthly closure.
 - `/protected/cierres`: reviews closure history and starts versioned corrections.
-- `/protected/resultados`: sees branch KPIs, targets, compliance, insights and audit.
-- `/protected/metas`: reads targets that apply to the branch.
-- `/protected/insights`: reads generated insights for the branch.
+- `/protected/resultados`: sees branch KPIs, targets, compliance, insights and audit without exposing separate goals or insights tabs.
 
 ### Gerente de Area
 
@@ -29,16 +27,12 @@ Gerente de Sucursal -> Nuevo cierre mensual -> Formulario Fisioterapia -> Valida
 ### Gerente de Operaciones
 
 - `/protected/resultados`: consolidates all Fisioterapia branches in scope.
-- `/protected/operacion`: uses the Fisioterapia operational dashboard when the selected line is Fisioterapia.
-- `/protected/metas`: configures branch targets.
-- `/protected/insights`: reviews operational insights.
+- `/protected/operacion`: uses the unified operational dashboard for goals, progress and insights when the selected line is Fisioterapia.
 
 ### CEO
 
 - `/protected/overview`: includes a Fisioterapia executive summary fed by published closures.
 - `/protected/resultados`: reads consolidated Fisioterapia results.
-- `/protected/metas`: governs targets.
-- `/protected/insights`: reviews executive insights.
 
 ### Viewer
 
@@ -208,11 +202,11 @@ The service enforces:
 
 Navigation visibility is aligned with RBAC, but the server remains the source of authorization.
 
-For Gerente de Sucursal, navigation is intentionally reduced to the Fisioterapia closure flow: Mi sucursal, Nuevo cierre mensual, Historial, Resultados, Metas, Insights and Mi cuenta. Technical legacy modules such as Importaciones and Formulario mensual are hidden for this role.
+For Gerente de Sucursal, navigation is intentionally reduced to the Fisioterapia closure flow: Mi sucursal, Importaciones, Historial, Resultados and Mi cuenta. Metas, Insights and Gerentes y bonos are hidden and blocked for this role because the branch report already contains its goals, progress, insights and evidence.
 
 ## Executive Screen Review
 
-- KEEP: Mi sucursal, Nuevo cierre mensual, Historial de cierres, Resultados, Metas, Insights and Resumen ejecutivo because each screen answers a concrete operating decision.
+- KEEP: Mi sucursal, Importaciones, Historial de cierres, Resultados and Resumen ejecutivo because each screen answers a concrete operating decision without duplicating the branch manager view.
 - KEEP: Gerentes, Sucursales, Capacidad, Finanzas and Calidad de datos for the roles that consolidate or govern operations, subject to existing RBAC.
 - REWORK: Legacy Formulario mensual and generic Importaciones for branch managers; they should be absorbed by the vertical closure flow or limited to back-office roles.
 - REWORK: generic dashboards when the selected business line is not Fisioterapia; they must eventually read the same closure/KPI/target contracts by line of business.

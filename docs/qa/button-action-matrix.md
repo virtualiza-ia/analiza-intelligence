@@ -20,7 +20,7 @@ Estado de cierre:
 | Sidebar desktop | CEO | Links permitidos | Muestra solo rutas autorizadas para CEO | Validado por tests navigation/RBAC y smoke visual | PASS | - |
 | Sidebar desktop | Gerente Operaciones | Links permitidos | Muestra operacion, cierres, bonos y acciones autorizadas | Validado por tests navigation/RBAC y smoke visual | PASS | - |
 | Sidebar desktop | Gerente Area | Links permitidos | Muestra cierres, resultados, sucursales, metas y gerentes segun alcance | Validado por tests navigation/RBAC | PASS | - |
-| Sidebar desktop | Gerente Sucursal | Links permitidos | Muestra cierres, resultados, metas, gerentes/bono propio y mi cuenta | Validado por tests navigation/RBAC | PASS | - |
+| Sidebar desktop | Gerente Sucursal | Links permitidos | Muestra mi sucursal, importaciones, cierres, resultados y mi cuenta; metas, insights y bonos quedan dentro de la lectura autorizada o bloqueados como pestañas separadas | Validado por tests navigation/RBAC | PASS | - |
 | Sidebar desktop | Viewer | Links permitidos | Solo lectura autorizada; sin acciones administrativas | Validado por tests RBAC y URL directa | PASS | - |
 | Mobile navigation | Todos | Select/menu de navegacion | Cambia a ruta seleccionada y respeta permisos | Validado en 390 px sin overflow horizontal | PASS | - |
 | Header/contexto global | CEO | Pais/empresa/linea/area/sucursal/gerente/profesional/servicio/pagador/fechas | Actualiza URL, encabezado y datos dependientes | Validado visualmente para pais, linea, bonos y rutas principales; tests BI cubren consistencia | PASS | - |
@@ -38,11 +38,11 @@ Estado de cierre:
 | Metas `/protected/metas` | Roles autorizados | Aprobar DEMO / quitar aprobacion / guardar meta | Cambia estado demo o persiste meta segun permisos | Cubierto por business-control y vertical tests; smoke visual responsive | PASS | - |
 | Insights `/protected/insights` | Roles autorizados | Filtros, detalle, evidencia, accion, asignar, relacionado, revisar, resolver/descartar, descargar/copiar | Mantiene evidencia, impacto y accion sin datos viejos | Validado por tests BI y smoke visual responsive | PASS | - |
 | Bonos `/protected/gerentes` | Gerente Area | Filtros, ordenar, seleccionar gerente, simulador | Actualiza perfil, desglose, ranking y simulacion sin modificar datos reales | Validado por bonus tests y smoke visual | PASS | - |
-| Bonos `/protected/gerentes` | Gerente Sucursal | Ver bono propio | Puede revisar su resultado; no puede aprobar su propio bono | Validado por RBAC/workflow tests | PASS | - |
+| Bonos `/protected/gerentes` | Gerente Sucursal | Sin acceso | Usa `/protected/mi-sucursal`; bonos queda para roles superiores en jerarquia | Validado por RBAC/navigation tests | PASS | - |
 | Bonos `/protected/gerentes` | CEO | Lectura consolidada | Acceso lectura; no aprueba automaticamente | Corregido y validado por tests/smoke | PASS | BUG-001 |
 | Bonos `/protected/gerentes` | Gerente Operaciones | Aprobar/rechazar/ajustar | Ejecuta workflow auditable server-side con razon cuando aplica | Implementado y validado visualmente: APPROVED, ADJUSTED, REJECTED preservan recomendacion original | PASS | BUG-002 |
 | Importaciones `/protected/importaciones` | Roles autorizados | Descargar plantilla, subir, validar, publicar, rollback, reemplazar, lineage, fallback | Respeta permisos y audita flujo sin mezclar produccion | Cubierto por ingestion/connectors tests | PASS | - |
-| Conectores `/protected/conectores` | Operaciones/admin | Test, sync, copiar endpoint | Ejecuta server-side sin secretos frontend | Cubierto por connector tests/build | PASS | - |
+| Conectores `/protected/conectores` | Admin | Test, sync, copiar endpoint | Ejecuta server-side sin secretos frontend | Cubierto por connector tests/build | PASS | - |
 | Calidad datos `/protected/calidad-datos` | Operaciones/admin | Aplicar sugerencia | Mantiene trazabilidad y alcance | Cubierto por data-quality tests existentes | PASS | - |
 | Mi cuenta `/protected/configuracion` | Todos | Guardar perfil | Actualiza perfil si editable; demo bloquea edicion sensible | Cubierto por executive readiness tests | PASS | - |
 | Logout | Todos | Salir desde sidebar/rutas | Cierra sesion y `/protected` vuelve a exigir auth | Cubierto por RBAC/security tests | PASS | - |

@@ -10,11 +10,11 @@ Principio: ninguna tarjeta, grafica, tabla, insight, meta, resultado o bono debe
 
 | Filtro | Pantallas impactadas | Resultado esperado | Evidencia | PASS/FAIL | Bug ID |
 | --- | --- | --- | --- | --- | --- |
-| Pais | Overview, Resultados, Lineas, Sucursales, Metas, Insights | Limita datos a pais seleccionado y actualiza encabezado/URL | Validado visualmente cambiando a El Salvador; tests BI cubren contexto | PASS | - |
+| Pais | Overview, Resultados, Lineas, Sucursales | Limita datos a pais seleccionado y actualiza encabezado/URL | Validado visualmente cambiando a El Salvador; tests BI cubren contexto | PASS | - |
 | Empresa | Overview, Resultados, Lineas, Metas | Limita empresa/unidad de negocio | Validado por dependencias de linea/empresa y tests BI | PASS | - |
-| Linea | Fisioterapia, Laboratorio, Imagenes, Resultados, Metas, Insights, Bonos | Cambia linea y evita mezcla de KPIs | Validado en rutas directas CEO y selector global; se reforzo sincronizacion URL/header | PASS | BUG-003 |
+| Linea | Fisioterapia, Laboratorio, Imagenes, Resultados, Bonos e informes unicos por rol | Cambia linea y evita mezcla de KPIs | Validado en rutas directas CEO y selector global; se reforzo sincronizacion URL/header | PASS | BUG-003 |
 | Area | Sucursales, Gerentes, Resultados, Metas | Limita sucursales del area | Cubierto por RBAC/scope tests y smoke visual de gerentes/bonos | PASS | - |
-| Sucursal | Cierres, Resultados, Metas, Insights, Mi sucursal | Limita a una sucursal y respeta alcance del rol | Cubierto por branch-manager-scope, persistence contract y smoke visual | PASS | - |
+| Sucursal | Cierres, Resultados, Mi sucursal | Limita a una sucursal y respeta alcance del rol; metas e insights se leen dentro de Mi sucursal para gerente de sucursal | Cubierto por branch-manager-scope, persistence contract y smoke visual | PASS | - |
 | Gerente | Gerentes/bonos, Sucursales, Insights | Limita gerente y no deja datos pegados | Validado visualmente al cambiar gerente en bonos: perfil, score, banda y workflow cambian | PASS | - |
 | Profesional | Capacidad, Resultados, BI granular | Si no existe fuente, muestra sin datos y KPI bloqueado | Cubierto por BI tests | PASS | - |
 | Servicio | Capacidad, Servicios, Resultados | Filtra servicio o muestra no disponible trazable | Cubierto por BI/data-quality tests existentes | PASS | - |
@@ -28,10 +28,10 @@ Principio: ninguna tarjeta, grafica, tabla, insight, meta, resultado o bono debe
 
 | Combinacion | Rol | Pantallas | Resultado esperado | Evidencia | PASS/FAIL | Bug ID |
 | --- | --- | --- | --- | --- | --- | --- |
-| Pais + linea | CEO | Overview, Lineas, Resultados, Insights | Solo KPIs de linea/pais; sin datos de linea anterior | Smoke visual y tests BI | PASS | - |
-| Pais + linea + sucursal | CEO | Resultados, Metas, Cierres, Insights | Sucursal corresponde a linea y pais | Vertical/persistence tests y smoke visual | PASS | - |
+| Pais + linea | CEO | Overview, Lineas, Resultados | Solo KPIs de linea/pais; sin datos de linea anterior | Smoke visual y tests BI | PASS | - |
+| Pais + linea + sucursal | CEO | Resultados, Cierres | Sucursal corresponde a linea y pais | Vertical/persistence tests y smoke visual | PASS | - |
 | Linea + gerente | Gerente Area | Gerentes/bonos, Sucursales | Muestra solo gerente/linea autorizados | Bonus workflow visual y scope tests | PASS | - |
-| Sucursal + periodo | Gerente Sucursal | Mi sucursal, Cierres, Resultados, Metas | Muestra cierre publicado y metas del periodo seleccionado | Persistence contract | PASS | - |
+| Sucursal + periodo | Gerente Sucursal | Mi sucursal, Cierres, Resultados | Muestra cierre publicado, metas e insights del periodo seleccionado desde Mi sucursal | Persistence contract | PASS | - |
 | Area + linea + fechas | Gerente Area | Sucursales, Gerentes, Resultados | Consolida sucursales del area, rango y linea | RBAC/scope tests y smoke visual | PASS | - |
 | Profesional + linea + fechas | Operaciones | Capacidad/Resultados | Si no hay granularidad, muestra no data reason y KPI bloqueado | BI tests | PASS | - |
 | Servicio + pagador + fechas | CEO | Finanzas/Resultados | Respeta filtros o indica fuente insuficiente | BI/data-quality tests | PASS | - |
@@ -56,9 +56,9 @@ Principio: ninguna tarjeta, grafica, tabla, insight, meta, resultado o bono debe
 | `/protected/fisioterapia` | CEO | Carga Fisioterapia con contexto autorizado | Smoke visual CEO | PASS | - |
 | `/protected/laboratorio` | CEO | Carga Laboratorio con contexto autorizado | Smoke visual CEO | PASS | - |
 | `/protected/imagenes` | CEO | Carga Imagenes con contexto autorizado | Smoke visual CEO | PASS | - |
-| `/protected/metas` | CEO, Operaciones, Area, Sucursal | Carga metas segun scope | Smoke visual responsive + tests | PASS | - |
-| `/protected/insights` | Roles lectura autorizados | Carga insights segun scope | Smoke visual responsive + tests | PASS | - |
-| `/protected/gerentes` | CEO, Gerente Operaciones, Gerente Area, Gerente Sucursal, admins | Carga bonos/gerentes en lectura/autorizacion segun politica | Corregido y cubierto por bonus/navigation tests | PASS | BUG-001 |
+| `/protected/metas` | Gerente Area | Carga metas segun scope; CEO, Operaciones y Sucursal usan sus informes unicos | Smoke visual responsive + tests | PASS | - |
+| `/protected/insights` | Gerente Area, Viewer, admins | Carga insights segun scope; CEO, Operaciones y Sucursal usan sus informes unicos | Smoke visual responsive + tests | PASS | - |
+| `/protected/gerentes` | CEO, Gerente Operaciones, Gerente Area, admins | Carga bonos/gerentes en lectura/autorizacion segun politica; Sucursal queda bloqueado | Corregido y cubierto por bonus/navigation tests | PASS | BUG-001 |
 | `/protected/cierres/nuevo` | Operaciones, Area, Sucursal, admins | Carga formulario mensual por linea | Cubierto por vertical tests; CEO bloqueado segun politica | PASS | - |
 
 ## Bugs Identificados En Filtros
