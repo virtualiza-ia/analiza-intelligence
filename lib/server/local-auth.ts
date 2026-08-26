@@ -99,6 +99,17 @@ type ManagerAssignmentRow = {
   status: string | null;
 };
 
+type ReportingManagerRow = {
+  manager_profile_id: string | null;
+};
+
+type ScopedBranchManagerRow = {
+  profile_id: string;
+};
+
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const managerAssignmentRoleKeys = new Set<RoleKey>([
   "gerente_area",
   "gerente_sucursal",
@@ -177,6 +188,22 @@ function readInvitationManagerIncentive(
   };
 }
 
+function readManagedBranchManagerIds(invitation: InvitationActivationRow) {
+  const metadata = parseMetadata(invitation.metadata);
+  const ids = Array.isArray(metadata.managed_branch_manager_ids)
+    ? metadata.managed_branch_manager_ids
+    : [];
+  const normalizedIds: string[] = [];
+
+  for (const id of ids) {
+    if (typeof id === "string" && uuidPattern.test(id) && !normalizedIds.includes(id)) {
+      normalizedIds.push(id);
+    }
+  }
+
+  return normalizedIds;
+}
+
 function getDisplayName(invitation: InvitationActivationRow) {
   const metadata = parseMetadata(invitation.metadata);
   const invitedName = metadata.invited_name;
@@ -192,6 +219,387 @@ function coerceRoleKey(value: string | null | undefined): RoleKey {
   return roleKeys.includes(value as RoleKey)
     ? (value as RoleKey)
     : "viewer";
+}
+
+async function assignOperationalAreaManager(
+  client: PoolClient,
+  managerProfileId: string,
+  invitation: InvitationActivationRow,
+) {
+  if (coerceRoleKey(invitation.role_key) !== "gerente_area") {
+    return;
+  }
+
+  if (!invitation.operational_area_id) {
+    return;
+  }
+
+  const previousResult = await client.query<{
+    manager_profile_id: string | null;
+  }>(
+    `
+      select manager_profile_id
+      from public.operational_areas
+      where id = $1
+        and organization_id = $2
+        and ($3::uuid is null or country_id = $3::uuid)
+        and ($4::uuid is null or company_id = $4::uuid)
+      for update
+    `,
+    [
+      invitation.operational_area_id,
+      invitation.organization_id,
+      invitation.country_id,
+      invitation.company_id,
+    ],
+  );
+  const previousManagerId = previousResult.rows[0]?.manager_profile_id ?? null;
+
+  await client.query(
+    `
+      update public.operational_areas
+      set manager_profile_id = $1,
+          updated_at = now()
+      where id = $2
+        and organization_id = $3
+        and ($4::uuid is null or country_id = $4::uuid)
+        and ($5::uuid is null or company_id = $5::uuid)
+    `,
+    [
+      managerProfileId,
+      invitation.operational_area_id,
+      invitation.organization_id,
+      invitation.country_id,
+      invitation.company_id,
+    ],
+  );
+
+  if (previousManagerId === managerProfileId) {
+    return;
+  }
+
+  await client.query(
+    `
+      insert into public.assignment_history (
+        organization_id,
+        actor_user_id,
+        entity_table,
+        entity_id,
+        action,
+        previous_scope,
+        next_scope,
+        reason
+      )
+      values ($1, $2, 'operational_areas', $3, 'operational_area.manager_assigned', $4::jsonb, $5::jsonb, $6)
+    `,
+    [
+      invitation.organization_id,
+      invitation.invited_by,
+      invitation.operational_area_id,
+      JSON.stringify({ previous_manager_profile_id: previousManagerId }),
+      JSON.stringify({
+        manager_profile_id: managerProfileId,
+        source: "invitation-activation",
+      }),
+      "Asignacion de gerente de area al aceptar invitacion segura.",
+    ],
+  );
+}
+
+async function getScopedActiveBranchManagerIds(
+  client: PoolClient,
+  candidateProfileIds: string[],
+  invitation: InvitationActivationRow,
+) {
+  if (candidateProfileIds.length === 0 || !invitation.operational_area_id) {
+    return [];
+  }
+
+  const result = await client.query<ScopedBranchManagerRow>(
+    `
+      select distinct ma.profile_id
+      from public.manager_assignments ma
+      join public.roles r on r.id = ma.role_id
+      join public.profiles p on p.id = ma.profile_id
+      where ma.profile_id = any($1::uuid[])
+        and ma.organization_id = $2
+        and ($3::uuid is null or ma.country_id = $3::uuid)
+        and ($4::uuid is null or ma.company_id = $4::uuid)
+        and ma.operational_area_id = $5
+        and ma.branch_id is not null
+        and ma.status = 'active'
+        and ma.deactivated_at is null
+        and r.key = 'gerente_sucursal'
+        and p.status = 'active'
+        and p.deactivated_at is null
+        and p.deleted_at is null
+    `,
+    [
+      candidateProfileIds,
+      invitation.organization_id,
+      invitation.country_id,
+      invitation.company_id,
+      invitation.operational_area_id,
+    ],
+  );
+
+  return result.rows.map((row) => row.profile_id);
+}
+
+async function replaceActiveReportingLines({
+  client,
+  invitation,
+  managerProfileId,
+  reason,
+  subordinateProfileIds,
+}: {
+  client: PoolClient;
+  invitation: InvitationActivationRow;
+  managerProfileId: string;
+  reason: string;
+  subordinateProfileIds: string[];
+}) {
+  if (subordinateProfileIds.length === 0) {
+    return;
+  }
+
+  await client.query(
+    `
+      update public.reporting_lines
+      set status = 'inactive',
+          ends_at = coalesce(ends_at, now())
+      where subordinate_profile_id = any($1::uuid[])
+        and manager_profile_id is distinct from $2
+        and status = 'active'
+    `,
+    [subordinateProfileIds, managerProfileId],
+  );
+
+  const insertedResult = await client.query<{ subordinate_profile_id: string }>(
+    `
+      insert into public.reporting_lines (
+        organization_id,
+        manager_profile_id,
+        subordinate_profile_id,
+        status,
+        starts_at,
+        created_by
+      )
+      select $2, $3, selected.subordinate_profile_id, 'active', now(), $4
+      from unnest($1::uuid[]) as selected(subordinate_profile_id)
+      where not exists (
+        select 1
+        from public.reporting_lines rl
+        where rl.manager_profile_id = $3
+          and rl.subordinate_profile_id = selected.subordinate_profile_id
+          and rl.status = 'active'
+      )
+      returning subordinate_profile_id
+    `,
+    [
+      subordinateProfileIds,
+      invitation.organization_id,
+      managerProfileId,
+      invitation.invited_by,
+    ],
+  );
+  const insertedProfileIds = insertedResult.rows.map(
+    (row) => row.subordinate_profile_id,
+  );
+
+  await client.query(
+    `
+      insert into public.assignment_history (
+        organization_id,
+        actor_user_id,
+        entity_table,
+        entity_id,
+        action,
+        previous_scope,
+        next_scope,
+        reason
+      )
+      values ($1, $2, 'reporting_lines', $3, 'reporting_lines.assigned', '{}'::jsonb, $4::jsonb, $5)
+    `,
+    [
+      invitation.organization_id,
+      invitation.invited_by,
+      managerProfileId,
+      JSON.stringify({
+        inserted_subordinate_profile_ids: insertedProfileIds,
+        manager_profile_id: managerProfileId,
+        source: "invitation-activation",
+        subordinate_profile_ids: subordinateProfileIds,
+      }),
+      reason,
+    ],
+  );
+
+  await client.query(
+    `
+      insert into public.audit_logs (
+        organization_id,
+        actor_user_id,
+        action,
+        entity_table,
+        entity_id,
+        country_id,
+        company_id,
+        branch_id,
+        metadata
+      )
+      values ($1, $2, 'reporting_lines.assigned', 'reporting_lines', $3, $4, $5, $6, $7::jsonb)
+    `,
+    [
+      invitation.organization_id,
+      invitation.invited_by,
+      managerProfileId,
+      invitation.country_id,
+      invitation.company_id,
+      invitation.branch_id,
+      JSON.stringify({
+        inserted_subordinate_profile_ids: insertedProfileIds,
+        manager_profile_id: managerProfileId,
+        source: "invitation-activation",
+        subordinate_profile_ids: subordinateProfileIds,
+      }),
+    ],
+  );
+}
+
+async function findReportingManagerForBranchManager(
+  client: PoolClient,
+  invitation: InvitationActivationRow,
+) {
+  if (!invitation.operational_area_id) {
+    return null;
+  }
+
+  const result = await client.query<ReportingManagerRow>(
+    `
+      with candidate_managers as (
+        select p.id as manager_profile_id, 1 as priority
+        from public.profiles p
+        join public.user_roles ur on ur.user_id = p.id
+        join public.roles r on r.id = ur.role_id
+        where p.id = $1
+          and p.status = 'active'
+          and p.deactivated_at is null
+          and p.deleted_at is null
+          and r.key = 'gerente_area'
+          and ur.status = 'active'
+          and ur.deactivated_at is null
+          and ur.organization_id = $2
+          and ($3::uuid is null or ur.country_id is null or ur.country_id = $3::uuid)
+          and ($4::uuid is null or ur.company_id is null or ur.company_id = $4::uuid)
+          and (
+            ur.operational_area_id is null
+            or ur.operational_area_id = $5
+          )
+
+        union all
+
+        select oa.manager_profile_id, 2 as priority
+        from public.operational_areas oa
+        join public.profiles p on p.id = oa.manager_profile_id
+        where oa.id = $5
+          and oa.organization_id = $2
+          and ($3::uuid is null or oa.country_id = $3::uuid)
+          and ($4::uuid is null or oa.company_id = $4::uuid)
+          and p.status = 'active'
+          and p.deactivated_at is null
+          and p.deleted_at is null
+
+        union all
+
+        select ma.profile_id as manager_profile_id, 3 as priority
+        from public.manager_assignments ma
+        join public.roles r on r.id = ma.role_id
+        join public.profiles p on p.id = ma.profile_id
+        where ma.organization_id = $2
+          and ($3::uuid is null or ma.country_id = $3::uuid)
+          and ($4::uuid is null or ma.company_id = $4::uuid)
+          and ma.operational_area_id = $5
+          and ma.branch_id is null
+          and ma.status = 'active'
+          and ma.deactivated_at is null
+          and r.key = 'gerente_area'
+          and p.status = 'active'
+          and p.deactivated_at is null
+          and p.deleted_at is null
+      )
+      select manager_profile_id
+      from candidate_managers
+      where manager_profile_id is not null
+      order by priority
+      limit 1
+    `,
+    [
+      invitation.invited_by,
+      invitation.organization_id,
+      invitation.country_id,
+      invitation.company_id,
+      invitation.operational_area_id,
+    ],
+  );
+
+  return result.rows[0]?.manager_profile_id ?? null;
+}
+
+async function activateReportingLines(
+  client: PoolClient,
+  userId: string,
+  invitation: InvitationActivationRow,
+) {
+  const roleKey = coerceRoleKey(invitation.role_key);
+
+  if (roleKey === "gerente_area") {
+    await assignOperationalAreaManager(client, userId, invitation);
+
+    const managedBranchManagerIds = await getScopedActiveBranchManagerIds(
+      client,
+      readManagedBranchManagerIds(invitation),
+      invitation,
+    );
+
+    await replaceActiveReportingLines({
+      client,
+      invitation,
+      managerProfileId: userId,
+      reason:
+        "Asignacion de gerentes de sucursal bajo gerente de area al aceptar invitacion segura.",
+      subordinateProfileIds: managedBranchManagerIds,
+    });
+    return;
+  }
+
+  if (roleKey !== "gerente_sucursal") {
+    return;
+  }
+
+  const managerProfileId = await findReportingManagerForBranchManager(
+    client,
+    invitation,
+  );
+
+  if (!managerProfileId) {
+    return;
+  }
+
+  const managedBranchManagerIds = await getScopedActiveBranchManagerIds(
+    client,
+    [userId],
+    invitation,
+  );
+
+  await replaceActiveReportingLines({
+    client,
+    invitation,
+    managerProfileId,
+    reason:
+      "Asignacion automatica de gerente de sucursal bajo su gerente de area.",
+    subordinateProfileIds: managedBranchManagerIds,
+  });
 }
 
 async function ensureActiveUserRole(
@@ -601,6 +1009,7 @@ export async function acceptUserInvitation({
     await ensureActiveUserRole(client, user.id, invitation);
     await grantScopedAccess(client, user.id, invitation);
     await activateManagerAssignment(client, user.id, invitation);
+    await activateReportingLines(client, user.id, invitation);
 
     await client.query(
       `

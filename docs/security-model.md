@@ -19,8 +19,8 @@ Official Analiza roles:
 - `super_admin`: superadministrador. Administra la plataforma completa, permisos globales, gobierno de datos, conectores y seguridad.
 - `webmaster_admin`: alias historico de administrador, conservado por compatibilidad con sesiones y datos DEMO existentes.
 - `ceo`: reads the executive BI view for Analiza and all assigned business lines, countries, and branches; may invite selected lower non-manager roles inside its delegated scope without bypassing operational manager creation.
-- `gerente_operaciones`: creates operational areas, creates branches, assigns branches to areas, creates area and branch managers, defines manager level, defines base bonus, captures branch capacity, imports operational data, and monitors all branches in scope through the unified operational report.
-- `gerente_area`: supervises assigned branches, validates monthly discipline, compares branch manager performance, and may invite operational users inside its area; it does not create branch managers.
+- `gerente_operaciones`: creates operational areas, creates branches, assigns branches to areas, creates area and branch managers, assigns branch managers under area managers, defines manager level, defines base bonus, captures branch capacity, imports operational data, and monitors all branches in scope through the unified operational report.
+- `gerente_area`: supervises assigned branches, validates monthly discipline, compares branch manager performance, creates branch managers inside its area, defines their manager level and base bonus, and may invite operational users inside its area.
 - `gerente_sucursal`: registers the assigned branch monthly close through the controlled form and reads branch results, goals, progress, insights and evidence from `/protected/mi-sucursal` instead of separate goal, insight or bonus modules.
 - `usuario_operativo`: loads or corrects operational data without managerial privileges when delegated.
 - `viewer`: reads only authorized dashboards and records.
@@ -34,7 +34,7 @@ Role hierarchy is explicit in `role_hierarchy`:
 - `usuario_operativo`: 20
 - `viewer`: 10
 
-`webmaster_admin` is treated as a level 100 legacy alias. A user may only invite or assign roles with a lower hierarchy level, and only when the target scope is inside the user's delegated scope. Area and branch manager creation is additionally controlled by the operations flow so `gerente_operaciones` defines the manager level and base bonus before the invitation is sent.
+`webmaster_admin` is treated as a level 100 legacy alias. A user may only invite or assign roles with a lower hierarchy level, and only when the target scope is inside the user's delegated scope. `gerente_operaciones` creates area managers and may preassign the branch managers under them. `gerente_operaciones` and `gerente_area` may create branch managers inside their delegated area, defining manager level and base bonus before the invitation is sent.
 
 ## Authorization
 
@@ -79,7 +79,7 @@ The delegation migration adds these controls:
 
 User creation is invitation-only. The platform must not ask administrators to set a manual password for another user. An invited account stays pending until accepted.
 
-Manager invitations and active manager assignments store `management_level` and `base_bonus_amount`. The recommended bonus is calculated as base bonus multiplied by the branch or portfolio goal completion, while score and data quality control eligibility, review and blocking.
+Manager invitations and active manager assignments store `management_level` and `base_bonus_amount`. Area manager invitations may also store branch manager subordinates in metadata; acceptance activates `reporting_lines`. The recommended bonus is calculated as base bonus multiplied by the branch or portfolio goal completion, while score and data quality control eligibility, review and blocking.
 
 Users and managers are deactivated with soft delete fields and history, not physical deletion. If a manager owns branches or subordinates, the system must request reassignment before finalizing the deactivation.
 

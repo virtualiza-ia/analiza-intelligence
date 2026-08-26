@@ -414,6 +414,35 @@ for (const userDelegationAction of [
 }
 
 assert.equal(
+  canPerformAction(areaManager, "users.invite", {
+    roleKey: "gerente_sucursal",
+    scope: {
+      branchId,
+      companyId,
+      countryId,
+      operationalAreaId: areaId,
+      organizationId,
+    },
+  }),
+  true,
+  "Area manager must create branch managers inside its delegated area.",
+);
+
+assert.equal(
+  canPerformAction(areaManager, "users.invite", {
+    roleKey: "gerente_area",
+    scope: {
+      companyId,
+      countryId,
+      operationalAreaId: areaId,
+      organizationId,
+    },
+  }),
+  false,
+  "Area manager must not create another area manager.",
+);
+
+assert.equal(
   canPerformAction(branchManager, "record.read", {
     scope: {
       branchId,
@@ -495,8 +524,8 @@ assert.equal(
       organizationId,
     },
   }),
-  false,
-  "Area manager must not create branch managers; operations owns manager creation.",
+  true,
+  "Area manager must create branch managers inside its delegated area.",
 );
 
 assert.equal(

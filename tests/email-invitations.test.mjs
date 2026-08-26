@@ -1,6 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
 
 const routePath = "app/api/users/invite/route.ts";
+const branchManagersRoutePath = "app/api/users/branch-managers/route.ts";
 const mailPath = "lib/server/mail.ts";
 const databasePath = "lib/server/database.ts";
 const invitationsPath = "lib/server/user-invitations.ts";
@@ -20,6 +21,7 @@ const dockerEnvExamplePath = ".env.docker.example";
 
 for (const file of [
   routePath,
+  branchManagersRoutePath,
   mailPath,
   databasePath,
   invitationsPath,
@@ -41,6 +43,7 @@ for (const file of [
 }
 
 const route = readFileSync(routePath, "utf8");
+const branchManagersRoute = readFileSync(branchManagersRoutePath, "utf8");
 const mail = readFileSync(mailPath, "utf8");
 const database = readFileSync(databasePath, "utf8");
 const invitations = readFileSync(invitationsPath, "utf8");
@@ -65,9 +68,25 @@ for (const requiredRouteText of [
   "canPerformAction",
   "sendMail",
   "No se pudo enviar la invitacion",
+  "managedBranchManagerIds",
+  "UserInvitationError",
 ]) {
   if (!route.includes(requiredRouteText)) {
     throw new Error(`Invitation API route is missing: ${requiredRouteText}`);
+  }
+}
+
+for (const requiredBranchManagerRouteText of [
+  "getCurrentAuthorizationActor",
+  "manager_assignments",
+  "gerente_sucursal",
+  "branchManagers",
+  "isSuperAdministrator",
+]) {
+  if (!branchManagersRoute.includes(requiredBranchManagerRouteText)) {
+    throw new Error(
+      `Branch manager listing route is missing: ${requiredBranchManagerRouteText}`,
+    );
   }
 }
 
@@ -105,6 +124,9 @@ for (const requiredInvitationText of [
   "management_level",
   "base_bonus_amount",
   "manager_incentive",
+  "managedBranchManagerIds",
+  "managed_branch_manager_ids",
+  "managed_branch_manager_count",
 ]) {
   if (!invitations.includes(requiredInvitationText)) {
     throw new Error(
@@ -121,6 +143,8 @@ for (const requiredComponentText of [
   "Nivel de gerencia",
   "Bono base mensual",
   "managerIncentive",
+  "Gerentes de sucursal a cargo",
+  "managedBranchManagerIds",
 ]) {
   if (!component.includes(requiredComponentText)) {
     throw new Error(`User form is missing: ${requiredComponentText}`);
@@ -195,6 +219,9 @@ for (const requiredLocalAuthText of [
   "public.manager_assignments",
   "management_level",
   "base_bonus_amount",
+  "reporting_lines",
+  "managed_branch_manager_ids",
+  "operational_area.manager_assigned",
   "requires_password_change",
   "local_password.changed",
   "invitation_token_hash = null",

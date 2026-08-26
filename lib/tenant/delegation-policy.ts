@@ -1,5 +1,4 @@
 import type { RoleKey } from "@/lib/tenant/demo-context";
-import { isManagerIncentiveRole } from "./manager-incentives.ts";
 
 export type ScopeBoundary = {
   organizationId: string;
@@ -142,7 +141,7 @@ const standardRoleCreation: Record<RoleKey, RoleKey[]> = {
   ],
   ceo: ["gerente_operaciones", "usuario_operativo", "viewer"],
   gerente_operaciones: ["gerente_area", "gerente_sucursal", "usuario_operativo", "viewer"],
-  gerente_area: ["usuario_operativo", "viewer"],
+  gerente_area: ["gerente_sucursal", "usuario_operativo", "viewer"],
   gerente_sucursal: ["usuario_operativo", "viewer"],
   usuario_operativo: [],
   viewer: [],
@@ -178,9 +177,18 @@ export function canCreateRole(
   }
 
   if (
-    isManagerIncentiveRole(targetRole) &&
+    targetRole === "gerente_area" &&
     !isSuperAdministrator(actorRole) &&
     actorRole !== "gerente_operaciones"
+  ) {
+    return false;
+  }
+
+  if (
+    targetRole === "gerente_sucursal" &&
+    !isSuperAdministrator(actorRole) &&
+    actorRole !== "gerente_operaciones" &&
+    actorRole !== "gerente_area"
   ) {
     return false;
   }

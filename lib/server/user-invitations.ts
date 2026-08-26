@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import type { PoolClient } from "pg";
 
 import { getPostgresPool } from "@/lib/server/database";
 import { demoRoleProfiles, type RoleKey } from "@/lib/tenant/demo-context";
@@ -23,11 +24,21 @@ type InvitationRow = {
 
 const assignmentTrackedRoles: RoleKey[] = ["gerente_area", "gerente_sucursal"];
 
+export class UserInvitationError extends Error {
+  constructor(
+    message: string,
+    public readonly status = 400,
+  ) {
+    super(message);
+  }
+}
+
 export type CreateInvitationInput = {
   appUrl: string;
   actorUserId: string;
   email: string;
   fullName: string;
+  managedBranchManagerIds?: string[];
   managerIncentive?: ManagerIncentiveInput;
   roleKey: RoleKey;
   scope: ScopeBoundary;
@@ -38,6 +49,7 @@ export type CreatedInvitation = {
   emailText: string;
   expiresAt: string;
   id: string;
+  managedBranchManagers: number;
   recipientEmail: string;
   subject: string;
 };
@@ -76,16 +88,98 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#39;");
 }
 
+function normalizeUuidList(values: string[]) {
+  const normalizedIds: string[] = [];
+
+  for (const value of values) {
+    const uuid = nullableUuid(value);
+
+    if (!uuid) {
+      throw new UserInvitationError(
+        "Selecciona gerentes de sucursal validos para esta gerencia de area.",
+      );
+    }
+
+    if (!normalizedIds.includes(uuid)) {
+      normalizedIds.push(uuid);
+    }
+  }
+
+  return normalizedIds;
+}
+
+async function assertManagedBranchManagersInScope({
+  branchManagerIds,
+  client,
+  scope,
+}: {
+  branchManagerIds: string[];
+  client: PoolClient;
+  scope: {
+    companyId: string | null;
+    countryId: string | null;
+    operationalAreaId: string | null;
+    organizationId: string;
+  };
+}) {
+  if (branchManagerIds.length === 0) {
+    return;
+  }
+
+  if (!scope.operationalAreaId) {
+    throw new UserInvitationError(
+      "Selecciona la gerencia de area antes de asignar gerentes de sucursal.",
+    );
+  }
+
+  const result = await client.query<{ profile_id: string }>(
+    `
+      select distinct ma.profile_id
+      from public.manager_assignments ma
+      join public.roles r on r.id = ma.role_id
+      join public.profiles p on p.id = ma.profile_id
+      where ma.profile_id = any($1::uuid[])
+        and ma.organization_id = $2
+        and ($3::uuid is null or ma.country_id = $3::uuid)
+        and ($4::uuid is null or ma.company_id = $4::uuid)
+        and ma.operational_area_id = $5
+        and ma.branch_id is not null
+        and ma.status = 'active'
+        and ma.deactivated_at is null
+        and r.key = 'gerente_sucursal'
+        and p.status = 'active'
+        and p.deactivated_at is null
+        and p.deleted_at is null
+    `,
+    [
+      branchManagerIds,
+      scope.organizationId,
+      scope.countryId,
+      scope.companyId,
+      scope.operationalAreaId,
+    ],
+  );
+  const validIds = new Set(result.rows.map((row) => row.profile_id));
+
+  if (branchManagerIds.some((id) => !validIds.has(id))) {
+    throw new UserInvitationError(
+      "Solo puedes asignar gerentes de sucursal activos dentro de la gerencia de area seleccionada.",
+    );
+  }
+}
+
 function buildEmailContent({
   expiresAt,
   fullName,
   invitationUrl,
+  managedBranchManagers,
   managerIncentive,
   roleKey,
 }: {
   expiresAt: string;
   fullName: string;
   invitationUrl: string;
+  managedBranchManagers: number;
   managerIncentive?: ManagerIncentiveInput;
   roleKey: RoleKey;
 }) {
@@ -93,9 +187,14 @@ function buildEmailContent({
   const incentiveText = managerIncentive
     ? `Nivel ${managementLevelLabels[managerIncentive.managementLevel]} con bono base mensual USD ${managerIncentive.baseBonusAmount}.`
     : null;
+  const subordinateText =
+    managedBranchManagers > 0
+      ? `Tendra ${managedBranchManagers} gerente${managedBranchManagers === 1 ? "" : "s"} de sucursal a cargo.`
+      : null;
   const greeting = fullName ? `Hola ${fullName},` : "Hola,";
   const htmlGreeting = escapeHtml(greeting);
   const htmlIncentiveText = incentiveText ? escapeHtml(incentiveText) : null;
+  const htmlSubordinateText = subordinateText ? escapeHtml(subordinateText) : null;
   const htmlInvitationUrl = escapeHtml(invitationUrl);
   const htmlRoleLabel = escapeHtml(roleLabel);
   const htmlExpiresAt = escapeHtml(expiresAt);
@@ -105,6 +204,7 @@ function buildEmailContent({
     "",
     `Te invitaron a Analiza BI con el rol ${roleLabel}.`,
     ...(incentiveText ? [incentiveText] : []),
+    ...(subordinateText ? [subordinateText] : []),
     "Abre el enlace para aceptar la invitacion y continuar con la configuracion de tu cuenta:",
     invitationUrl,
     "",
@@ -118,6 +218,7 @@ function buildEmailContent({
       <p>${htmlGreeting}</p>
       <p>Te invitaron a Analiza BI con el rol <strong>${htmlRoleLabel}</strong>.</p>
       ${htmlIncentiveText ? `<p>${htmlIncentiveText}</p>` : ""}
+      ${htmlSubordinateText ? `<p>${htmlSubordinateText}</p>` : ""}
       <p>
         <a href="${htmlInvitationUrl}" style="display:inline-block;background:#4338ca;color:white;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:700">
           Aceptar invitacion
@@ -136,6 +237,7 @@ export async function createUserInvitation({
   actorUserId,
   email,
   fullName,
+  managedBranchManagerIds = [],
   managerIncentive,
   roleKey,
   scope,
@@ -146,6 +248,14 @@ export async function createUserInvitation({
   const invitationTokenHash = createHash("sha256").update(token).digest("hex");
   const organizationId = requiredUuid(scope.organizationId, "organizationId");
   const auditableActorUserId = nullableUuid(actorUserId);
+  const countryId = nullableUuid(scope.countryId);
+  const companyId = nullableUuid(scope.companyId);
+  const operationalAreaId = nullableUuid(scope.operationalAreaId);
+  const branchId = nullableUuid(scope.branchId);
+  const normalizedManagedBranchManagerIds =
+    roleKey === "gerente_area"
+      ? normalizeUuidList(managedBranchManagerIds)
+      : [];
 
   try {
     await client.query("begin");
@@ -159,6 +269,17 @@ export async function createUserInvitation({
     if (!roleId) {
       throw new Error("Role not found for invitation.");
     }
+
+    await assertManagedBranchManagersInScope({
+      branchManagerIds: normalizedManagedBranchManagerIds,
+      client,
+      scope: {
+        companyId,
+        countryId,
+        operationalAreaId,
+        organizationId,
+      },
+    });
 
     const invitationResult = await client.query<InvitationRow>(
       `
@@ -183,10 +304,10 @@ export async function createUserInvitation({
         organizationId,
         email,
         roleId,
-        nullableUuid(scope.countryId),
-        nullableUuid(scope.companyId),
-        nullableUuid(scope.operationalAreaId),
-        nullableUuid(scope.branchId),
+        countryId,
+        companyId,
+        operationalAreaId,
+        branchId,
         managerIncentive?.managementLevel ?? null,
         managerIncentive?.baseBonusAmount ?? null,
         auditableActorUserId,
@@ -201,6 +322,9 @@ export async function createUserInvitation({
                 management_level: managerIncentive.managementLevel,
               }
             : undefined,
+          managed_branch_manager_count:
+            normalizedManagedBranchManagerIds.length,
+          managed_branch_manager_ids: normalizedManagedBranchManagerIds,
           source: "usuarios-permisos",
         }),
       ],
@@ -231,9 +355,9 @@ export async function createUserInvitation({
         "user_invitation.created",
         "user_invitations",
         invitation.id,
-        nullableUuid(scope.countryId),
-        nullableUuid(scope.companyId),
-        nullableUuid(scope.branchId),
+        countryId,
+        companyId,
+        branchId,
         auditableActorUserId,
         JSON.stringify({
           invited_email_domain: email.split("@")[1] ?? "unknown",
@@ -245,6 +369,8 @@ export async function createUserInvitation({
                 management_level: managerIncentive.managementLevel,
               }
             : undefined,
+          managed_branch_manager_count:
+            normalizedManagedBranchManagerIds.length,
           source: "usuarios-permisos",
         }),
       ],
@@ -271,10 +397,11 @@ export async function createUserInvitation({
           invitation.id,
           JSON.stringify({
             branch_id: nullableUuid(scope.branchId),
-            company_id: nullableUuid(scope.companyId),
-            country_id: nullableUuid(scope.countryId),
+            company_id: companyId,
+            country_id: countryId,
             invited_email_domain: email.split("@")[1] ?? "unknown",
             invited_role: roleKey,
+            managed_branch_manager_ids: normalizedManagedBranchManagerIds,
             manager_incentive: managerIncentive
               ? {
                   base_bonus_amount: managerIncentive.baseBonusAmount,
@@ -282,7 +409,7 @@ export async function createUserInvitation({
                   management_level: managerIncentive.managementLevel,
                 }
               : undefined,
-            operational_area_id: nullableUuid(scope.operationalAreaId),
+            operational_area_id: operationalAreaId,
             status: "pending_invitation",
           }),
           "Invitacion para nombramiento de gerente con alcance operativo controlado.",
@@ -302,6 +429,7 @@ export async function createUserInvitation({
       expiresAt,
       fullName,
       invitationUrl,
+      managedBranchManagers: normalizedManagedBranchManagerIds.length,
       managerIncentive,
       roleKey,
     });
@@ -311,6 +439,7 @@ export async function createUserInvitation({
       emailText: emailContent.text,
       expiresAt,
       id: invitation.id,
+      managedBranchManagers: normalizedManagedBranchManagerIds.length,
       recipientEmail: email,
       subject: emailContent.subject,
     };

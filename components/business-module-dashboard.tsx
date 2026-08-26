@@ -14,6 +14,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   moduleConfigs,
@@ -94,16 +95,42 @@ type DemoManagedUser = {
   createdAt: string;
   deactivatedAt?: string;
   invitationStatus?: "Pendiente" | "Aceptada" | "Revocada";
+  managedBranchManagerCount?: number;
+  managedBranchManagerIds?: string[];
   reassignmentRequired?: boolean;
+};
+
+type AssignableBranchManager = {
+  areaId: string | null;
+  areaName: string | null;
+  baseBonusAmount: number | null;
+  branchId: string | null;
+  branchName: string | null;
+  businessId: string | null;
+  businessName: string | null;
+  countryId: string | null;
+  countryName: string | null;
+  email: string | null;
+  fullName: string;
+  id: string;
+  managementLevel: ManagementLevel | null;
 };
 
 type InviteUserApiResponse = {
   error?: string;
   expiresAt?: string;
   invitationId?: string;
+  managedBranchManagers?: number;
   missingConfig?: string[];
   ok?: boolean;
   status?: "sent";
+};
+
+type BranchManagersApiResponse = {
+  branchManagers?: AssignableBranchManager[];
+  error?: string;
+  missingConfig?: string[];
+  ok?: boolean;
 };
 
 type CreateBranchApiResponse = {
@@ -321,6 +348,19 @@ function getManagedUserBaseBonusLabel(user: DemoManagedUser) {
     : "Pendiente";
 }
 
+function getManagedBranchManagersLabel(user: DemoManagedUser) {
+  if (user.roleKey !== "gerente_area") {
+    return "-";
+  }
+
+  const count =
+    typeof user.managedBranchManagerCount === "number"
+      ? user.managedBranchManagerCount
+      : user.managedBranchManagerIds?.length ?? 0;
+
+  return count > 0 ? `${count} a cargo` : "Sin asignar";
+}
+
 function readInviteUserApiResponse(value: unknown): InviteUserApiResponse {
   if (typeof value !== "object" || value === null) {
     return {};
@@ -341,9 +381,80 @@ function readInviteUserApiResponse(value: unknown): InviteUserApiResponse {
       typeof response.invitationId === "string"
         ? response.invitationId
         : undefined,
+    managedBranchManagers:
+      typeof response.managedBranchManagers === "number"
+        ? response.managedBranchManagers
+        : undefined,
     missingConfig,
     ok: response.ok === true,
     status: response.status === "sent" ? "sent" : undefined,
+  };
+}
+
+function readNullableString(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
+function readAssignableBranchManager(value: unknown): AssignableBranchManager | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const manager = value as Record<string, unknown>;
+
+  if (
+    typeof manager.id !== "string" ||
+    typeof manager.fullName !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    areaId: readNullableString(manager.areaId),
+    areaName: readNullableString(manager.areaName),
+    baseBonusAmount:
+      typeof manager.baseBonusAmount === "number"
+        ? manager.baseBonusAmount
+        : null,
+    branchId: readNullableString(manager.branchId),
+    branchName: readNullableString(manager.branchName),
+    businessId: readNullableString(manager.businessId),
+    businessName: readNullableString(manager.businessName),
+    countryId: readNullableString(manager.countryId),
+    countryName: readNullableString(manager.countryName),
+    email: readNullableString(manager.email),
+    fullName: manager.fullName,
+    id: manager.id,
+    managementLevel: isManagementLevel(manager.managementLevel)
+      ? manager.managementLevel
+      : null,
+  };
+}
+
+function readBranchManagersApiResponse(
+  value: unknown,
+): BranchManagersApiResponse {
+  if (typeof value !== "object" || value === null) {
+    return {};
+  }
+
+  const response = value as Record<string, unknown>;
+  const missingConfig = Array.isArray(response.missingConfig)
+    ? response.missingConfig.filter(
+        (configName): configName is string => typeof configName === "string",
+      )
+    : undefined;
+  const branchManagers = Array.isArray(response.branchManagers)
+    ? response.branchManagers
+        .map(readAssignableBranchManager)
+        .filter((manager): manager is AssignableBranchManager => Boolean(manager))
+    : undefined;
+
+  return {
+    branchManagers,
+    error: typeof response.error === "string" ? response.error : undefined,
+    missingConfig,
+    ok: response.ok === true,
   };
 }
 
@@ -629,6 +740,12 @@ function UsersAndPermissionsManager({
   const [baseBonusAmount, setBaseBonusAmount] = useState(
     String(getDefaultBaseBonusAmount("middle")),
   );
+  const [assignableBranchManagers, setAssignableBranchManagers] = useState<
+    AssignableBranchManager[]
+  >([]);
+  const [managedBranchManagerIds, setManagedBranchManagerIds] = useState<
+    string[]
+  >([]);
   const [countryScope, setCountryScope] = useState(allCountryScope);
   const [businessScope, setBusinessScope] = useState(allBusinessScope);
   const [areaScope, setAreaScope] = useState(allAreaScope);
@@ -720,6 +837,57 @@ function UsersAndPermissionsManager({
     ],
     [areaScope, businessScope, countryScope],
   );
+  const demoBranchManagerOptions = useMemo(
+    () =>
+      demoBranches
+        .filter(
+          (branch) =>
+            branch.branchManagerName &&
+            branch.operationalAreaId &&
+            branch.isActive !== false,
+        )
+        .map(
+          (branch): AssignableBranchManager => ({
+            areaId: branch.operationalAreaId ?? null,
+            areaName: getAreaScopeLabel(branch.operationalAreaId),
+            baseBonusAmount: null,
+            branchId: branch.id,
+            branchName: branch.name,
+            businessId: branch.companyId,
+            businessName: getBusinessScopeLabel(branch.companyId),
+            countryId: branch.countryId,
+            countryName: getCountryScopeLabel(branch.countryId),
+            email: null,
+            fullName: branch.branchManagerName ?? "Gerente de sucursal",
+            id: `demo-${branch.id}`,
+            managementLevel: null,
+          }),
+        ),
+    [],
+  );
+  const branchManagerOptions = useMemo(
+    () =>
+      assignableBranchManagers.length > 0
+        ? assignableBranchManagers
+        : enableDemoFixtures
+          ? demoBranchManagerOptions
+          : [],
+    [assignableBranchManagers, demoBranchManagerOptions, enableDemoFixtures],
+  );
+  const scopedBranchManagerOptions = useMemo(
+    () =>
+      roleKey === "gerente_area" && areaScope !== allAreaScope
+        ? branchManagerOptions.filter(
+            (manager) =>
+              manager.areaId === areaScope &&
+              (countryScope === allCountryScope ||
+                manager.countryId === countryScope) &&
+              (businessScope === allBusinessScope ||
+                manager.businessId === businessScope),
+          )
+        : [],
+    [areaScope, branchManagerOptions, businessScope, countryScope, roleKey],
+  );
   const selectedBranch = useMemo(
     () => demoBranches.find((branch) => branch.id === branchScope),
     [branchScope],
@@ -796,6 +964,57 @@ function UsersAndPermissionsManager({
     branchCountryScope !== allCountryScope &&
     branchBusinessScope !== allBusinessScope &&
     canCreateBranch(actor, branchCreationScope);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadAssignableBranchManagers() {
+      if (
+        !canCreateUsers ||
+        activeRole === "gerente_sucursal" ||
+        activeRole === "usuario_operativo" ||
+        activeRole === "viewer"
+      ) {
+        setAssignableBranchManagers([]);
+        return;
+      }
+
+      const response = await fetch("/api/users/branch-managers", {
+        cache: "no-store",
+      }).catch(() => null);
+
+      if (!response?.ok) {
+        if (isActive) {
+          setAssignableBranchManagers([]);
+        }
+        return;
+      }
+
+      const branchManagerResult = readBranchManagersApiResponse(
+        await response.json().catch(() => null),
+      );
+
+      if (isActive) {
+        setAssignableBranchManagers(branchManagerResult.branchManagers ?? []);
+      }
+    }
+
+    void loadAssignableBranchManagers();
+
+    return () => {
+      isActive = false;
+    };
+  }, [activeRole, canCreateUsers]);
+
+  useEffect(() => {
+    const availableIds = new Set(
+      scopedBranchManagerOptions.map((manager) => manager.id),
+    );
+
+    setManagedBranchManagerIds((currentIds) =>
+      currentIds.filter((id) => availableIds.has(id)),
+    );
+  }, [scopedBranchManagerOptions]);
 
   useEffect(() => {
     setUsers(readDemoUsers(enableDemoFixtures));
@@ -949,6 +1168,24 @@ function UsersAndPermissionsManager({
     }
   }
 
+  function toggleManagedBranchManager(managerId: string, checked: boolean) {
+    setManagedBranchManagerIds((currentIds) =>
+      checked
+        ? [...new Set([...currentIds, managerId])]
+        : currentIds.filter((id) => id !== managerId),
+    );
+  }
+
+  function selectAllManagedBranchManagers() {
+    setManagedBranchManagerIds(
+      scopedBranchManagerOptions.map((manager) => manager.id),
+    );
+  }
+
+  function clearManagedBranchManagers() {
+    setManagedBranchManagerIds([]);
+  }
+
   async function createDemoUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -1028,6 +1265,14 @@ function UsersAndPermissionsManager({
           managementLevel,
         }
       : null;
+    const selectedManagedBranchManagerIds =
+      roleKey === "gerente_area"
+        ? managedBranchManagerIds.filter((managerId) =>
+            scopedBranchManagerOptions.some(
+              (manager) => manager.id === managerId && isUuid(manager.id),
+            ),
+          )
+        : [];
 
     if (isManagerIncentiveRole(roleKey) && !normalizedBaseBonusAmount) {
       setMessage("Ingresa el nivel y un bono base valido para este gerente.");
@@ -1041,6 +1286,10 @@ function UsersAndPermissionsManager({
         body: JSON.stringify({
           email: normalizedEmail,
           fullName: normalizedName,
+          managedBranchManagerIds:
+            selectedManagedBranchManagerIds.length > 0
+              ? selectedManagedBranchManagerIds
+              : undefined,
           managerIncentive: managerIncentive ?? undefined,
           roleKey,
           scope: targetScope,
@@ -1077,6 +1326,15 @@ function UsersAndPermissionsManager({
           areaScope: targetAreaScope,
           branchScope: targetBranchScope,
           invitationStatus: "Pendiente",
+          managedBranchManagerCount:
+            roleKey === "gerente_area"
+              ? inviteResult.managedBranchManagers ??
+                selectedManagedBranchManagerIds.length
+              : undefined,
+          managedBranchManagerIds:
+            roleKey === "gerente_area"
+              ? [...managedBranchManagerIds]
+              : undefined,
           status: "Pendiente invitacion",
           createdAt: todayIsoDate(),
         },
@@ -1092,14 +1350,19 @@ function UsersAndPermissionsManager({
       setRoleKey(getDefaultRoleForActor(activeRole));
       setManagementLevel("middle");
       setBaseBonusAmount(String(getDefaultBaseBonusAmount("middle")));
+      setManagedBranchManagerIds([]);
       setCountryScope(allCountryScope);
       setBusinessScope(allBusinessScope);
       setAreaScope(allAreaScope);
       setBranchScope(allBranchScope);
+      const managedBranchMessage =
+        roleKey === "gerente_area" && selectedManagedBranchManagerIds.length > 0
+          ? ` Quedan ${selectedManagedBranchManagerIds.length} gerentes de sucursal preasignados a cargo.`
+          : "";
       setMessage(
         inviteResult.expiresAt
-          ? `Invitacion enviada por correo. La cuenta queda pendiente hasta aceptar antes del ${inviteResult.expiresAt}.`
-          : "Invitacion enviada por correo. La cuenta queda pendiente hasta aceptar.",
+          ? `Invitacion enviada por correo. La cuenta queda pendiente hasta aceptar antes del ${inviteResult.expiresAt}.${managedBranchMessage}`
+          : `Invitacion enviada por correo. La cuenta queda pendiente hasta aceptar.${managedBranchMessage}`,
       );
     } catch (error) {
       setMessage(
@@ -1380,7 +1643,8 @@ function UsersAndPermissionsManager({
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
               Crea usuarios por invitacion y define su alcance por pais, linea de
               negocio, gerencia de area y sucursal. Para gerentes, define nivel
-              y bono base antes de enviar la invitacion.
+              y bono base; para gerentes de area, asigna los gerentes de sucursal
+              a cargo.
             </p>
           </div>
           <Badge variant={canCreateUsers ? "outline" : "secondary"}>
@@ -1598,6 +1862,81 @@ function UsersAndPermissionsManager({
               ))}
             </select>
           </label>
+
+          {roleKey === "gerente_area" ? (
+            <div className="grid min-w-0 gap-3 text-sm xl:col-span-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="grid gap-1">
+                  <span className="font-medium">Gerentes de sucursal a cargo</span>
+                  <span className="text-xs leading-5 text-muted-foreground">
+                    {managedBranchManagerIds.length} seleccionados
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    disabled={
+                      !canCreateUsers || scopedBranchManagerOptions.length === 0
+                    }
+                    onClick={selectAllManagedBranchManagers}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Todos
+                  </Button>
+                  <Button
+                    disabled={!canCreateUsers || managedBranchManagerIds.length === 0}
+                    onClick={clearManagedBranchManagers}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    Limpiar
+                  </Button>
+                </div>
+              </div>
+
+              {areaScope === allAreaScope ? (
+                <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                  Selecciona una gerencia de area.
+                </div>
+              ) : scopedBranchManagerOptions.length === 0 ? (
+                <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                  Sin gerentes de sucursal activos en esta gerencia.
+                </div>
+              ) : (
+                <div className="grid max-h-56 min-w-0 gap-2 overflow-y-auto rounded-md border bg-background p-3 md:grid-cols-2">
+                  {scopedBranchManagerOptions.map((manager) => (
+                    <label
+                      className="flex min-w-0 items-start gap-3 rounded-md border bg-muted/30 p-3"
+                      key={manager.id}
+                    >
+                      <Checkbox
+                        checked={managedBranchManagerIds.includes(manager.id)}
+                        disabled={!canCreateUsers}
+                        onCheckedChange={(checked) =>
+                          toggleManagedBranchManager(manager.id, checked === true)
+                        }
+                      />
+                      <span className="grid min-w-0 gap-1">
+                        <span className="truncate font-medium">
+                          {manager.fullName}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {manager.branchName ?? "Sucursal sin nombre"}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {manager.baseBonusAmount
+                            ? `Bono base ${formatCurrency(manager.baseBonusAmount)}`
+                            : "Bono base pendiente"}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
@@ -1632,13 +1971,14 @@ function UsersAndPermissionsManager({
           <Badge variant="outline">{users.length} usuarios</Badge>
         </div>
         <div className="min-w-0 overflow-x-auto">
-          <table className="w-full min-w-[1220px] table-fixed text-left text-sm">
+          <table className="w-full min-w-[1340px] table-fixed text-left text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b">
                 <th className="w-[220px] py-2 pr-4 font-medium">Usuario</th>
                 <th className="w-[190px] py-2 pr-4 font-medium">Rol</th>
                 <th className="w-[110px] py-2 pr-4 font-medium">Nivel</th>
                 <th className="w-[130px] py-2 pr-4 font-medium">Bono base</th>
+                <th className="w-[120px] py-2 pr-4 font-medium">A cargo</th>
                 <th className="w-[140px] py-2 pr-4 font-medium">Pais</th>
                 <th className="w-[170px] py-2 pr-4 font-medium">Linea</th>
                 <th className="w-[190px] py-2 pr-4 font-medium">Gerencia</th>
@@ -1694,6 +2034,9 @@ function UsersAndPermissionsManager({
                     </td>
                     <td className="py-3 pr-4 align-top">
                       {getManagedUserBaseBonusLabel(user)}
+                    </td>
+                    <td className="py-3 pr-4 align-top">
+                      {getManagedBranchManagersLabel(user)}
                     </td>
                     <td className="py-3 pr-4 align-top">
                       {getCountryScopeLabel(user.countryScope ?? allCountryScope)}

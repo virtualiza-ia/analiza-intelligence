@@ -22,6 +22,8 @@ const ceoUserDelegationMigrationPath =
   "supabase/migrations/20260825000200_ceo_user_delegation.sql";
 const managerIncentiveMigrationPath =
   "supabase/migrations/20260826000100_manager_incentive_policy.sql";
+const areaManagerBranchDelegationMigrationPath =
+  "supabase/migrations/20260826000200_area_manager_branch_delegation.sql";
 const seedPath = "supabase/seed.sql";
 const contextDataPath = "lib/tenant/demo-context.ts";
 const usersComponentPath = "components/business-module-dashboard.tsx";
@@ -31,6 +33,7 @@ for (const file of [
   ceoBranchGovernanceMigrationPath,
   ceoUserDelegationMigrationPath,
   managerIncentiveMigrationPath,
+  areaManagerBranchDelegationMigrationPath,
   seedPath,
   contextDataPath,
   usersComponentPath,
@@ -49,6 +52,10 @@ const ceoUserDelegationMigration = readFileSync(
 );
 const managerIncentiveMigration = readFileSync(
   managerIncentiveMigrationPath,
+  "utf8",
+);
+const areaManagerBranchDelegationMigration = readFileSync(
+  areaManagerBranchDelegationMigrationPath,
   "utf8",
 );
 const seed = readFileSync(seedPath, "utf8");
@@ -175,10 +182,16 @@ assert.deepEqual(
   "CEO must keep non-manager lower roles available without bypassing operations manager creation.",
 );
 
+assert.deepEqual(
+  getCreatableRoles("gerente_area"),
+  ["gerente_sucursal", "usuario_operativo", "viewer"],
+  "Area manager must create branch managers and lower operational users in scope.",
+);
+
 assert.equal(
   canInviteUser(areaActor, branchManagerTarget),
-  false,
-  "Area manager must not create branch managers; operations owns manager creation.",
+  true,
+  "Area manager should create branch managers inside its operational area.",
 );
 
 assert.equal(
@@ -319,12 +332,23 @@ for (const requiredManagerIncentiveSql of [
   "manager_assignments_management_level_check",
   "manager_assignments_base_bonus_amount_check",
   "current_user_can_delegate_role",
-  "target_hierarchy.role_key not in ('gerente_area', 'gerente_sucursal')",
-  "actor_hierarchy.role_key = 'gerente_operaciones'",
 ]) {
   if (!managerIncentiveMigration.includes(requiredManagerIncentiveSql)) {
     throw new Error(
       `Manager incentive migration is missing: ${requiredManagerIncentiveSql}`,
+    );
+  }
+}
+
+for (const requiredAreaDelegationSql of [
+  "target_hierarchy.role_key not in ('gerente_area', 'gerente_sucursal')",
+  "actor_hierarchy.role_key = 'gerente_operaciones'",
+  "target_hierarchy.role_key = 'gerente_sucursal'",
+  "actor_hierarchy.role_key in ('gerente_operaciones', 'gerente_area')",
+]) {
+  if (!areaManagerBranchDelegationMigration.includes(requiredAreaDelegationSql)) {
+    throw new Error(
+      `Area manager delegation migration is missing: ${requiredAreaDelegationSql}`,
     );
   }
 }
@@ -360,6 +384,8 @@ for (const requiredUserUiText of [
   "Invitar usuario",
   "Nivel de gerencia",
   "Bono base mensual",
+  "Gerentes de sucursal a cargo",
+  "managedBranchManagerIds",
   "Recomendado = bono base x cumplimiento de meta",
   "Selecciona la gerencia de area",
   "Selecciona la sucursal",

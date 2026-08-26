@@ -186,6 +186,7 @@ Reglas:
 - `NOT ELIGIBLE` muestra USD 0 hasta resolver condicion.
 - La banda Exceptional debe ser rara y estar sustentada por datos completos.
 - El score no define un monto fijo; controla si el bono calculado por meta puede pasar a revision.
+- El bono base se define al crear el gerente. Operaciones lo define para gerentes de area y puede preasignar los gerentes de sucursal a cargo; gerentes de area lo definen para gerentes de sucursal dentro de su area.
 
 ## Elegibilidad
 

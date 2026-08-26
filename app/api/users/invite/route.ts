@@ -4,7 +4,10 @@ import { demoOrganizationId } from "@/lib/auth/demo-admin";
 import { getCurrentAuthorizationActor } from "@/lib/server/authorization";
 import { getMissingDatabaseConfig } from "@/lib/server/database";
 import { getMissingSmtpConfig, sendMail } from "@/lib/server/mail";
-import { createUserInvitation } from "@/lib/server/user-invitations";
+import {
+  createUserInvitation,
+  UserInvitationError,
+} from "@/lib/server/user-invitations";
 import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
 import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
 import { canPerformAction } from "@/lib/security/authorization-policy";
@@ -16,16 +19,24 @@ import {
   type ManagerIncentiveInput,
 } from "@/lib/tenant/manager-incentives";
 
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type InviteUserRequest = {
   email?: unknown;
   fullName?: unknown;
   managerIncentive?: unknown;
+  managedBranchManagerIds?: unknown;
   roleKey?: unknown;
   scope?: unknown;
 };
 
 function isRoleKey(value: unknown): value is RoleKey {
   return typeof value === "string" && roleKeys.includes(value as RoleKey);
+}
+
+function isUuid(value: string) {
+  return uuidPattern.test(value);
 }
 
 function readScope(value: unknown): ScopeBoundary | null {
@@ -147,6 +158,42 @@ function readManagerIncentive(
   };
 }
 
+function readManagedBranchManagerIds(
+  value: unknown,
+  roleKey: RoleKey,
+): { error: string | null; ids: string[] } {
+  if (roleKey !== "gerente_area" || value === undefined) {
+    return { error: null, ids: [] };
+  }
+
+  if (!Array.isArray(value)) {
+    return {
+      error: "Selecciona gerentes de sucursal validos para esta gerencia de area.",
+      ids: [],
+    };
+  }
+
+  if (value.length > 50) {
+    return {
+      error: "Puedes asignar hasta 50 gerentes de sucursal por invitacion.",
+      ids: [],
+    };
+  }
+
+  const ids = value.filter(
+    (id): id is string => typeof id === "string" && isUuid(id),
+  );
+
+  if (ids.length !== value.length) {
+    return {
+      error: "Selecciona gerentes de sucursal validos para esta gerencia de area.",
+      ids: [],
+    };
+  }
+
+  return { error: null, ids: [...new Set(ids)] };
+}
+
 export async function POST(request: Request) {
   const actor = await getCurrentAuthorizationActor();
 
@@ -219,6 +266,15 @@ export async function POST(request: Request) {
     return jsonError(managerIncentiveResult.error, 400);
   }
 
+  const managedBranchManagerResult = readManagedBranchManagerIds(
+    payload.managedBranchManagerIds,
+    payload.roleKey,
+  );
+
+  if (managedBranchManagerResult.error) {
+    return jsonError(managedBranchManagerResult.error, 400);
+  }
+
   if (
     !canPerformAction(actor, "users.invite", {
       roleKey: payload.roleKey,
@@ -236,6 +292,7 @@ export async function POST(request: Request) {
       appUrl,
       email,
       fullName,
+      managedBranchManagerIds: managedBranchManagerResult.ids,
       roleKey: payload.roleKey,
       scope: targetScope,
       actorUserId: actor.userId,
@@ -252,10 +309,15 @@ export async function POST(request: Request) {
     return NextResponse.json({
       expiresAt: invitation.expiresAt,
       invitationId: invitation.id,
+      managedBranchManagers: invitation.managedBranchManagers,
       ok: true,
       status: "sent",
     });
   } catch (error) {
+    if (error instanceof UserInvitationError) {
+      return jsonError(error.message, error.status);
+    }
+
     console.error("Failed to send user invitation", {
       message: error instanceof Error ? error.message : "Unknown error",
     });
