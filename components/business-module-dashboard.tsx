@@ -21,6 +21,7 @@ import {
   type ModuleInsight,
   type ModuleMetric,
 } from "@/lib/analytics/demo-business-modules";
+import { formatCurrency } from "@/lib/analytics/el-salvador-result-templates";
 import {
   demoBranches,
   demoCountryOptions,
@@ -40,6 +41,15 @@ import {
   type DelegationActor,
   type ScopeBoundary,
 } from "@/lib/tenant/delegation-policy";
+import {
+  getDefaultBaseBonusAmount,
+  isManagementLevel,
+  isManagerIncentiveRole,
+  managementLevelLabels,
+  managementLevels,
+  normalizeBaseBonusAmount,
+  type ManagementLevel,
+} from "@/lib/tenant/manager-incentives";
 import { cn } from "@/lib/utils";
 
 const storageKey = "analiza:selected-context";
@@ -73,6 +83,8 @@ type DemoManagedUser = {
   fullName: string;
   email: string;
   roleKey: RoleKey;
+  baseBonusAmount?: number;
+  managementLevel?: ManagementLevel;
   organizationScope: string;
   countryScope: string;
   businessScope: string;
@@ -287,6 +299,26 @@ function getDefaultRoleForActor(actorRole: RoleKey) {
   return getCreatableRoles(actorRole, {
     canInviteOperationalUsers: actorRole === "gerente_sucursal",
   })[0] ?? "viewer";
+}
+
+function getManagedUserManagementLevelLabel(user: DemoManagedUser) {
+  if (!isManagerIncentiveRole(user.roleKey)) {
+    return "-";
+  }
+
+  return user.managementLevel && isManagementLevel(user.managementLevel)
+    ? managementLevelLabels[user.managementLevel]
+    : "-";
+}
+
+function getManagedUserBaseBonusLabel(user: DemoManagedUser) {
+  if (!isManagerIncentiveRole(user.roleKey)) {
+    return "-";
+  }
+
+  return typeof user.baseBonusAmount === "number"
+    ? formatCurrency(user.baseBonusAmount)
+    : "Pendiente";
 }
 
 function readInviteUserApiResponse(value: unknown): InviteUserApiResponse {
@@ -592,6 +624,11 @@ function UsersAndPermissionsManager({
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [roleKey, setRoleKey] = useState<RoleKey>("gerente_area");
+  const [managementLevel, setManagementLevel] =
+    useState<ManagementLevel>("middle");
+  const [baseBonusAmount, setBaseBonusAmount] = useState(
+    String(getDefaultBaseBonusAmount("middle")),
+  );
   const [countryScope, setCountryScope] = useState(allCountryScope);
   const [businessScope, setBusinessScope] = useState(allBusinessScope);
   const [areaScope, setAreaScope] = useState(allAreaScope);
@@ -982,6 +1019,21 @@ function UsersAndPermissionsManager({
       return;
     }
 
+    const normalizedBaseBonusAmount = normalizeBaseBonusAmount(
+      Number(baseBonusAmount),
+    );
+    const managerIncentive = isManagerIncentiveRole(roleKey)
+      ? {
+          baseBonusAmount: normalizedBaseBonusAmount ?? 0,
+          managementLevel,
+        }
+      : null;
+
+    if (isManagerIncentiveRole(roleKey) && !normalizedBaseBonusAmount) {
+      setMessage("Ingresa el nivel y un bono base valido para este gerente.");
+      return;
+    }
+
     setIsInviting(true);
 
     try {
@@ -989,6 +1041,7 @@ function UsersAndPermissionsManager({
         body: JSON.stringify({
           email: normalizedEmail,
           fullName: normalizedName,
+          managerIncentive: managerIncentive ?? undefined,
           roleKey,
           scope: targetScope,
         }),
@@ -1018,6 +1071,8 @@ function UsersAndPermissionsManager({
           organizationScope: "Grupo Analiza DEMO",
           countryScope: targetCountryScope,
           roleKey,
+          baseBonusAmount: managerIncentive?.baseBonusAmount,
+          managementLevel: managerIncentive?.managementLevel,
           businessScope: targetBusinessScope,
           areaScope: targetAreaScope,
           branchScope: targetBranchScope,
@@ -1035,6 +1090,8 @@ function UsersAndPermissionsManager({
       setFullName("");
       setEmail("");
       setRoleKey(getDefaultRoleForActor(activeRole));
+      setManagementLevel("middle");
+      setBaseBonusAmount(String(getDefaultBaseBonusAmount("middle")));
       setCountryScope(allCountryScope);
       setBusinessScope(allBusinessScope);
       setAreaScope(allAreaScope);
@@ -1075,11 +1132,22 @@ function UsersAndPermissionsManager({
       return;
     }
 
+    const nextManagementLevel =
+      userToUpdate.managementLevel && isManagementLevel(userToUpdate.managementLevel)
+        ? userToUpdate.managementLevel
+        : "middle";
     const nextUsers = users.map((user) =>
       user.id === userId
         ? {
             ...user,
             roleKey: nextRole,
+            baseBonusAmount: isManagerIncentiveRole(nextRole)
+              ? (user.baseBonusAmount ??
+                getDefaultBaseBonusAmount(nextManagementLevel))
+              : undefined,
+            managementLevel: isManagerIncentiveRole(nextRole)
+              ? nextManagementLevel
+              : undefined,
             businessScope:
               isSuperAdministrator(nextRole) || nextRole === "ceo"
                 ? allBusinessScope
@@ -1311,8 +1379,8 @@ function UsersAndPermissionsManager({
             </div>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
               Crea usuarios por invitacion y define su alcance por pais, linea de
-              negocio, gerencia de area y sucursal. El acceso no depende solo del
-              rol.
+              negocio, gerencia de area y sucursal. Para gerentes, define nivel
+              y bono base antes de enviar la invitacion.
             </p>
           </div>
           <Badge variant={canCreateUsers ? "outline" : "secondary"}>
@@ -1347,7 +1415,7 @@ function UsersAndPermissionsManager({
           pendiente hasta que la persona acepte el acceso.
         </div>
 
-        <div className="grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-4">
           <label className="grid min-w-0 gap-2 text-sm">
             <span className="font-medium">Nombre</span>
             <Input
@@ -1389,6 +1457,53 @@ function UsersAndPermissionsManager({
               {demoRoleProfiles[roleKey].accessSummary}
             </span>
           </label>
+
+          {isManagerIncentiveRole(roleKey) ? (
+            <>
+              <label className="grid min-w-0 gap-2 text-sm">
+                <span className="font-medium">Nivel de gerencia</span>
+                <select
+                  className={formSelectClassName}
+                  disabled={!canCreateUsers}
+                  onChange={(event) => {
+                    const nextLevel = event.target.value;
+
+                    if (isManagementLevel(nextLevel)) {
+                      setManagementLevel(nextLevel);
+                      setBaseBonusAmount(
+                        String(getDefaultBaseBonusAmount(nextLevel)),
+                      );
+                    }
+                  }}
+                  value={managementLevel}
+                >
+                  {managementLevels.map((level) => (
+                    <option key={level} value={level}>
+                      {managementLevelLabels[level]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid min-w-0 gap-2 text-sm">
+                <span className="font-medium">Bono base mensual</span>
+                <Input
+                  className="h-10"
+                  disabled={!canCreateUsers}
+                  max={10000}
+                  min={1}
+                  onChange={(event) => setBaseBonusAmount(event.target.value)}
+                  placeholder="400"
+                  step={1}
+                  type="number"
+                  value={baseBonusAmount}
+                />
+                <span className="text-xs leading-5 text-muted-foreground">
+                  Recomendado = bono base x cumplimiento de meta.
+                </span>
+              </label>
+            </>
+          ) : null}
 
           <label className="grid min-w-0 gap-2 text-sm">
             <span className="font-medium">Pais</span>
@@ -1517,11 +1632,13 @@ function UsersAndPermissionsManager({
           <Badge variant="outline">{users.length} usuarios</Badge>
         </div>
         <div className="min-w-0 overflow-x-auto">
-          <table className="w-full min-w-[1040px] table-fixed text-left text-sm">
+          <table className="w-full min-w-[1220px] table-fixed text-left text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b">
                 <th className="w-[220px] py-2 pr-4 font-medium">Usuario</th>
                 <th className="w-[190px] py-2 pr-4 font-medium">Rol</th>
+                <th className="w-[110px] py-2 pr-4 font-medium">Nivel</th>
+                <th className="w-[130px] py-2 pr-4 font-medium">Bono base</th>
                 <th className="w-[140px] py-2 pr-4 font-medium">Pais</th>
                 <th className="w-[170px] py-2 pr-4 font-medium">Linea</th>
                 <th className="w-[190px] py-2 pr-4 font-medium">Gerencia</th>
@@ -1571,6 +1688,12 @@ function UsersAndPermissionsManager({
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td className="py-3 pr-4 align-top">
+                      {getManagedUserManagementLevelLabel(user)}
+                    </td>
+                    <td className="py-3 pr-4 align-top">
+                      {getManagedUserBaseBonusLabel(user)}
                     </td>
                     <td className="py-3 pr-4 align-top">
                       {getCountryScopeLabel(user.countryScope ?? allCountryScope)}

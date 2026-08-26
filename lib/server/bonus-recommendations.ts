@@ -86,6 +86,7 @@ export function toBonusRecommendationSnapshot(
 ): BonusRecommendationSnapshot {
   return {
     bonusRecommendationId: record.id,
+    baseBonusAmount: record.baseBonusAmount,
     breakdown: record.dimensions.map((dimension) => ({
       id: dimension.id,
       insight: dimension.insight,
@@ -96,6 +97,7 @@ export function toBonusRecommendationSnapshot(
     })),
     businessLine: record.line,
     businessLineSlug: record.lineSlug,
+    managementLevel: record.managementLevel,
     manager: record.manager,
     managerRoleKey: toManagerRoleKey(record),
     managerRoleLabel: record.managerRole,
@@ -104,6 +106,7 @@ export function toBonusRecommendationSnapshot(
     recommendedAmount: record.bonusRecommended,
     scope: getBonusRecommendationScope(record),
     score: record.score,
+    targetCompletionRate: record.targetCompletionRate,
   };
 }
 

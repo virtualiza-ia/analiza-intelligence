@@ -12,6 +12,14 @@ import {
   formatCurrency,
   formatRate,
 } from "@/lib/analytics/el-salvador-result-templates";
+import {
+  calculateRecommendedManagerBonus,
+  getDefaultBaseBonusAmount,
+  getGoalCompletionFactor,
+  managementLevelLabels,
+  managerIncentiveFormulaVersion,
+  type ManagementLevel,
+} from "@/lib/tenant/manager-incentives";
 
 export type ManagerBonusStatus =
   | "Sobresaliente"
@@ -114,6 +122,9 @@ export type ManagerBonusRecord = {
   dataQuality: number;
   staffTurnoverRate: number;
   criticalIncidents: number;
+  managementLevel: ManagementLevel;
+  baseBonusAmount: number;
+  bonusCompletionFactor: number;
   bonusPotential: number;
   bonusProjected: number;
   bonusRecommended: number;
@@ -757,65 +768,94 @@ function getBonusState(
   return "ELIGIBLE";
 }
 
-function getBonusBand(score: number): { amount: number; band: BonusBand } {
+function getBonusBand(score: number): BonusBand {
   if (score >= 95) {
-    return { amount: 200, band: "Exceptional" };
+    return "Exceptional";
   }
 
   if (score >= 89) {
-    return { amount: 175, band: "Outstanding" };
+    return "Outstanding";
   }
 
   if (score >= 82) {
-    return { amount: 150, band: "High" };
+    return "High";
   }
 
   if (score >= 75) {
-    return { amount: 125, band: "Strong" };
+    return "Strong";
   }
 
   if (score >= 70) {
-    return { amount: 100, band: "Satisfactory" };
+    return "Satisfactory";
   }
 
-  return { amount: 0, band: "No bonus" };
+  return "No bonus";
+}
+
+function getDemoManagementLevel(
+  managerRole: ManagerRole,
+  index: number,
+): ManagementLevel {
+  if (managerRole === "Gerente de Area") {
+    return index % 3 === 1 ? "middle" : "senior";
+  }
+
+  if (index % 5 === 0) {
+    return "senior";
+  }
+
+  if (index % 4 === 0) {
+    return "junior";
+  }
+
+  return "middle";
 }
 
 function buildWaterfall({
-  band,
-  bonusCap,
+  baseBonusAmount,
+  managementLevel,
   bonusRecommended,
+  targetCompletionRate,
   eligibilityStatus,
 }: {
-  band: BonusBand;
-  bonusCap: number;
+  baseBonusAmount: number;
+  managementLevel: ManagementLevel;
   bonusRecommended: number;
+  targetCompletionRate: number;
   eligibilityStatus: BonusState;
 }) {
-  const scoreBandAmount = eligibilityStatus === "NOT ELIGIBLE" ? 0 : bonusRecommended;
+  const completionFactor = getGoalCompletionFactor(targetCompletionRate);
+  const earnedBeforeEligibility = calculateRecommendedManagerBonus({
+    baseBonusAmount,
+    targetCompletionRate,
+  });
+  const completionAdjustment = earnedBeforeEligibility - baseBonusAmount;
   const eligibilityAdjustment =
-    eligibilityStatus === "NOT ELIGIBLE" ? -scoreBandAmount : 0;
+    eligibilityStatus === "NOT ELIGIBLE" ? -earnedBeforeEligibility : 0;
 
   return {
     projected: bonusRecommended,
     waterfall: [
       {
-        label: "Rango maximo",
-        amount: bonusCap,
+        label: `Bono base ${managementLevelLabels[managementLevel]}`,
+        amount: baseBonusAmount,
         kind: "base" as const,
-        note: "Tope mensual aprobado para recomendacion.",
+        note: "Monto mensual definido al crear o asignar el gerente.",
       },
       {
-        label: `Banda ${band}`,
-        amount: scoreBandAmount - bonusCap,
+        label: "Cumplimiento de meta",
+        amount: completionAdjustment,
         kind: "adjustment" as const,
-        note: "Monto discreto segun puntaje transparente.",
+        note: `La sucursal cumplio ${formatRate(completionFactor)} de la meta aprobada.`,
       },
       {
         label: "Elegibilidad",
         amount: eligibilityAdjustment,
         kind: "adjustment" as const,
-        note: `Estado del bono: ${eligibilityStatus}.`,
+        note:
+          eligibilityStatus === "NOT ELIGIBLE"
+            ? "El monto ganado queda bloqueado hasta resolver condiciones criticas."
+            : `Estado del bono: ${eligibilityStatus}.`,
       },
       {
         label: "Bono recomendado",
@@ -904,7 +944,9 @@ function buildManagerBonusRecord(
   const targetCompletionRate = clamp(1 + record.targetGap / 100, 0.5, 1.2);
   const fulfillmentFactor = clamp(targetCompletionRate, 0.72, 1.08);
   const qualityFactor = clamp(record.dataQuality / 100 + (record.slaRate >= 0.9 ? 0.08 : 0), 0.72, 1.05);
-  const bonusPotential = 200;
+  const managementLevel = getDemoManagementLevel(managerRole, index);
+  const baseBonusAmount = getDefaultBaseBonusAmount(managementLevel);
+  const bonusCompletionFactor = getGoalCompletionFactor(targetCompletionRate);
   const penalties =
     conditions.filter((condition) => condition.state === "Bloquea").length * 100 +
     conditions.filter((condition) => condition.state === "Retiene").length * 50 +
@@ -912,11 +954,20 @@ function buildManagerBonusRecord(
     conditions.filter((condition) => condition.state === "Pendiente").length * 15;
   const bonusState = getBonusState(score, record.dataQuality, conditions, record);
   const band = getBonusBand(score);
-  const bonusRecommended = bonusState === "NOT ELIGIBLE" ? 0 : band.amount;
+  const earnedBeforeEligibility = calculateRecommendedManagerBonus({
+    baseBonusAmount,
+    targetCompletionRate,
+  });
+  const bonusRecommended = calculateRecommendedManagerBonus({
+    baseBonusAmount,
+    isEligible: bonusState !== "NOT ELIGIBLE",
+    targetCompletionRate,
+  });
   const { projected, waterfall } = buildWaterfall({
-    band: band.band,
-    bonusCap: bonusPotential,
+    baseBonusAmount,
+    managementLevel,
     bonusRecommended,
+    targetCompletionRate,
     eligibilityStatus: bonusState,
   });
   const bonusApproved = 0;
@@ -948,7 +999,7 @@ function buildManagerBonusRecord(
     line: record.line,
     lineSlug: record.lineSlug,
     country: "El Salvador",
-    formulaVersion: "bonus-policy-v1-demo",
+    formulaVersion: managerIncentiveFormulaVersion,
     region: record.region,
     managerType: getManagerType(record, index),
     goalType: getGoalType(record, dimensions),
@@ -970,15 +1021,18 @@ function buildManagerBonusRecord(
     criticalIncidents: conditions.filter((condition) =>
       ["Bloquea", "Retiene"].includes(condition.state),
     ).length,
-    bonusPotential,
+    managementLevel,
+    baseBonusAmount,
+    bonusCompletionFactor,
+    bonusPotential: baseBonusAmount,
     bonusProjected: projected,
     bonusRecommended,
     bonusApproved,
     bonusRetained: bonusState === "REVIEW REQUIRED" ? projected : 0,
-    bonusBlocked: bonusState === "NOT ELIGIBLE" ? band.amount : 0,
+    bonusBlocked: bonusState === "NOT ELIGIBLE" ? earnedBeforeEligibility : 0,
     bonusPaid,
     bonusState,
-    bonusBand: band.band,
+    bonusBand: band,
     approvalReason: "Pendiente de revision humana; el sistema no paga automaticamente.",
     approvalStatus: "SYSTEM RECOMMENDS",
     scoreMultiplier,
@@ -997,8 +1051,8 @@ function buildManagerBonusRecord(
     explanation: `${record.manager} obtuvo ${score} puntos. ${highestDimension.insight} fue la principal fortaleza; pierde puntos por ${lowestDimension.label.toLowerCase()}. ${getLineSpecificExplanation(record)}`,
     whyBonus:
       bonusState === "NOT ELIGIBLE"
-        ? `No hay bono recomendado porque ${lowestDimension.label.toLowerCase()} y las reglas de elegibilidad requieren resolver datos o bloqueos antes de aprobacion.`
-        : `Recibe una recomendacion de ${formatCurrency(bonusRecommended)} por banda ${band.band}: Finanzas ${getDimensionByLabel(dimensions, /Finanzas|Resultado consolidado/)}/100, Operacion ${getDimensionByLabel(dimensions, /Operacion|Productividad|Utilizacion|Sucursales en meta|Mejora/)}/100, Metas ${getDimensionByLabel(dimensions, /Metas|Sucursales en meta/)}/100, Eficiencia/calidad ${getDimensionByLabel(dimensions, /Eficiencia|Calidad|SLA|Informes|margen/i)}/100 y Calidad dato ${getDimensionByLabel(dimensions, /Dato|Puntualidad/)}/100.`,
+        ? `No hay bono recomendado porque ${lowestDimension.label.toLowerCase()} y las reglas de elegibilidad requieren resolver datos o bloqueos antes de aprobacion. El monto base ${managementLevelLabels[managementLevel]} de ${formatCurrency(baseBonusAmount)} habia generado ${formatCurrency(earnedBeforeEligibility)} por cumplimiento de meta ${formatRate(bonusCompletionFactor)}, pero queda bloqueado.`
+        : `Recibe una recomendacion de ${formatCurrency(bonusRecommended)} porque el bono base ${managementLevelLabels[managementLevel]} de ${formatCurrency(baseBonusAmount)} se multiplica por el cumplimiento de meta ${formatRate(bonusCompletionFactor)}. El puntaje gerencial queda en banda ${band}: Finanzas ${getDimensionByLabel(dimensions, /Finanzas|Resultado consolidado/)}/100, Operacion ${getDimensionByLabel(dimensions, /Operacion|Productividad|Utilizacion|Sucursales en meta|Mejora/)}/100, Metas ${getDimensionByLabel(dimensions, /Metas|Sucursales en meta/)}/100, Eficiencia/calidad ${getDimensionByLabel(dimensions, /Eficiencia|Calidad|SLA|Informes|margen/i)}/100 y Calidad dato ${getDimensionByLabel(dimensions, /Dato|Puntualidad/)}/100.`,
     dimensions,
     blockingConditions: conditions,
     waterfall,
@@ -1143,6 +1197,9 @@ function buildMetrics(records: ManagerBonusRecord[]): ManagerBonusMetric[] {
   const totalProjected = records.reduce((sum, record) => sum + record.bonusRecommended, 0);
   const totalApproved = records.reduce((sum, record) => sum + record.bonusApproved, 0);
   const totalPaid = records.reduce((sum, record) => sum + record.bonusPaid, 0);
+  const baseBonusAmounts = records.map((record) => record.baseBonusAmount);
+  const minBaseBonus = baseBonusAmounts.length > 0 ? Math.min(...baseBonusAmounts) : 0;
+  const maxBaseBonus = baseBonusAmounts.length > 0 ? Math.max(...baseBonusAmounts) : 0;
   const averageScore =
     records.reduce((sum, record) => sum + record.score, 0) / Math.max(active, 1);
   const managedSales = records.reduce((sum, record) => sum + record.netSales, 0);
@@ -1166,7 +1223,7 @@ function buildMetrics(records: ManagerBonusRecord[]): ManagerBonusMetric[] {
     { group: "Gerentes", label: "Gerentes sobre meta", value: `${aboveTarget}`, note: "cumplimiento >= 100%", tone: "positive" },
     { group: "Gerentes", label: "En precaucion", value: `${warning}`, note: "requieren accion", tone: warning > 0 ? "warning" : "positive" },
     { group: "Gerentes", label: "Criticos o sin datos", value: `${critical}`, note: "riesgo de bono", tone: critical > 0 ? "negative" : "positive" },
-    { group: "Bonos", label: "Rango por gerente", value: "$100-$200", note: "si cumple elegibilidad", tone: "neutral" },
+    { group: "Bonos", label: "Bono base por nivel", value: `${formatCurrency(minBaseBonus)}-${formatCurrency(maxBaseBonus)}`, note: "definido al crear gerente", tone: "neutral" },
     { group: "Bonos", label: "Elegibles", value: `${eligibleManagers}`, note: "puede pasar a aprobacion humana", tone: eligibleManagers > 0 ? "positive" : "warning" },
     { group: "Bonos", label: "Requieren revision", value: `${reviewManagers}`, note: "requiere evidencia o conciliacion", tone: reviewManagers > 0 ? "warning" : "positive" },
     { group: "Bonos", label: "No elegibles", value: `${blockedManagers}`, note: "sin bono hasta resolver", tone: blockedManagers > 0 ? "negative" : "positive" },
@@ -1192,18 +1249,25 @@ export function getManagerBonusBacktest(
   const withRecommendation = records.filter((record) => record.bonusRecommended > 0);
   const exceptional = records.filter((record) => record.bonusBand === "Exceptional").length;
   const satisfactory = records.filter((record) => record.bonusBand === "Satisfactory").length;
+  const fullBaseBonus = records.filter(
+    (record) =>
+      record.bonusRecommended >= record.baseBonusAmount &&
+      record.bonusRecommended > 0,
+  ).length;
   const eligible = records.filter((record) => record.bonusState === "ELIGIBLE").length;
   const reviewRequired = records.filter((record) => record.bonusState === "REVIEW REQUIRED").length;
   const notEligible = records.filter((record) => record.bonusState === "NOT ELIGIBLE").length;
   const topSalesRecords = [...records]
     .sort((first, second) => second.netSales - first.netSales)
     .slice(0, Math.max(1, Math.ceil(records.length * 0.25)));
-  const topSalesNotMaxed = topSalesRecords.some((record) => record.bonusRecommended < 200);
+  const topSalesNotMaxed = topSalesRecords.some(
+    (record) => record.bonusRecommended < record.baseBonusAmount,
+  );
   const smallBranchWithBonus = records.some(
     (record) =>
       record.managerRole === "Gerente de Sucursal" &&
       /Pequena|comparable/i.test(record.managerType) &&
-      record.bonusRecommended >= 100,
+      record.bonusRecommended > 0,
   );
   const areaRecords = records.filter((record) => record.managerRole === "Gerente de Area");
   const branchRecords = records.filter(
@@ -1221,8 +1285,8 @@ export function getManagerBonusBacktest(
       {
         check: "No premia volumen absoluto automaticamente",
         result: topSalesNotMaxed
-          ? "Al menos una sucursal de alto volumen no recibe $200 por tener brechas de margen, meta o datos."
-          : "Todos los registros de alto volumen llegan a $200; revisar sesgo por tamano.",
+          ? "Al menos una sucursal de alto volumen no recibe el 100% del bono base por brechas de margen, meta o datos."
+          : "Todos los registros de alto volumen llegan al bono base completo; revisar sesgo por tamano.",
         status: topSalesNotMaxed ? "PASS" : "REVIEW",
       },
       {
@@ -1233,12 +1297,12 @@ export function getManagerBonusBacktest(
         status: smallBranchWithBonus ? "PASS" : "REVIEW",
       },
       {
-        check: "No genera demasiados $200",
-        result: `${exceptional} de ${records.length} registros quedan en Exceptional.`,
-        status: exceptional <= Math.ceil(records.length * 0.15) ? "PASS" : "REVIEW",
+        check: "No genera demasiados bonos base completos",
+        result: `${fullBaseBonus} de ${records.length} registros reciben 100% del bono base.`,
+        status: fullBaseBonus <= Math.ceil(records.length * 0.25) ? "PASS" : "REVIEW",
       },
       {
-        check: "No concentra todo en $100",
+        check: "No concentra todo en banda minima",
         result: `${satisfactory} de ${records.length} registros quedan en Satisfactory.`,
         status: satisfactory <= Math.ceil(records.length * 0.45) ? "PASS" : "REVIEW",
       },
@@ -1265,7 +1329,7 @@ export function getManagerBonusScreen(slug: BusinessLineSlug): ManagerBonusScree
       title: "Gerentes y bonos",
       subtitle: "Bonos mensuales transparentes y auditables",
       description:
-        "Muestra score, componentes, elegibilidad, bono recomendado y decision pendiente para Gerentes de Sucursal y Gerentes de Area.",
+        "Muestra score, componentes, elegibilidad, bono base, cumplimiento de meta y decision pendiente para Gerentes de Sucursal y Gerentes de Area.",
     },
     laboratorio: {
       title: "Gerentes de Laboratorio",
@@ -1291,12 +1355,12 @@ export function getManagerBonusScreen(slug: BusinessLineSlug): ManagerBonusScree
     slug,
     ...titles[slug],
     rule:
-      "Regla: el sistema recomienda bonos mensuales de $100 a $200 con formula visible; no paga automaticamente y no reemplaza aprobacion humana.",
+      "Regla: el sistema recomienda el bono mensual como bono base del gerente por cumplimiento de meta de su sucursal o portafolio; no paga automaticamente y no reemplaza aprobacion humana.",
     weights: managerBonusWeightsByLine[slug],
     metrics: buildMetrics(records),
     records,
     executiveInsights: [
-      "El puntaje no depende solo de venta: finanzas, operacion, metas, eficiencia/calidad y calidad del dato pesan en la recomendacion.",
+      "El monto recomendado se calcula con bono base por nivel y cumplimiento de meta; el puntaje controla elegibilidad, revision y riesgos.",
       "El estado del bono puede ser Elegible, Requiere revision o No elegible segun cierre, calidad, indicadores criticos e inconsistencias.",
       "La aprobacion final debe pasar por autoridad autorizada; el gerente puede ver el calculo y evidencia, pero no aprobar su bono.",
       "El Gerente de Area se evalua por portafolio, porcentaje de sucursales en meta y mejora de rezagadas, no por suma simple.",
@@ -1310,6 +1374,10 @@ function seriesForRecords(
   valueFormatter: (record: ManagerBonusRecord) => string,
 ): TrendSeries[] {
   const scoped = records.slice(0, 5);
+  const projectedBonusGoal =
+    field === "projectedBonus"
+      ? Math.max(...scoped.map((record) => record.baseBonusAmount), 1)
+      : 85;
 
   return [
     ...scoped.map((record, index) => ({
@@ -1319,17 +1387,31 @@ function seriesForRecords(
       points: record.trend[field],
     })),
     {
-      label: field === "projectedBonus" ? "Tope politica" : "Meta gerencial",
-      value: field === "projectedBonus" ? "$200" : "85",
+      label: field === "projectedBonus" ? "Bono base mayor" : "Meta gerencial",
+      value:
+        field === "projectedBonus"
+          ? formatCurrency(projectedBonusGoal)
+          : "85",
       color: "slate" as const,
-      points: recordGoalPoints(field),
+      points: recordGoalPoints(field, projectedBonusGoal),
     },
   ];
 }
 
-function recordGoalPoints(field: keyof ManagerBonusRecord["trend"]) {
+function recordGoalPoints(
+  field: keyof ManagerBonusRecord["trend"],
+  projectedBonusGoal: number,
+) {
   if (field === "projectedBonus") {
-    return [200, 200, 200, 200, 200, 200, 200];
+    return [
+      projectedBonusGoal,
+      projectedBonusGoal,
+      projectedBonusGoal,
+      projectedBonusGoal,
+      projectedBonusGoal,
+      projectedBonusGoal,
+      projectedBonusGoal,
+    ];
   }
 
   return [85, 85, 85, 85, 85, 85, 85];
@@ -1415,7 +1497,7 @@ export function buildManagerBonusTrendChart(
       id: "bono-proyectado-gerente",
       label: "Bono recomendado",
       description:
-        "Evolucion del bono recomendado frente al tope de politica, periodo anterior o rango personalizado.",
+        "Evolucion del bono recomendado frente al bono base configurado, periodo anterior o rango personalizado.",
       yLabel: "USD",
       series: seriesForRecords(scopedRecords, "projectedBonus", (record) =>
         formatCurrency(record.bonusRecommended),

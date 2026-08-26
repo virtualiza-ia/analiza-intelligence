@@ -4,6 +4,7 @@ import {
 } from "../security/authorization-policy.ts";
 import type { RoleKey } from "../tenant/demo-context.ts";
 import type { ScopeBoundary } from "../tenant/delegation-policy.ts";
+import type { ManagementLevel } from "../tenant/manager-incentives.ts";
 
 export type BonusWorkflowStatus =
   | "SYSTEM_RECOMMENDED"
@@ -27,6 +28,8 @@ export type BonusRecommendationSnapshot = {
   businessLine: string;
   businessLineSlug: string;
   breakdown: BonusBreakdownSnapshot[];
+  baseBonusAmount: number;
+  managementLevel: ManagementLevel;
   manager: string;
   managerRoleKey: RoleKey;
   managerRoleLabel: string;
@@ -35,6 +38,7 @@ export type BonusRecommendationSnapshot = {
   recommendedAmount: number;
   scope: ScopeBoundary;
   score: number;
+  targetCompletionRate: number;
 };
 
 export type BonusAuditEvent = {
@@ -43,10 +47,13 @@ export type BonusAuditEvent = {
   businessLine: string;
   decidedAt: string;
   finalAmount: number;
+  baseBonusAmount: number;
+  managementLevel: ManagementLevel;
   manager: string;
   period: string;
   reason: string | null;
   recommendedAmount: number;
+  targetCompletionRate: number;
   status: BonusWorkflowStatus;
   userEmail: string;
   userId: string;
@@ -58,12 +65,15 @@ export type BonusDecisionRecord = {
   businessLine: string;
   decidedAt: string;
   finalAmount: number;
+  baseBonusAmount: number;
+  managementLevel: ManagementLevel;
   manager: string;
   managerUserId: string;
   period: string;
   reason: string | null;
   recommendedAmount: number;
   scoreOriginal: number;
+  targetCompletionRate: number;
   status: BonusWorkflowStatus;
   userEmail: string;
   userId: string;
@@ -155,12 +165,15 @@ export function getBonusWorkflowView(
     businessLine: recommendation.businessLine,
     decidedAt: "",
     finalAmount: recommendation.recommendedAmount,
+    baseBonusAmount: recommendation.baseBonusAmount,
+    managementLevel: recommendation.managementLevel,
     manager: recommendation.manager,
     managerUserId: recommendation.managerUserId,
     period: recommendation.period,
     reason: null,
     recommendedAmount: recommendation.recommendedAmount,
     scoreOriginal: recommendation.score,
+    targetCompletionRate: recommendation.targetCompletionRate,
     status: "SYSTEM_RECOMMENDED",
     userEmail: "",
     userId: "",
@@ -203,16 +216,16 @@ export function decideBonus(
 
   const finalAmount = readFinalAmount(recommendation, input);
 
-  if (!Number.isFinite(finalAmount) || finalAmount < 0 || finalAmount > 200) {
+  if (
+    !Number.isFinite(finalAmount) ||
+    finalAmount < 0 ||
+    finalAmount > recommendation.baseBonusAmount
+  ) {
     throw new Error("BONUS_DECISION_INVALID_AMOUNT");
   }
 
   if (input.action === "adjust" && finalAmount === recommendation.recommendedAmount) {
     throw new Error("BONUS_DECISION_ADJUSTMENT_UNCHANGED");
-  }
-
-  if (input.action === "adjust" && finalAmount < 100) {
-    throw new Error("BONUS_DECISION_INVALID_AMOUNT");
   }
 
   const now = new Date().toISOString();
@@ -223,12 +236,15 @@ export function decideBonus(
     businessLine: recommendation.businessLine,
     decidedAt: now,
     finalAmount,
+    baseBonusAmount: recommendation.baseBonusAmount,
+    managementLevel: recommendation.managementLevel,
     manager: recommendation.manager,
     managerUserId: recommendation.managerUserId,
     period: recommendation.period,
     reason,
     recommendedAmount: recommendation.recommendedAmount,
     scoreOriginal: recommendation.score,
+    targetCompletionRate: recommendation.targetCompletionRate,
     status,
     userEmail: actor.email,
     userId: actor.userId,
@@ -239,10 +255,13 @@ export function decideBonus(
     businessLine: recommendation.businessLine,
     decidedAt: now,
     finalAmount,
+    baseBonusAmount: recommendation.baseBonusAmount,
+    managementLevel: recommendation.managementLevel,
     manager: recommendation.manager,
     period: recommendation.period,
     reason,
     recommendedAmount: recommendation.recommendedAmount,
+    targetCompletionRate: recommendation.targetCompletionRate,
     status,
     userEmail: actor.email,
     userId: actor.userId,

@@ -9,10 +9,17 @@ import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
 import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
 import { canPerformAction } from "@/lib/security/authorization-policy";
 import { isProductionRuntimeEnvironment } from "@/lib/security/environment";
+import {
+  isManagementLevel,
+  isManagerIncentiveRole,
+  normalizeBaseBonusAmount,
+  type ManagerIncentiveInput,
+} from "@/lib/tenant/manager-incentives";
 
 type InviteUserRequest = {
   email?: unknown;
   fullName?: unknown;
+  managerIncentive?: unknown;
   roleKey?: unknown;
   scope?: unknown;
 };
@@ -91,6 +98,55 @@ function getMissingScopeError(roleKey: RoleKey, scope: ScopeBoundary) {
   return null;
 }
 
+function readManagerIncentive(
+  value: unknown,
+  roleKey: RoleKey,
+): { error: string | null; incentive: ManagerIncentiveInput | null } {
+  if (!isManagerIncentiveRole(roleKey)) {
+    return { error: null, incentive: null };
+  }
+
+  if (typeof value !== "object" || value === null) {
+    return {
+      error: "Define nivel de gerencia y bono base para este gerente.",
+      incentive: null,
+    };
+  }
+
+  const incentive = value as Record<string, unknown>;
+  const rawBaseBonusAmount = incentive.baseBonusAmount;
+  const baseBonusAmount =
+    typeof rawBaseBonusAmount === "number"
+      ? rawBaseBonusAmount
+      : typeof rawBaseBonusAmount === "string"
+        ? Number(rawBaseBonusAmount)
+        : Number.NaN;
+  const normalizedBaseBonusAmount =
+    normalizeBaseBonusAmount(baseBonusAmount);
+
+  if (!isManagementLevel(incentive.managementLevel)) {
+    return {
+      error: "Selecciona nivel de gerencia senior, middle o junior.",
+      incentive: null,
+    };
+  }
+
+  if (!normalizedBaseBonusAmount) {
+    return {
+      error: "Ingresa un bono base mayor a 0 y menor o igual a 10000.",
+      incentive: null,
+    };
+  }
+
+  return {
+    error: null,
+    incentive: {
+      baseBonusAmount: normalizedBaseBonusAmount,
+      managementLevel: incentive.managementLevel,
+    },
+  };
+}
+
 export async function POST(request: Request) {
   const actor = await getCurrentAuthorizationActor();
 
@@ -154,6 +210,15 @@ export async function POST(request: Request) {
     return jsonError(missingScopeError, 400);
   }
 
+  const managerIncentiveResult = readManagerIncentive(
+    payload.managerIncentive,
+    payload.roleKey,
+  );
+
+  if (managerIncentiveResult.error) {
+    return jsonError(managerIncentiveResult.error, 400);
+  }
+
   if (
     !canPerformAction(actor, "users.invite", {
       roleKey: payload.roleKey,
@@ -174,6 +239,7 @@ export async function POST(request: Request) {
       roleKey: payload.roleKey,
       scope: targetScope,
       actorUserId: actor.userId,
+      managerIncentive: managerIncentiveResult.incentive ?? undefined,
     });
 
     await sendMail({

@@ -376,6 +376,18 @@ for (const userDelegationAction of [
 ]) {
   assert.equal(
     canPerformAction(ceo, userDelegationAction, {
+      roleKey: "usuario_operativo",
+      scope: {
+        companyId,
+        countryId,
+        organizationId,
+      },
+    }),
+    true,
+    `CEO must be able to delegate non-manager lower user roles with ${userDelegationAction}.`,
+  );
+  assert.equal(
+    canPerformAction(ceo, userDelegationAction, {
       roleKey: "gerente_area",
       scope: {
         companyId,
@@ -384,8 +396,8 @@ for (const userDelegationAction of [
         organizationId,
       },
     }),
-    true,
-    `CEO must be able to delegate lower user roles with ${userDelegationAction}.`,
+    false,
+    `CEO must not bypass operations when creating managers with ${userDelegationAction}.`,
   );
   assert.equal(
     canPerformAction(ceo, userDelegationAction, {
@@ -483,8 +495,8 @@ assert.equal(
       organizationId,
     },
   }),
-  true,
-  "Area manager must create branch managers in its assigned area.",
+  false,
+  "Area manager must not create branch managers; operations owns manager creation.",
 );
 
 assert.equal(

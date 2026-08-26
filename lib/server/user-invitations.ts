@@ -3,6 +3,11 @@ import { createHash, randomBytes } from "node:crypto";
 import { getPostgresPool } from "@/lib/server/database";
 import { demoRoleProfiles, type RoleKey } from "@/lib/tenant/demo-context";
 import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
+import {
+  managementLevelLabels,
+  managerIncentiveFormulaVersion,
+  type ManagerIncentiveInput,
+} from "@/lib/tenant/manager-incentives";
 
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -23,6 +28,7 @@ export type CreateInvitationInput = {
   actorUserId: string;
   email: string;
   fullName: string;
+  managerIncentive?: ManagerIncentiveInput;
   roleKey: RoleKey;
   scope: ScopeBoundary;
 };
@@ -74,16 +80,22 @@ function buildEmailContent({
   expiresAt,
   fullName,
   invitationUrl,
+  managerIncentive,
   roleKey,
 }: {
   expiresAt: string;
   fullName: string;
   invitationUrl: string;
+  managerIncentive?: ManagerIncentiveInput;
   roleKey: RoleKey;
 }) {
   const roleLabel = demoRoleProfiles[roleKey].label;
+  const incentiveText = managerIncentive
+    ? `Nivel ${managementLevelLabels[managerIncentive.managementLevel]} con bono base mensual USD ${managerIncentive.baseBonusAmount}.`
+    : null;
   const greeting = fullName ? `Hola ${fullName},` : "Hola,";
   const htmlGreeting = escapeHtml(greeting);
+  const htmlIncentiveText = incentiveText ? escapeHtml(incentiveText) : null;
   const htmlInvitationUrl = escapeHtml(invitationUrl);
   const htmlRoleLabel = escapeHtml(roleLabel);
   const htmlExpiresAt = escapeHtml(expiresAt);
@@ -92,6 +104,7 @@ function buildEmailContent({
     greeting,
     "",
     `Te invitaron a Analiza BI con el rol ${roleLabel}.`,
+    ...(incentiveText ? [incentiveText] : []),
     "Abre el enlace para aceptar la invitacion y continuar con la configuracion de tu cuenta:",
     invitationUrl,
     "",
@@ -104,6 +117,7 @@ function buildEmailContent({
       <h2 style="margin:0 0 16px">Invitacion a Analiza BI</h2>
       <p>${htmlGreeting}</p>
       <p>Te invitaron a Analiza BI con el rol <strong>${htmlRoleLabel}</strong>.</p>
+      ${htmlIncentiveText ? `<p>${htmlIncentiveText}</p>` : ""}
       <p>
         <a href="${htmlInvitationUrl}" style="display:inline-block;background:#4338ca;color:white;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:700">
           Aceptar invitacion
@@ -122,6 +136,7 @@ export async function createUserInvitation({
   actorUserId,
   email,
   fullName,
+  managerIncentive,
   roleKey,
   scope,
 }: CreateInvitationInput): Promise<CreatedInvitation> {
@@ -155,11 +170,13 @@ export async function createUserInvitation({
           company_id,
           operational_area_id,
           branch_id,
+          management_level,
+          base_bonus_amount,
           invited_by,
           invitation_token_hash,
           metadata
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
         returning id, expires_at
       `,
       [
@@ -170,11 +187,20 @@ export async function createUserInvitation({
         nullableUuid(scope.companyId),
         nullableUuid(scope.operationalAreaId),
         nullableUuid(scope.branchId),
+        managerIncentive?.managementLevel ?? null,
+        managerIncentive?.baseBonusAmount ?? null,
         auditableActorUserId,
         invitationTokenHash,
         JSON.stringify({
           delivery_provider: "smtp",
           invited_name: fullName,
+          manager_incentive: managerIncentive
+            ? {
+                base_bonus_amount: managerIncentive.baseBonusAmount,
+                formula_version: managerIncentiveFormulaVersion,
+                management_level: managerIncentive.managementLevel,
+              }
+            : undefined,
           source: "usuarios-permisos",
         }),
       ],
@@ -212,6 +238,13 @@ export async function createUserInvitation({
         JSON.stringify({
           invited_email_domain: email.split("@")[1] ?? "unknown",
           invited_role: roleKey,
+          manager_incentive: managerIncentive
+            ? {
+                base_bonus_amount: managerIncentive.baseBonusAmount,
+                formula_version: managerIncentiveFormulaVersion,
+                management_level: managerIncentive.managementLevel,
+              }
+            : undefined,
           source: "usuarios-permisos",
         }),
       ],
@@ -242,6 +275,13 @@ export async function createUserInvitation({
             country_id: nullableUuid(scope.countryId),
             invited_email_domain: email.split("@")[1] ?? "unknown",
             invited_role: roleKey,
+            manager_incentive: managerIncentive
+              ? {
+                  base_bonus_amount: managerIncentive.baseBonusAmount,
+                  formula_version: managerIncentiveFormulaVersion,
+                  management_level: managerIncentive.managementLevel,
+                }
+              : undefined,
             operational_area_id: nullableUuid(scope.operationalAreaId),
             status: "pending_invitation",
           }),
@@ -262,6 +302,7 @@ export async function createUserInvitation({
       expiresAt,
       fullName,
       invitationUrl,
+      managerIncentive,
       roleKey,
     });
 

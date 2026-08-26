@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
 
+import {
+  calculateRecommendedManagerBonus,
+  getGoalCompletionFactor,
+} from "../lib/tenant/manager-incentives.ts";
+
 function read(path) {
   statSync(path);
   return readFileSync(path, "utf8");
@@ -9,12 +14,19 @@ function read(path) {
 const proposal = read("docs/bonuses/bonus-model-proposal.md");
 const analytics = read("lib/analytics/manager-bonuses.ts");
 const dashboard = read("components/manager-bonus-dashboard.tsx");
+const incentives = read("lib/tenant/manager-incentives.ts");
+const migration = read(
+  "supabase/migrations/20260826000100_manager_incentive_policy.sql",
+);
 const navigation = read("lib/navigation.ts");
 const packageJson = read("package.json");
 
 for (const requiredProposalText of [
-  "USD 100",
+  "USD 400",
+  "USD 300",
   "USD 200",
+  "bono base",
+  "cumplimiento de meta",
   "ELIGIBLE",
   "REVIEW REQUIRED",
   "NOT ELIGIBLE",
@@ -41,12 +53,16 @@ for (const requiredAnalyticsText of [
   '"ADJUSTED WITH REASON"',
   'export type ManagerRole = "Gerente de Sucursal" | "Gerente de Area"',
   'function getBonusBand(score: number)',
-  "return { amount: 200, band: \"Exceptional\" }",
-  "return { amount: 175, band: \"Outstanding\" }",
-  "return { amount: 150, band: \"High\" }",
-  "return { amount: 125, band: \"Strong\" }",
-  "return { amount: 100, band: \"Satisfactory\" }",
-  "bonusPotential = 200",
+  'return "Exceptional"',
+  'return "Outstanding"',
+  'return "High"',
+  'return "Strong"',
+  'return "Satisfactory"',
+  "calculateRecommendedManagerBonus",
+  "managerIncentiveFormulaVersion",
+  "managementLevel",
+  "baseBonusAmount",
+  "bonusCompletionFactor",
   "bonusApproved = 0",
   "bonusPaid = 0",
   "buildAreaManagerBonusRecords",
@@ -78,7 +94,10 @@ for (const requiredWeightText of [
 for (const requiredDashboardText of [
   "Estado del bono",
   "Rol evaluado",
+  "Nivel de gerencia",
+  "Bono base",
   "Bono recomendado",
+  "Bono base x",
   "Bono final",
   "Por que recibo este bono",
   "Backtest de politica de bonos",
@@ -93,6 +112,32 @@ for (const requiredDashboardText of [
   assert.ok(
     dashboard.includes(requiredDashboardText),
     `Bonus dashboard is missing: ${requiredDashboardText}`,
+  );
+}
+
+for (const requiredIncentiveText of [
+  'managementLevels = ["senior", "middle", "junior"]',
+  "senior: 400",
+  "middle: 300",
+  "junior: 200",
+  "getGoalCompletionFactor",
+  "calculateRecommendedManagerBonus",
+]) {
+  assert.ok(
+    incentives.includes(requiredIncentiveText),
+    `Manager incentive helper is missing: ${requiredIncentiveText}`,
+  );
+}
+
+for (const requiredMigrationText of [
+  "management_level",
+  "base_bonus_amount",
+  "user_invitations_management_level_check",
+  "manager_assignments_base_bonus_amount_check",
+]) {
+  assert.ok(
+    migration.includes(requiredMigrationText),
+    `Manager incentive migration is missing: ${requiredMigrationText}`,
   );
 }
 
@@ -128,5 +173,25 @@ assert.ok(
   packageJson.includes("tests/bonus-workflow.test.mjs"),
   "Bonus workflow test must be part of npm test.",
 );
+
+assert.equal(
+  calculateRecommendedManagerBonus({
+    baseBonusAmount: 400,
+    targetCompletionRate: 0.8,
+  }),
+  320,
+  "Senior manager with USD 400 base and 80% goal completion should recommend USD 320.",
+);
+
+assert.equal(
+  calculateRecommendedManagerBonus({
+    baseBonusAmount: 400,
+    targetCompletionRate: 1.2,
+  }),
+  400,
+  "Goal completion above 100% must not exceed the authorized base bonus.",
+);
+
+assert.equal(getGoalCompletionFactor(1.2), 1);
 
 console.log("Bonus incentive model checks passed.");

@@ -12,6 +12,12 @@ import {
 } from "@/lib/server/passwords";
 import type { CurrentUserScope } from "@/lib/tenant/current-user-access";
 import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
+import {
+  isManagementLevel,
+  managerIncentiveFormulaVersion,
+  normalizeBaseBonusAmount,
+  type ManagerIncentiveInput,
+} from "@/lib/tenant/manager-incentives";
 
 type InvitationActivationRow = {
   branch_id: string | null;
@@ -21,6 +27,8 @@ type InvitationActivationRow = {
   id: string;
   invited_by: string | null;
   invited_role_id: string;
+  base_bonus_amount: number | string | null;
+  management_level: string | null;
   metadata: Record<string, unknown> | string | null;
   operational_area_id: string | null;
   organization_id: string;
@@ -114,6 +122,59 @@ function parseMetadata(metadata: InvitationActivationRow["metadata"]) {
   }
 
   return metadata ?? {};
+}
+
+function readNumberLike(value: unknown) {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return Number(value);
+  }
+
+  return Number.NaN;
+}
+
+function readInvitationManagerIncentive(
+  invitation: InvitationActivationRow,
+): ManagerIncentiveInput | null {
+  if (isManagementLevel(invitation.management_level)) {
+    const baseBonusAmount = normalizeBaseBonusAmount(
+      readNumberLike(invitation.base_bonus_amount),
+    );
+
+    if (baseBonusAmount) {
+      return {
+        baseBonusAmount,
+        managementLevel: invitation.management_level,
+      };
+    }
+  }
+
+  const metadata = parseMetadata(invitation.metadata);
+  const metadataIncentive =
+    typeof metadata.manager_incentive === "object" &&
+    metadata.manager_incentive !== null
+      ? (metadata.manager_incentive as Record<string, unknown>)
+      : null;
+
+  if (!metadataIncentive || !isManagementLevel(metadataIncentive.management_level)) {
+    return null;
+  }
+
+  const baseBonusAmount = normalizeBaseBonusAmount(
+    readNumberLike(metadataIncentive.base_bonus_amount),
+  );
+
+  if (!baseBonusAmount) {
+    return null;
+  }
+
+  return {
+    baseBonusAmount,
+    managementLevel: metadataIncentive.management_level,
+  };
 }
 
 function getDisplayName(invitation: InvitationActivationRow) {
@@ -273,14 +334,25 @@ async function activateManagerAssignment(
     assignmentValues,
   );
   const existingAssignment = existingAssignmentResult.rows[0];
+  const managerIncentive = readInvitationManagerIncentive(invitation);
   const assignmentMetadata = JSON.stringify({
+    manager_incentive: managerIncentive
+      ? {
+          base_bonus_amount: managerIncentive.baseBonusAmount,
+          formula_version: managerIncentiveFormulaVersion,
+          management_level: managerIncentive.managementLevel,
+        }
+      : undefined,
     invitation_id: invitation.id,
     source: "invitation-activation",
   });
   const nextScope = {
     branch_id: invitation.branch_id,
+    base_bonus_amount: managerIncentive?.baseBonusAmount ?? null,
+    bonus_formula: managerIncentiveFormulaVersion,
     company_id: invitation.company_id,
     country_id: invitation.country_id,
+    management_level: managerIncentive?.managementLevel ?? null,
     operational_area_id: invitation.operational_area_id,
     profile_id: userId,
     role_key: roleKey,
@@ -299,12 +371,14 @@ async function activateManagerAssignment(
               company_id,
               operational_area_id,
               branch_id,
+              management_level,
+              base_bonus_amount,
               assigned_by,
               status,
               starts_at,
               metadata
             )
-            values ($1, $2, $3, $4, $5, $6, $7, $8, 'active', now(), $9::jsonb)
+            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', now(), $11::jsonb)
             returning id
           `,
           [
@@ -315,6 +389,8 @@ async function activateManagerAssignment(
             invitation.company_id,
             invitation.operational_area_id,
             invitation.branch_id,
+            managerIncentive?.managementLevel ?? null,
+            managerIncentive?.baseBonusAmount ?? null,
             invitation.invited_by,
             assignmentMetadata,
           ],
@@ -333,10 +409,18 @@ async function activateManagerAssignment(
             starts_at = coalesce(starts_at, now()),
             ends_at = null,
             assigned_by = coalesce(assigned_by, $2),
-            metadata = metadata || $3::jsonb
+            metadata = metadata || $3::jsonb,
+            management_level = coalesce($4, management_level),
+            base_bonus_amount = coalesce($5, base_bonus_amount)
         where id = $1
       `,
-      [assignmentId, invitation.invited_by, assignmentMetadata],
+      [
+        assignmentId,
+        invitation.invited_by,
+        assignmentMetadata,
+        managerIncentive?.managementLevel ?? null,
+        managerIncentive?.baseBonusAmount ?? null,
+      ],
     );
   }
 
@@ -431,6 +515,8 @@ export async function acceptUserInvitation({
           ui.company_id,
           ui.operational_area_id,
           ui.branch_id,
+          ui.management_level,
+          ui.base_bonus_amount,
           ui.metadata,
           r.key as role_key
         from public.user_invitations ui

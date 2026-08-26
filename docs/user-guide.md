@@ -102,6 +102,8 @@ Phase 3 adds DEMO operational views:
 
 Appointments show citas por negocio and appointment success rate by business and branch. Capacity now starts with the branch capacity form used by operations when creating or editing capacity for a branch; it captures available, planned, effective and successful units, then calculates occupancy automatically. Branches show managers, result templates, goals, sales, losses, revenue, operating costs, appointments, and data quality. Manager performance uses separated components and does not present a score when capacity or data completeness is insufficient; it also includes organization view and bonus-oriented employee performance for area, operations, CEO and administrator roles. Gerente de sucursal does not open the manager bonus module.
 
+In Usuarios y permisos, Gerente de Operaciones creates Gerente de Area and Gerente de Sucursal users with operational scope, manager level and monthly base bonus. Initial levels are Senior USD 400, Middle USD 300 and Junior USD 200. The bonus recommendation in Gerentes y bonos is calculated as base bonus multiplied by goal completion for the assigned branch or portfolio, for example USD 400 x 80% = USD 320.
+
 ## Business Modules
 
 The DEMO module pages now include structured panels for:

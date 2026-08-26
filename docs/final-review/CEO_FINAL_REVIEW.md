@@ -84,7 +84,7 @@ Resultado: PASS. Los insights ayudan a tomar decisiones, pero la vista debe segu
 
 BONUS CLARITY: PASS
 
-El CEO puede entender por que una persona recibe USD 100, USD 150 o USD 200 porque la pantalla separa puntaje, componentes, elegibilidad, bono recomendado y estado de aprobacion. La experiencia transmite que el sistema recomienda y una autoridad revisa, no que la plataforma paga automaticamente.
+El CEO puede entender por que una persona recibe un bono proporcional porque la pantalla separa nivel gerencial, bono base, cumplimiento de meta, puntaje, componentes, elegibilidad, bono recomendado y estado de aprobacion. La experiencia transmite que el sistema recomienda y una autoridad revisa, no que la plataforma paga automaticamente.
 
 Riesgo residual: la tabla es pesada para lectura ejecutiva. Conviene iniciar la demo con lectura rapida y luego abrir detalle solo si preguntan.
 

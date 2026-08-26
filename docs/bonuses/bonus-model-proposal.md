@@ -18,8 +18,11 @@ Este modelo no paga nomina, no ejecuta transferencias y no integra bancos. El si
 
 ## Rango
 
-- Bono minimo recomendado: USD 100.
-- Bono maximo recomendado: USD 200.
+- El bono base se define al crear o asignar al gerente.
+- Niveles iniciales: Senior USD 400, Middle USD 300, Junior USD 200.
+- La formula de recomendacion es: `bono recomendado = bono base x cumplimiento de meta`.
+- El cumplimiento se capea a 100% para que el recomendado no supere el bono base autorizado.
+- Ejemplo: gerente Senior con bono base USD 400 y cumplimiento de meta de 80% genera USD 320 recomendados.
 - Si el resultado no cumple elegibilidad, el monto mostrado debe ser USD 0 o `Pendiente de revision`, no un bono automatico.
 
 ## Estados
@@ -40,11 +43,11 @@ No existe cierre publicado, faltan KPIs criticos, el periodo esta incompleto, la
 
 SYSTEM RECOMMENDS
 
-El sistema calcula score, componente y bono recomendado.
+El sistema calcula score, componentes, cumplimiento de meta y bono recomendado.
 
 OPERATIONS REVIEWS
 
-Gerente de Operaciones o autoridad autorizada revisa evidencia, periodo, cierre y calidad.
+Gerente de Operaciones o autoridad autorizada revisa evidencia, periodo, cierre, calidad, nivel gerencial y bono base.
 
 APPROVED
 
@@ -158,15 +161,23 @@ Indice de area sobre 100 puntos:
 
 ## Thresholds
 
-Recomendacion inicial:
+Nivel y bono base inicial:
 
-| Banda | Score | Bono recomendado |
-| --- | ---: | ---: |
-| Satisfactory | 70 - 74 | USD 100 |
-| Strong | 75 - 81 | USD 125 |
-| High | 82 - 88 | USD 150 |
-| Outstanding | 89 - 94 | USD 175 |
-| Exceptional | 95 - 100 | USD 200 |
+| Nivel | Bono base mensual | Lectura |
+| --- | ---: | --- |
+| Senior | USD 400 | Lidera sucursal o area de mayor impacto, complejidad o responsabilidad. |
+| Middle | USD 300 | Lidera operacion estable con responsabilidad gerencial media. |
+| Junior | USD 200 | Lidera sucursal o area en curva de crecimiento o menor complejidad. |
+
+Bandas de score para elegibilidad y lectura:
+
+| Banda | Score | Uso |
+| --- | ---: | --- |
+| Satisfactory | 70 - 74 | Puede recomendar bono proporcional si no hay bloqueo. |
+| Strong | 75 - 81 | Puede recomendar bono proporcional con lectura saludable. |
+| High | 82 - 88 | Puede recomendar bono proporcional con buena evidencia. |
+| Outstanding | 89 - 94 | Puede recomendar bono proporcional con riesgo bajo. |
+| Exceptional | 95 - 100 | Puede recomendar hasta el bono base completo si cumple meta. |
 
 Reglas:
 
@@ -174,6 +185,7 @@ Reglas:
 - `REVIEW REQUIRED` puede mostrar monto recomendado, pero no aprobado.
 - `NOT ELIGIBLE` muestra USD 0 hasta resolver condicion.
 - La banda Exceptional debe ser rara y estar sustentada por datos completos.
+- El score no define un monto fijo; controla si el bono calculado por meta puede pasar a revision.
 
 ## Elegibilidad
 
@@ -191,6 +203,9 @@ No asignar bono si:
 
 Cada gerente debe ver:
 
+- Nivel gerencial.
+- Bono base mensual.
+- Cumplimiento de meta usado para el calculo.
 - Bono propuesto.
 - Estado.
 - Score total.
@@ -211,8 +226,8 @@ Objetivo del backtest:
 
 - Verificar que no premie sucursales grandes injustamente.
 - Verificar que no penalice sucursales pequenas por volumen.
-- Evitar demasiados USD 200.
-- Evitar que todo caiga en USD 100.
+- Evitar demasiados bonos base completos.
+- Evitar que todo caiga en una sola banda de score.
 - Revisar si el resultado tiene sentido operativo.
 
 Criterios esperados:
@@ -230,6 +245,9 @@ Cada recomendacion debe registrar:
 - linea;
 - gerente;
 - rol evaluado;
+- nivel gerencial;
+- bono base;
+- cumplimiento de meta;
 - sucursales incluidas;
 - componentes y pesos;
 - score;

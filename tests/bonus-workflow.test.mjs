@@ -49,12 +49,14 @@ function recommendation(overrides = {}) {
     ],
     businessLine: "Laboratorio",
     businessLineSlug: "laboratorio",
+    baseBonusAmount: 400,
+    managementLevel: "senior",
     manager: "Gerente Laboratorio Centro",
     managerRoleKey: "gerente_sucursal",
     managerRoleLabel: "Gerente de Sucursal",
     managerUserId: "manager-lab-centro",
     period: "Julio 2026",
-    recommendedAmount: 150,
+    recommendedAmount: 320,
     scope: {
       branchId,
       companyId,
@@ -63,6 +65,7 @@ function recommendation(overrides = {}) {
       organizationId,
     },
     score: 86,
+    targetCompletionRate: 0.8,
     ...overrides,
   };
 }
@@ -99,8 +102,11 @@ resetBonusWorkflowStoreForTests();
 
 const recommendedView = getBonusWorkflowView(operationsManager, recommendation());
 assert.equal(recommendedView.status, "SYSTEM_RECOMMENDED");
-assert.equal(recommendedView.recommendedAmount, 150);
-assert.equal(recommendedView.finalAmount, 150);
+assert.equal(recommendedView.recommendedAmount, 320);
+assert.equal(recommendedView.finalAmount, 320);
+assert.equal(recommendedView.baseBonusAmount, 400);
+assert.equal(recommendedView.managementLevel, "senior");
+assert.equal(recommendedView.targetCompletionRate, 0.8);
 assert.equal(recommendedView.scoreOriginal, 86);
 assert.equal(recommendedView.breakdownOriginal[0]?.label, "Finanzas");
 assert.equal(recommendedView.canApprove, true);
@@ -118,16 +124,16 @@ const approved = decideBonus(operationsManager, recommendation(), {
   action: "approve",
 });
 assert.equal(approved.status, "APPROVED");
-assert.equal(approved.recommendedAmount, 150);
-assert.equal(approved.finalAmount, 150);
+assert.equal(approved.recommendedAmount, 320);
+assert.equal(approved.finalAmount, 320);
 assert.equal(approved.scoreOriginal, 86);
 assert.equal(approved.auditEvents.length, 1);
 assert.equal(approved.auditEvents[0]?.action, "approve");
 
 const persistedApproval = getBonusWorkflowView(operationsManager, recommendation());
 assert.equal(persistedApproval.status, "APPROVED");
-assert.equal(persistedApproval.finalAmount, 150);
-assert.equal(persistedApproval.recommendedAmount, 150);
+assert.equal(persistedApproval.finalAmount, 320);
+assert.equal(persistedApproval.recommendedAmount, 320);
 
 assertDecisionError("BONUS_DECISION_ALREADY_RECORDED", () =>
   decideBonus(operationsManager, recommendation(), {
@@ -149,7 +155,7 @@ const rejected = decideBonus(operationsManager, recommendation(), {
   reason: "Cierre con inconsistencia de calidad pendiente.",
 });
 assert.equal(rejected.status, "REJECTED");
-assert.equal(rejected.recommendedAmount, 150);
+assert.equal(rejected.recommendedAmount, 320);
 assert.equal(rejected.finalAmount, 0);
 assert.equal(rejected.reason, "Cierre con inconsistencia de calidad pendiente.");
 assert.equal(rejected.auditEvents[0]?.reason, rejected.reason);
@@ -159,31 +165,31 @@ resetBonusWorkflowStoreForTests();
 assertDecisionError("BONUS_DECISION_REASON_REQUIRED", () =>
   decideBonus(operationsManager, recommendation(), {
     action: "adjust",
-    finalAmount: 175,
+    finalAmount: 350,
   }),
 );
 
 assertDecisionError("BONUS_DECISION_INVALID_AMOUNT", () =>
   decideBonus(operationsManager, recommendation(), {
     action: "adjust",
-    finalAmount: 0,
-    reason: "Un ajuste no debe reemplazar el flujo formal de rechazo.",
+    finalAmount: 401,
+    reason: "No debe superar el bono base autorizado.",
   }),
 );
 
 const adjusted = decideBonus(operationsManager, recommendation(), {
   action: "adjust",
-  finalAmount: 175,
+  finalAmount: 350,
   reason: "Evidencia de SLA validada por operaciones.",
 });
 assert.equal(adjusted.status, "ADJUSTED");
-assert.equal(adjusted.recommendedAmount, 150);
-assert.equal(adjusted.finalAmount, 175);
+assert.equal(adjusted.recommendedAmount, 320);
+assert.equal(adjusted.finalAmount, 350);
 assert.equal(adjusted.scoreOriginal, 86);
 assert.equal(adjusted.breakdownOriginal[1]?.label, "Operacion");
 
 const persistedAdjustment = getBonusWorkflowView(operationsManager, recommendation());
-assert.equal(persistedAdjustment.finalAmount, 175);
+assert.equal(persistedAdjustment.finalAmount, 350);
 assert.equal(persistedAdjustment.auditEvents.length, 1);
 
 resetBonusWorkflowStoreForTests();

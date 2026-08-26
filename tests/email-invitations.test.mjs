@@ -101,6 +101,10 @@ for (const requiredInvitationText of [
   "user_invitations",
   "audit_logs",
   "delivery_provider",
+  "managerIncentive",
+  "management_level",
+  "base_bonus_amount",
+  "manager_incentive",
 ]) {
   if (!invitations.includes(requiredInvitationText)) {
     throw new Error(
@@ -114,6 +118,9 @@ for (const requiredComponentText of [
   "Invitacion enviada por correo",
   "Variables pendientes",
   "Enviando...",
+  "Nivel de gerencia",
+  "Bono base mensual",
+  "managerIncentive",
 ]) {
   if (!component.includes(requiredComponentText)) {
     throw new Error(`User form is missing: ${requiredComponentText}`);
@@ -185,6 +192,9 @@ for (const requiredLocalAuthText of [
   "public.profiles",
   "public.user_roles",
   "public.user_invitations",
+  "public.manager_assignments",
+  "management_level",
+  "base_bonus_amount",
   "requires_password_change",
   "local_password.changed",
   "invitation_token_hash = null",

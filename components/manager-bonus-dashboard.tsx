@@ -40,6 +40,11 @@ import {
   formatCurrency,
   formatRate,
 } from "@/lib/analytics/el-salvador-result-templates";
+import {
+  calculateRecommendedManagerBonus,
+  getGoalCompletionFactor,
+  managementLevelLabels,
+} from "@/lib/tenant/manager-incentives";
 import { cn } from "@/lib/utils";
 
 const storageKey = "analiza:selected-context";
@@ -90,9 +95,12 @@ type BonusWorkflowItem = {
   decidedAt: string;
   finalAmount: number;
   manager: string;
+  baseBonusAmount: number;
+  managementLevel: string;
   period: string;
   reason: string | null;
   recommendedAmount: number;
+  targetCompletionRate: number;
   scoreOriginal: number;
   status: BonusWorkflowStatus;
   userEmail: string;
@@ -125,6 +133,7 @@ type SortKey =
   | "utility"
   | "occupancyRate"
   | "dataQuality"
+  | "baseBonusAmount"
   | "bonusRecommended"
   | "blockers";
 
@@ -303,9 +312,12 @@ function defaultWorkflowItem(record: ManagerBonusRecord): BonusWorkflowItem {
     decidedAt: "",
     finalAmount: record.bonusRecommended,
     manager: record.manager,
+    baseBonusAmount: record.baseBonusAmount,
+    managementLevel: managementLevelLabels[record.managementLevel],
     period: record.period,
     reason: null,
     recommendedAmount: record.bonusRecommended,
+    targetCompletionRate: record.targetCompletionRate,
     scoreOriginal: record.score,
     status: "SYSTEM_RECOMMENDED",
     userEmail: "",
@@ -798,6 +810,11 @@ function ManagerRankingTable({
     },
     { key: "dataQuality", label: "Datos", render: (record) => `${record.dataQuality}` },
     {
+      key: "baseBonusAmount",
+      label: "Bono base",
+      render: (record) => formatCurrency(record.baseBonusAmount),
+    },
+    {
       key: "bonusRecommended",
       label: "Bono recomendado",
       render: (record) => formatCurrency(record.bonusRecommended),
@@ -816,11 +833,12 @@ function ManagerRankingTable({
         Ranking de gerentes: resultado, gestion y bono
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] text-left text-sm">
+        <table className="w-full min-w-[1320px] text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
               <th className="py-2 pr-4 font-medium">Gerente</th>
               <th className="py-2 pr-4 font-medium">Rol</th>
+              <th className="py-2 pr-4 font-medium">Nivel</th>
               <th className="py-2 pr-4 font-medium">Sucursal</th>
               <th className="py-2 pr-4 font-medium">Linea</th>
               {columns.map((column) => (
@@ -855,6 +873,9 @@ function ManagerRankingTable({
                 >
                   <td className="py-3 pr-4 font-medium">{record.manager}</td>
                   <td className="py-3 pr-4">{record.managerRole}</td>
+                  <td className="py-3 pr-4">
+                    {managementLevelLabels[record.managementLevel]}
+                  </td>
                   <td className="py-3 pr-4">
                     <div>{record.branch}</div>
                     <div className="text-xs text-muted-foreground">
@@ -1059,6 +1080,7 @@ function ComplianceBonusChart({ records }: { records: ManagerBonusRecord[] }) {
                 >
                   <title>{`${record.manager}
 Cumplimiento: ${formatRate(record.targetCompletionRate)}
+Bono base: ${formatCurrency(record.baseBonusAmount)}
 Bono recomendado: ${formatCurrency(record.bonusRecommended)}
 Estado: ${bonusStateLabel(record.bonusState)}`}</title>
                 </rect>
@@ -1110,7 +1132,7 @@ Estado: ${bonusStateLabel(record.bonusState)}`}</title>
           {
             color: "bg-blue-600",
             label: "Linea azul",
-            text: "bono recomendado en dolares; se lee con el eje derecho azul, no con el porcentaje.",
+            text: "bono recomendado en dolares despues de aplicar bono base y cumplimiento; se lee con el eje derecho azul.",
           },
           {
             color: "bg-emerald-600",
@@ -1330,7 +1352,7 @@ function BonusWaterfall({ record }: { record: ManagerBonusRecord }) {
           Composicion del bono
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
-          Tope de politica, banda, elegibilidad y bono recomendado.
+          Bono base, cumplimiento de meta, elegibilidad y bono recomendado.
         </p>
       </div>
       <div className="grid gap-3">
@@ -1633,8 +1655,10 @@ function ManagerProfile({
         {[
           { label: "Puntaje de desempeno", value: `${record.score}`, note: `${record.scoreDelta >= 0 ? "+" : ""}${record.scoreDelta} pts vs periodo anterior` },
           { label: "Rol evaluado", value: record.managerRole, note: `${record.branchesInScope.length} sucursal(es) en alcance` },
+          { label: "Nivel de gerencia", value: managementLevelLabels[record.managementLevel], note: "definido al crear gerente" },
+          { label: "Bono base", value: formatCurrency(record.baseBonusAmount), note: "monto mensual configurable" },
           { label: "Cumplimiento", value: formatRate(record.targetCompletionRate), note: "meta aprobada del periodo" },
-          { label: "Bono recomendado", value: formatCurrency(workflow.recommendedAmount), note: `${record.bonusBand} / monto original preservado` },
+          { label: "Bono recomendado", value: formatCurrency(workflow.recommendedAmount), note: `Bono base x ${formatRate(record.bonusCompletionFactor)}` },
           { label: "Bono final", value: workflow.status === "SYSTEM_RECOMMENDED" ? "Pendiente" : formatCurrency(workflow.finalAmount), note: workflowStatusLabel(workflow.status) },
           { label: "Bloqueos", value: `${record.blockingConditions.length}`, note: record.principalGap },
           { label: "Fortaleza", value: record.principalStrength, note: "dimension principal" },
@@ -1970,6 +1994,12 @@ function BonusDecisionWorkflow({
                   {formatCurrency(workflow.recommendedAmount)}
                 </span>
               </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Bono base autorizado</span>
+                <span className="font-medium">
+                  {formatCurrency(record.baseBonusAmount)}
+                </span>
+              </div>
               {modal.action === "adjust" ? (
                 <label className="grid gap-1">
                   <span className="text-xs font-medium text-muted-foreground">
@@ -1977,8 +2007,8 @@ function BonusDecisionWorkflow({
                   </span>
                   <input
                     className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    max="200"
-                    min="100"
+                    max={record.baseBonusAmount}
+                    min="0"
                     onChange={(event) =>
                       setModal({ ...modal, amount: event.target.value })
                     }
@@ -2038,37 +2068,25 @@ function BonusSimulator({ record }: { record: ManagerBonusRecord }) {
     setDataLift(4);
   }, [record.id]);
 
-  function recommendedBonus(score: number) {
-    if (score >= 95) {
-      return 200;
-    }
-
-    if (score >= 89) {
-      return 175;
-    }
-
-    if (score >= 82) {
-      return 150;
-    }
-
-    if (score >= 75) {
-      return 125;
-    }
-
-    if (score >= 70) {
-      return 100;
-    }
-
-    return 0;
-  }
-
   const simulatedScore = Math.round(
     Math.min(100, record.score + occupancyLift * 0.35 + marginLift * 0.75 + dataLift * 0.25),
   );
+  const simulatedTargetCompletionRate = Math.min(
+    1.2,
+    record.targetCompletionRate + occupancyLift * 0.004 + marginLift * 0.006,
+  );
+  const simulatedCompletionFactor = getGoalCompletionFactor(
+    simulatedTargetCompletionRate,
+  );
+  const simulatedIsEligible =
+    !(record.bonusState === "NOT ELIGIBLE" && record.dataQuality + dataLift < 70) &&
+    simulatedScore >= 70;
   const simulatedBonus =
-    record.bonusState === "NOT ELIGIBLE" && record.dataQuality + dataLift < 70
-      ? 0
-      : recommendedBonus(simulatedScore);
+    calculateRecommendedManagerBonus({
+      baseBonusAmount: record.baseBonusAmount,
+      isEligible: simulatedIsEligible,
+      targetCompletionRate: simulatedTargetCompletionRate,
+    });
 
   return (
     <section className="rounded-md border bg-card p-4">
@@ -2133,6 +2151,12 @@ function BonusSimulator({ record }: { record: ManagerBonusRecord }) {
             <div className="text-xs text-muted-foreground">Puntaje simulado</div>
             <div className="text-2xl font-semibold text-emerald-700">
               {simulatedScore}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">Cumplimiento simulado</div>
+            <div className="text-2xl font-semibold">
+              {formatRate(simulatedCompletionFactor)}
             </div>
           </div>
           <div>

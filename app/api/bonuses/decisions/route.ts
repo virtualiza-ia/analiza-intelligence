@@ -70,7 +70,7 @@ function errorStatus(error: unknown) {
   }
 
   if (message === "BONUS_DECISION_INVALID_AMOUNT") {
-    return { message: "El monto final debe estar entre USD 100 y USD 200, o USD 0 al rechazar.", status: 400 };
+    return { message: "El monto final debe estar entre USD 0 y el bono base autorizado.", status: 400 };
   }
 
   if (message === "BONUS_DECISION_ADJUSTMENT_UNCHANGED") {
