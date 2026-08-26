@@ -1017,12 +1017,54 @@ function UsersAndPermissionsManager({
         ? selectedArea?.countryId ?? countryScope
         : countryScope;
   const organizationId = actorScope.organizationId || demoOrganizationId;
+  const getProductionScopedValue = (
+    selectedValue: string | undefined,
+    allValue: string,
+    actorValue?: string | null,
+  ) => {
+    if (!selectedValue || selectedValue === allValue) {
+      return null;
+    }
+
+    if (!enableDemoFixtures) {
+      return actorValue ?? null;
+    }
+
+    return selectedValue;
+  };
   const createScopeBoundary = (scope: {
     areaScope?: string;
     branchScope: string;
     businessScope: string;
     countryScope: string;
-  }) => buildScopeBoundary({ ...scope, organizationId });
+  }) =>
+    buildScopeBoundary({
+      areaScope:
+        getProductionScopedValue(
+          scope.areaScope,
+          allAreaScope,
+          actorScope.operationalAreaId,
+        ) ?? allAreaScope,
+      branchScope:
+        getProductionScopedValue(
+          scope.branchScope,
+          allBranchScope,
+          actorScope.branchId,
+        ) ?? allBranchScope,
+      businessScope:
+        getProductionScopedValue(
+          scope.businessScope,
+          allBusinessScope,
+          actorScope.companyId,
+        ) ?? allBusinessScope,
+      countryScope:
+        getProductionScopedValue(
+          scope.countryScope,
+          allCountryScope,
+          actorScope.countryId,
+        ) ?? allCountryScope,
+      organizationId,
+    });
   const actor = useMemo(
     () => {
       if (!allowDemoRoleSwitch) {
