@@ -89,6 +89,8 @@ For the CEO, `/protected/overview` is the single executive report. Financial hea
 
 For Gerente de operaciones, `/protected/operacion` is the single operational report for metas, avances and insights. The separate `/protected/metas` and `/protected/insights` routes are hidden and blocked for this role so the same KPIs are not repeated under different labels.
 
+For Gerente de area, `/protected/metas` is the single area report for metas, avances and insights. The separate `/protected/insights` route and the legacy `/protected/plantillas` monthly form are hidden and blocked for this role so KPIs and data-entry flows are not duplicated.
+
 For Gerente de sucursal, `/protected/mi-sucursal` is the single branch report for closure status, results, goals, progress, insights and evidence. The separate `/protected/metas`, `/protected/insights` and `/protected/gerentes` routes are hidden and blocked for this role so the same KPIs and manager views are not duplicated.
 
 ## Operational Views
@@ -140,7 +142,7 @@ For Google Workspace with app passwords, use `smtp.gmail.com`, port `587`, `SMTP
 
 ## Imports
 
-The import center guides users through the operational import form and controlled file fallback. For Gerente de operaciones, Importaciones is the only visible data-entry entry point; the legacy Formulario mensual menu entry, Conectores and Integraciones are hidden and blocked for that role.
+The import center guides users through the operational import form and controlled file fallback. For Gerente de operaciones and Gerente de area, Importaciones is the only visible data-entry entry point; the legacy Formulario mensual menu entry is hidden and blocked for both roles. Conectores and Integraciones are also hidden and blocked for Gerente de operaciones.
 
 Templates are the root of the system when no API or CRM connector is available. The minimum root templates are appointments, capacity, costs, revenue, services, professionals, targets, result templates by branch, and payroll/bonus sheets.
 

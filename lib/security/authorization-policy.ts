@@ -109,6 +109,13 @@ export function canAccessProtectedPath(
     return true;
   }
 
+  if (
+    normalizedPathname === "/protected/cierres/nuevo" &&
+    actor.roleKey === "gerente_area"
+  ) {
+    return false;
+  }
+
   if (isSuperAdministrator(actor.roleKey)) {
     return accessPathname.startsWith("/protected");
   }

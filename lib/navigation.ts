@@ -94,7 +94,6 @@ const allRoles: RoleKey[] = [
 
 const insightReadRoles: RoleKey[] = [
   ...adminRoles,
-  "gerente_area",
   "viewer",
 ];
 
@@ -271,7 +270,6 @@ export const navigationItems: NavigationItem[] = [
     group: "datos",
     allowedRoles: [
       ...adminRoles,
-      "gerente_area",
       "usuario_operativo",
     ],
   },

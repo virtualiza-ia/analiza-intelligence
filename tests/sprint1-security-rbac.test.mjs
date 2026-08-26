@@ -312,6 +312,35 @@ for (const duplicateOperationsPath of [
   );
 }
 
+for (const areaManagerAllowedPath of [
+  "/protected/importaciones",
+  "/protected/cierres",
+  "/protected/resultados",
+  "/protected/sucursales",
+  "/protected/gerentes",
+  "/protected/metas",
+  "/protected/usuarios-permisos",
+  "/protected/configuracion",
+]) {
+  assert.equal(
+    canAccessProtectedPath(areaManager, areaManagerAllowedPath),
+    true,
+    `Area manager must access ${areaManagerAllowedPath}.`,
+  );
+}
+
+for (const duplicateAreaManagerPath of [
+  "/protected/cierres/nuevo",
+  "/protected/insights",
+  "/protected/plantillas",
+]) {
+  assert.equal(
+    canAccessProtectedPath(areaManager, duplicateAreaManagerPath),
+    false,
+    `Area manager must use /protected/metas as the single goals and insights view instead of ${duplicateAreaManagerPath}.`,
+  );
+}
+
 assert.equal(
   canAccessProtectedPath(ceo, "/protected/usuarios-permisos"),
   true,

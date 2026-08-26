@@ -56,10 +56,10 @@ Principio: ninguna tarjeta, grafica, tabla, insight, meta, resultado o bono debe
 | `/protected/fisioterapia` | CEO | Carga Fisioterapia con contexto autorizado | Smoke visual CEO | PASS | - |
 | `/protected/laboratorio` | CEO | Carga Laboratorio con contexto autorizado | Smoke visual CEO | PASS | - |
 | `/protected/imagenes` | CEO | Carga Imagenes con contexto autorizado | Smoke visual CEO | PASS | - |
-| `/protected/metas` | Gerente Area | Carga metas segun scope; CEO, Operaciones y Sucursal usan sus informes unicos | Smoke visual responsive + tests | PASS | - |
-| `/protected/insights` | Gerente Area, Viewer, admins | Carga insights segun scope; CEO, Operaciones y Sucursal usan sus informes unicos | Smoke visual responsive + tests | PASS | - |
+| `/protected/metas` | Gerente Area | Carga metas, avances e insights segun scope como informe unico; CEO, Operaciones y Sucursal usan sus informes unicos | Smoke visual responsive + tests | PASS | - |
+| `/protected/insights` | Viewer, admins | Carga insights segun scope; CEO, Operaciones, Area y Sucursal usan sus informes unicos | Smoke visual responsive + tests | PASS | - |
 | `/protected/gerentes` | CEO, Gerente Operaciones, Gerente Area, admins | Carga bonos/gerentes en lectura/autorizacion segun politica; Sucursal queda bloqueado | Corregido y cubierto por bonus/navigation tests | PASS | BUG-001 |
-| `/protected/cierres/nuevo` | Operaciones, Area, Sucursal, admins | Carga formulario mensual por linea | Cubierto por vertical tests; CEO bloqueado segun politica | PASS | - |
+| `/protected/cierres/nuevo` | Operaciones, Sucursal, admins | Carga formulario mensual por linea | Cubierto por vertical tests; CEO y Area bloqueados segun politica | PASS | - |
 
 ## Bugs Identificados En Filtros
 
