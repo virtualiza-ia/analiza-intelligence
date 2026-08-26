@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 import { getDataConnector } from "@/lib/data-ingestion/connectors";
 import { buildImportScope } from "@/lib/data-ingestion/platform";
 import { requireProtectedAccess } from "@/lib/server/authorization";
+import { assertScopedBranchReadyForOperationalData } from "@/lib/server/branch-governance";
+import { getMissingDatabaseConfig } from "@/lib/server/database";
 import { canPerformAction } from "@/lib/security/authorization-policy";
+import { isDemoRuntimeEnvironment } from "@/lib/security/environment";
 
 type ConnectorRouteContext = {
   params: Promise<{
@@ -63,6 +66,18 @@ export async function POST(request: Request, context: ConnectorRouteContext) {
   }
 
   try {
+    if (
+      scope.branchId &&
+      !isDemoRuntimeEnvironment() &&
+      getMissingDatabaseConfig().length === 0
+    ) {
+      await assertScopedBranchReadyForOperationalData({
+        actor,
+        branchId: scope.branchId,
+        operationLabel: "sincronizar conectores",
+      });
+    }
+
     return NextResponse.json(
       await connector.sync({
         actor,

@@ -381,6 +381,8 @@ for (const requiredUserUiText of [
   "Alta de sucursal",
   "/api/branches",
   "pendiente de gerente",
+  "governanceStatus",
+  "Ahora crea o asigna su gerente de sucursal para activarla",
   "Invitar usuario",
   "Nivel de gerencia",
   "Bono base mensual",

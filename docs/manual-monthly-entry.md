@@ -7,7 +7,7 @@ La via manual principal para actualizar Analiza Intelligence sera Importaciones,
 ## Alcance
 
 - Cada gerente registra un cierre mensual por linea de negocio.
-- La sucursal reportada se elige desde el catalogo activo de sucursales; no se captura como texto libre.
+- La sucursal reportada se elige desde el catalogo activo de sucursales; no se captura como texto libre. Una sucursal recien creada queda `pendiente de gerente` y no puede recibir importaciones, metas, capacidad ni cierres hasta que se active con un gerente de sucursal asignado.
 - El gerente de sucursal y el gerente de area se eligen desde listas derivadas del catalogo; no se capturan como texto libre.
 - El catalogo de sucursales incluye gerente de sucursal, gerente de area, pais, zona y linea de negocio desde `ddddd2.xlsx`.
 - El cierre captura contexto, resultados comerciales, operacion, citas, capacidad, costos, margen y calidad.
@@ -43,7 +43,7 @@ El formulario debe leerse como un asistente de cierre mensual, no como un tabler
 
 - `super_admin`: gobierna permisos globales, conectores, auditoria y seguridad del sistema.
 - `webmaster_admin`: alias historico de administrador DEMO, conservado por compatibilidad.
-- `ceo`: consulta resultados ejecutivos, decide metas finales, crea sucursales e invita roles inferiores dentro de su alcance.
+- `ceo`: consulta resultados ejecutivos, decide metas finales, crea sucursales por linea de negocio dentro de su alcance y las deja pendientes de gerente antes de alimentar datos.
 - `gerente_operaciones`: crea sucursales, crea areas operativas, asigna sucursales a areas, crea gerentes de area, preasigna sus gerentes de sucursal a cargo, captura capacidad por sucursal y valida cierres desde Importaciones dentro de su alcance. No usa el menu heredado de Formulario mensual ni las pantallas de Conectores/Integraciones.
 - `gerente_area`: supervisa el grupo de sucursales asignadas, compara disciplina, puntualidad y calidad, crea gerentes de sucursal dentro de su area, define su bono base y puede invitar usuarios operativos dentro de su area.
 - `gerente_sucursal`: llena el cierre mensual de su sucursal y consulta sus resultados.

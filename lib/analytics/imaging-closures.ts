@@ -5,6 +5,7 @@ import {
   getPostgresPool,
   withPostgresRlsContext,
 } from "../server/database.ts";
+import { assertBranchReadyForOperationalData } from "../server/branch-governance.ts";
 import {
   canPerformAction,
   type AuthorizationActor,
@@ -3479,6 +3480,7 @@ async function getPostgresBranchesForActor(
       left join public.profiles area_profile on area_profile.id = ma.profile_id
       where co.unit_type = 'imagenes'
         and b.is_enabled = true
+        and b.status = 'active'
       order by b.name
     `,
   );
@@ -3976,6 +3978,13 @@ async function getWritablePostgresBranch(
   if (!branch) {
     throw new Error("Sucursal de Imagenes no encontrada o fuera de alcance.");
   }
+
+  await assertBranchReadyForOperationalData({
+    actor,
+    branchId,
+    client,
+    operationLabel: "cargar datos de Imagenes",
+  });
 
   return branch;
 }

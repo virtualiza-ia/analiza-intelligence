@@ -9,6 +9,9 @@ import {
   type IngestionDatasetType,
 } from "@/lib/data-ingestion/templates";
 import { requireProtectedAccess } from "@/lib/server/authorization";
+import { assertScopedBranchReadyForOperationalData } from "@/lib/server/branch-governance";
+import { getMissingDatabaseConfig } from "@/lib/server/database";
+import { isDemoRuntimeEnvironment } from "@/lib/security/environment";
 
 function readFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -78,6 +81,14 @@ export async function POST(request: Request) {
   const buffer = Buffer.from(await fileValue.arrayBuffer());
 
   try {
+    if (!isDemoRuntimeEnvironment() && getMissingDatabaseConfig().length === 0) {
+      await assertScopedBranchReadyForOperationalData({
+        actor,
+        branchId: scope.branchId,
+        operationLabel: "cargar importaciones",
+      });
+    }
+
     const result = ingestTabularFile({
       actor,
       allowReplace: readFormString(formData, "allow_replace") === "true",

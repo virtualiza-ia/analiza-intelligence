@@ -36,6 +36,8 @@ Role hierarchy is explicit in `role_hierarchy`:
 
 `webmaster_admin` is treated as a level 100 legacy alias. A user may only invite or assign roles with a lower hierarchy level, and only when the target scope is inside the user's delegated scope. `gerente_operaciones` creates area managers and may preassign the branch managers under them. `gerente_operaciones` and `gerente_area` may create branch managers inside their delegated area, defining manager level and base bonus before the invitation is sent.
 
+Branch creation follows a governed lifecycle. `ceo` or `gerente_operaciones` creates the branch inside an authorized country and business line; the branch starts as `pending_manager`. Operational data writes are blocked while the branch is pending. When the assigned `gerente_sucursal` accepts the invitation, the branch is activated and the transition is recorded in `assignment_history` and `audit_logs`. Only active branches may receive imports, connector syncs, KPI targets, capacity records, or monthly close data.
+
 ## Authorization
 
 RLS must enforce access by:
@@ -85,7 +87,7 @@ Users and managers are deactivated with soft delete fields and history, not phys
 
 Phase 3 extends RLS to appointments, capacity, professionals, anonymous patients, and service events. Operational reads are scoped through `current_user_can_access_branch`.
 
-Write access to operational data is limited to `webmaster_admin`, `gerente_operaciones`, `gerente_area`, and the controlled import/form path for `gerente_sucursal`. Published closes require authorization before replacement. Connector management and connector execution are reserved for `super_admin` and `webmaster_admin`; `gerente_operaciones` uses Importaciones instead of Conectores or Integraciones.
+Write access to operational data is limited to `webmaster_admin`, `gerente_operaciones`, `gerente_area`, and the controlled import/form path for `gerente_sucursal`. Published closes require authorization before replacement. Operational writes must also verify branch status `active`; `pending_manager`, draft, inactive, deleted or disabled branches cannot receive data. Connector management and connector execution are reserved for `super_admin` and `webmaster_admin`; `gerente_operaciones` uses Importaciones instead of Conectores or Integraciones.
 
 Self-hosted PostgreSQL persistence also applies server-side authorization before reads and writes. Production database access requires an explicit `ANALIZA_POSTGRES_RLS_VERIFIED=true` gate after confirming that the configured database role does not bypass RLS and that deny cases fail in the target environment. This is a production readiness blocker, not a client-side control.
 

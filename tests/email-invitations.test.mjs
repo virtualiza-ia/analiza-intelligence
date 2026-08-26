@@ -5,7 +5,10 @@ const branchManagersRoutePath = "app/api/users/branch-managers/route.ts";
 const mailPath = "lib/server/mail.ts";
 const databasePath = "lib/server/database.ts";
 const invitationsPath = "lib/server/user-invitations.ts";
+const branchGovernancePath = "lib/server/branch-governance.ts";
 const componentPath = "components/business-module-dashboard.tsx";
+const importUploadRoutePath = "app/api/imports/upload/route.ts";
+const connectorSyncRoutePath = "app/api/connectors/[connectorId]/sync/route.ts";
 const signUpPath = "app/auth/sign-up/page.tsx";
 const acceptInvitationFormPath = "components/accept-invitation-form.tsx";
 const acceptInvitationRoutePath = "app/api/auth/accept-invitation/route.ts";
@@ -25,7 +28,10 @@ for (const file of [
   mailPath,
   databasePath,
   invitationsPath,
+  branchGovernancePath,
   componentPath,
+  importUploadRoutePath,
+  connectorSyncRoutePath,
   signUpPath,
   acceptInvitationFormPath,
   acceptInvitationRoutePath,
@@ -47,7 +53,10 @@ const branchManagersRoute = readFileSync(branchManagersRoutePath, "utf8");
 const mail = readFileSync(mailPath, "utf8");
 const database = readFileSync(databasePath, "utf8");
 const invitations = readFileSync(invitationsPath, "utf8");
+const branchGovernance = readFileSync(branchGovernancePath, "utf8");
 const component = readFileSync(componentPath, "utf8");
+const importUploadRoute = readFileSync(importUploadRoutePath, "utf8");
+const connectorSyncRoute = readFileSync(connectorSyncRoutePath, "utf8");
 const signUp = readFileSync(signUpPath, "utf8");
 const acceptInvitationForm = readFileSync(acceptInvitationFormPath, "utf8");
 const acceptInvitationRoute = readFileSync(acceptInvitationRoutePath, "utf8");
@@ -222,6 +231,7 @@ for (const requiredLocalAuthText of [
   "reporting_lines",
   "managed_branch_manager_ids",
   "operational_area.manager_assigned",
+  "branch.activated_by_manager",
   "requires_password_change",
   "local_password.changed",
   "invitation_token_hash = null",
@@ -229,6 +239,37 @@ for (const requiredLocalAuthText of [
 ]) {
   if (!localAuth.includes(requiredLocalAuthText)) {
     throw new Error(`Local auth service is missing: ${requiredLocalAuthText}`);
+  }
+}
+
+for (const requiredBranchGovernanceText of [
+  "assertBranchReadyForOperationalData",
+  "assertScopedBranchReadyForOperationalData",
+  "pendiente de gerente",
+  "branch.status !== \"active\"",
+  "canPerformAction(actor, \"record.read\"",
+]) {
+  if (!branchGovernance.includes(requiredBranchGovernanceText)) {
+    throw new Error(
+      `Branch governance service is missing: ${requiredBranchGovernanceText}`,
+    );
+  }
+}
+
+for (const requiredOperationalDataGuardText of [
+  "assertScopedBranchReadyForOperationalData",
+  "operationLabel",
+]) {
+  if (!importUploadRoute.includes(requiredOperationalDataGuardText)) {
+    throw new Error(
+      `Import upload route is missing branch readiness guard: ${requiredOperationalDataGuardText}`,
+    );
+  }
+
+  if (!connectorSyncRoute.includes(requiredOperationalDataGuardText)) {
+    throw new Error(
+      `Connector sync route is missing branch readiness guard: ${requiredOperationalDataGuardText}`,
+    );
   }
 }
 

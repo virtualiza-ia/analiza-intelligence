@@ -25,11 +25,13 @@ import {
 import { formatCurrency } from "@/lib/analytics/el-salvador-result-templates";
 import {
   demoBranches,
+  demoBusinessLineOptions,
   demoCountryOptions,
   demoCompanyOptions,
   demoOperationalAreas,
   demoRoleProfiles,
   roleKeys,
+  type BranchOption,
   type RoleKey,
 } from "@/lib/tenant/demo-context";
 import {
@@ -144,6 +146,10 @@ type CreateBranchApiResponse = {
   missingConfig?: string[];
   ok?: boolean;
   status?: "created";
+};
+
+type PendingCreatedBranch = BranchOption & {
+  governanceStatus: "pending_manager";
 };
 
 const businessHealth = [
@@ -509,6 +515,11 @@ function getBusinessScopeLabel(businessScope: string) {
   );
 }
 
+function getBusinessLineCodeForCompany(companyId: string) {
+  return demoBusinessLineOptions.find((line) => line.companyId === companyId)
+    ?.code;
+}
+
 function getAreaScopeLabel(areaScope?: string) {
   if (!areaScope) {
     return allAreaScope;
@@ -758,6 +769,9 @@ function UsersAndPermissionsManager({
   const [branchCountryScope, setBranchCountryScope] = useState(allCountryScope);
   const [branchBusinessScope, setBranchBusinessScope] = useState(allBusinessScope);
   const [branchAreaScope, setBranchAreaScope] = useState(allAreaScope);
+  const [createdBranches, setCreatedBranches] = useState<PendingCreatedBranch[]>(
+    [],
+  );
   const [isCreatingBranch, setIsCreatingBranch] = useState(false);
   const [branchMessage, setBranchMessage] = useState("");
   const [message, setMessage] = useState("");
@@ -817,10 +831,14 @@ function UsersAndPermissionsManager({
     ],
     [branchBusinessScope, branchCountryScope],
   );
+  const availableBranches = useMemo(
+    () => [...demoBranches, ...createdBranches],
+    [createdBranches],
+  );
   const branchOptions = useMemo(
     () => [
       { label: allBranchScope, value: allBranchScope },
-      ...demoBranches
+      ...availableBranches
         .filter(
           (branch) =>
             (countryScope === allCountryScope ||
@@ -831,11 +849,15 @@ function UsersAndPermissionsManager({
               branch.operationalAreaId === areaScope),
         )
         .map((branch) => ({
-          label: `${branch.name} · ${getBusinessScopeLabel(branch.companyId)}`,
+          label:
+            "governanceStatus" in branch &&
+            branch.governanceStatus === "pending_manager"
+              ? `${branch.name} · pendiente de gerente`
+              : `${branch.name} · ${getBusinessScopeLabel(branch.companyId)}`,
           value: branch.id,
         })),
     ],
-    [areaScope, businessScope, countryScope],
+    [areaScope, availableBranches, businessScope, countryScope],
   );
   const demoBranchManagerOptions = useMemo(
     () =>
@@ -889,8 +911,8 @@ function UsersAndPermissionsManager({
     [areaScope, branchManagerOptions, businessScope, countryScope, roleKey],
   );
   const selectedBranch = useMemo(
-    () => demoBranches.find((branch) => branch.id === branchScope),
-    [branchScope],
+    () => availableBranches.find((branch) => branch.id === branchScope),
+    [availableBranches, branchScope],
   );
   const selectedArea = useMemo(
     () => demoOperationalAreas.find((area) => area.id === areaScope),
@@ -1059,11 +1081,12 @@ function UsersAndPermissionsManager({
 
     if (context?.branchName) {
       setBranchScope(
-        demoBranches.find((branch) => branch.name === context.branchName)?.id ??
+        availableBranches.find((branch) => branch.name === context.branchName)?.id ??
           allBranchScope,
       );
     }
   }, [
+    availableBranches,
     businessOptions,
     countryOptions,
     context?.branchName,
@@ -1151,10 +1174,41 @@ function UsersAndPermissionsManager({
       setBranchCode("");
       setBranchCity("");
       setBranchReason("");
+      const createdBranch = branchResult.branch;
+
+      if (createdBranch) {
+        setCreatedBranches((currentBranches) => [
+          {
+            id: createdBranch.id,
+            areaManagerName: getAreaScopeLabel(branchAreaScope),
+            branchManagerName: "Gerente de sucursal pendiente",
+            businessLineCode: getBusinessLineCodeForCompany(branchBusinessScope),
+            city: normalizedCity || "Pendiente",
+            code: createdBranch.code,
+            companyId: branchBusinessScope,
+            countryId: branchCountryScope,
+            governanceStatus: "pending_manager",
+            isActive: false,
+            isDemo: false,
+            name: createdBranch.name,
+            operationalAreaId:
+              branchAreaScope === allAreaScope ? undefined : branchAreaScope,
+            sourceTrace: "Alta de sucursal real pendiente de gerente",
+          },
+          ...currentBranches.filter((branch) => branch.id !== createdBranch.id),
+        ]);
+        setBranchScope(createdBranch.id);
+        setCountryScope(branchCountryScope);
+        setBusinessScope(branchBusinessScope);
+        setAreaScope(
+          branchAreaScope === allAreaScope ? allAreaScope : branchAreaScope,
+        );
+      }
+
       setBranchAreaScope(allAreaScope);
       setBranchMessage(
-        branchResult.branch
-          ? `Sucursal ${branchResult.branch.name} creada como pendiente de gerente. Historial registrado.`
+        createdBranch
+          ? `Sucursal ${createdBranch.name} creada como pendiente de gerente. Ahora crea o asigna su gerente de sucursal para activarla.`
           : "Sucursal creada como pendiente de gerente. Historial registrado.",
       );
     } catch (error) {
@@ -1184,6 +1238,13 @@ function UsersAndPermissionsManager({
 
   function clearManagedBranchManagers() {
     setManagedBranchManagerIds([]);
+  }
+
+  function getVisibleBranchScopeLabel(nextBranchScope: string) {
+    return (
+      availableBranches.find((branch) => branch.id === nextBranchScope)?.name ??
+      getBranchScopeLabel(nextBranchScope)
+    );
   }
 
   async function createDemoUser(event: FormEvent<HTMLFormElement>) {
@@ -2048,7 +2109,7 @@ function UsersAndPermissionsManager({
                       {getAreaScopeLabel(user.areaScope)}
                     </td>
                     <td className="py-3 pr-4 align-top">
-                      {getBranchScopeLabel(user.branchScope)}
+                      {getVisibleBranchScopeLabel(user.branchScope)}
                     </td>
                     <td className="py-3 pr-4 align-top">
                       <Badge variant="outline">{user.status}</Badge>

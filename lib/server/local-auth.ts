@@ -467,6 +467,110 @@ async function replaceActiveReportingLines({
   );
 }
 
+async function activateBranchAfterBranchManagerAcceptance(
+  client: PoolClient,
+  userId: string,
+  invitation: InvitationActivationRow,
+) {
+  if (!invitation.branch_id) {
+    return;
+  }
+
+  const previousResult = await client.query<{ status: string }>(
+    `
+      select status
+      from public.branches
+      where id = $1
+        and organization_id = $2
+        and ($3::uuid is null or country_id = $3::uuid)
+        and ($4::uuid is null or company_id = $4::uuid)
+        and ($5::uuid is null or operational_area_id = $5::uuid)
+        and deleted_at is null
+      for update
+    `,
+    [
+      invitation.branch_id,
+      invitation.organization_id,
+      invitation.country_id,
+      invitation.company_id,
+      invitation.operational_area_id,
+    ],
+  );
+  const previousStatus = previousResult.rows[0]?.status;
+
+  if (!previousStatus || previousStatus === "active") {
+    return;
+  }
+
+  await client.query(
+    `
+      update public.branches
+      set status = 'active',
+          updated_at = now()
+      where id = $1
+        and organization_id = $2
+    `,
+    [invitation.branch_id, invitation.organization_id],
+  );
+
+  await client.query(
+    `
+      insert into public.assignment_history (
+        organization_id,
+        actor_user_id,
+        entity_table,
+        entity_id,
+        action,
+        previous_scope,
+        next_scope,
+        reason
+      )
+      values ($1, $2, 'branches', $3, 'branch.activated_by_manager', $4::jsonb, $5::jsonb, $6)
+    `,
+    [
+      invitation.organization_id,
+      invitation.invited_by,
+      invitation.branch_id,
+      JSON.stringify({ status: previousStatus }),
+      JSON.stringify({
+        branch_id: invitation.branch_id,
+        branch_manager_profile_id: userId,
+        status: "active",
+      }),
+      "Sucursal activada al aceptar invitacion el gerente de sucursal asignado.",
+    ],
+  );
+
+  await client.query(
+    `
+      insert into public.audit_logs (
+        organization_id,
+        actor_user_id,
+        action,
+        entity_table,
+        entity_id,
+        country_id,
+        company_id,
+        branch_id,
+        metadata
+      )
+      values ($1, $2, 'branch.activated_by_manager', 'branches', $3, $4, $5, $3, $6::jsonb)
+    `,
+    [
+      invitation.organization_id,
+      invitation.invited_by,
+      invitation.branch_id,
+      invitation.country_id,
+      invitation.company_id,
+      JSON.stringify({
+        branch_manager_profile_id: userId,
+        previous_status: previousStatus,
+        source: "invitation-activation",
+      }),
+    ],
+  );
+}
+
 async function findReportingManagerForBranchManager(
   client: PoolClient,
   invitation: InvitationActivationRow,
@@ -576,6 +680,8 @@ async function activateReportingLines(
   if (roleKey !== "gerente_sucursal") {
     return;
   }
+
+  await activateBranchAfterBranchManagerAcceptance(client, userId, invitation);
 
   const managerProfileId = await findReportingManagerForBranchManager(
     client,

@@ -1,9 +1,13 @@
 import {
   getPostgresPool,
   resetPostgresRuntimeRole,
-} from "@/lib/server/database";
-import type { AuthorizationActor } from "@/lib/security/authorization-policy";
-import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
+} from "./database.ts";
+import {
+  canPerformAction,
+  type AuthorizationActor,
+} from "../security/authorization-policy.ts";
+import type { ScopeBoundary } from "../tenant/delegation-policy.ts";
+import type { PoolClient } from "pg";
 
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -12,6 +16,15 @@ type BranchRow = {
   code: string;
   id: string;
   name: string;
+  status: string;
+};
+
+type BranchStatusRow = {
+  company_id: string | null;
+  country_id: string | null;
+  name: string;
+  operational_area_id: string | null;
+  organization_id: string;
   status: string;
 };
 
@@ -53,6 +66,99 @@ function normalizeBranchCode(code: string) {
 
 function getActorUuid(actor: AuthorizationActor) {
   return nullableUuid(actor.userId);
+}
+
+export async function assertBranchReadyForOperationalData({
+  actor,
+  branchId,
+  client,
+  operationLabel,
+}: {
+  actor: AuthorizationActor;
+  branchId: string | null | undefined;
+  client: PoolClient;
+  operationLabel: string;
+}) {
+  const normalizedBranchId = nullableUuid(branchId);
+
+  if (!normalizedBranchId) {
+    throw new BranchGovernanceError(
+      `Selecciona una sucursal activa antes de ${operationLabel}.`,
+    );
+  }
+
+  const result = await client.query<BranchStatusRow>(
+    `
+      select
+        organization_id,
+        country_id,
+        company_id,
+        operational_area_id,
+        name,
+        status
+      from public.branches
+      where id = $1
+        and is_enabled = true
+        and deleted_at is null
+      limit 1
+    `,
+    [normalizedBranchId],
+  );
+  const branch = result.rows[0];
+
+  if (!branch) {
+    throw new BranchGovernanceError(
+      `La sucursal no existe o no esta disponible para ${operationLabel}.`,
+    );
+  }
+
+  if (branch.status !== "active") {
+    throw new BranchGovernanceError(
+      `${branch.name} esta pendiente de gerente. Asigna primero un gerente de sucursal antes de ${operationLabel}.`,
+    );
+  }
+
+  if (
+    !canPerformAction(actor, "record.read", {
+      scope: {
+        branchId: normalizedBranchId,
+        companyId: branch.company_id,
+        countryId: branch.country_id,
+        operationalAreaId: branch.operational_area_id,
+        organizationId: branch.organization_id,
+      },
+    })
+  ) {
+    throw new BranchGovernanceError(
+      `Tu rol no puede usar esta sucursal para ${operationLabel}.`,
+    );
+  }
+}
+
+export async function assertScopedBranchReadyForOperationalData({
+  actor,
+  branchId,
+  operationLabel,
+}: {
+  actor: AuthorizationActor;
+  branchId: string | null | undefined;
+  operationLabel: string;
+}) {
+  const pool = getPostgresPool();
+  const client = await pool.connect();
+
+  try {
+    await resetPostgresRuntimeRole(client);
+    await assertBranchReadyForOperationalData({
+      actor,
+      branchId,
+      client,
+      operationLabel,
+    });
+  } finally {
+    await resetPostgresRuntimeRole(client).catch(() => undefined);
+    client.release();
+  }
 }
 
 export async function createGovernedBranch({
