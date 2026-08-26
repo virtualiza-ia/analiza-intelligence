@@ -10,7 +10,7 @@ The local executive demo login is created server-side through `/api/auth/demo-se
 
 When `NODE_ENV=production` and no explicit `APP_ENV`/`ANALIZA_APP_ENV` is present, the runtime fails closed as `production`; it must not silently become `demo`.
 
-Self-hosted deployments may keep operational data, invitations, users, password hashes, and role assignments in PostgreSQL while email delivery uses an SMTP provider such as Google Workspace. User invitations are stored in `user_invitations` with a hashed token; the raw invitation token is sent only in the email link and must not be logged or stored in public data. When the user accepts the invitation, they create a password, the system stores only a server-side password hash in `auth.users.encrypted_password`, activates `profiles` and `user_roles`, clears the invitation token hash, and issues an HTTP-only local session cookie. SMTP credentials and local session secrets are server-only environment variables and are never exposed with `NEXT_PUBLIC_`.
+Self-hosted deployments may keep operational data, invitations, users, password hashes, and role assignments in PostgreSQL while email delivery uses an SMTP provider such as Google Workspace. User invitations are stored in `user_invitations` with a hashed token; the raw invitation token is sent only in the email link and must not be logged or stored in public data. When the user accepts the invitation, they create a password, the system stores only a server-side password hash in `auth.users.encrypted_password`, activates `profiles` and `user_roles`, clears the invitation token hash, and issues an HTTP-only local session cookie. Authorized administrators may also create or reset lower-scope users with a temporary password; the temporary value is hashed server-side, the profile is marked with `requires_password_change`, and the user must change it before entering protected modules. SMTP credentials and local session secrets are server-only environment variables and are never exposed with `NEXT_PUBLIC_`.
 
 ## Roles
 
@@ -79,7 +79,7 @@ The delegation migration adds these controls:
 - `current_user_can_access_operational_area`
 - `current_user_can_manage_delegated_scope`
 
-User creation is invitation-only. The platform must not ask administrators to set a manual password for another user. An invited account stays pending until accepted.
+User creation supports invitation links and administrator-assigned temporary passwords. Temporary-password creation and reset are limited by server-side hierarchy and scope checks, are audit logged without the raw password, and always force password change on the next login.
 
 Manager invitations and active manager assignments store `management_level` and `base_bonus_amount`. Area manager invitations may also store branch manager subordinates in metadata; acceptance activates `reporting_lines`. The recommended bonus is calculated as base bonus multiplied by the branch or portfolio goal completion, while score and data quality control eligibility, review and blocking.
 

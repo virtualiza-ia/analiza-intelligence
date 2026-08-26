@@ -129,7 +129,7 @@ The DEMO module pages now include structured panels for:
 
 `Mi cuenta` is for profile, password recovery, preferences, and user-level settings. System-wide configuration remains an admin-only responsibility.
 
-Users are created by invitation. The system should not email manual passwords; each invited user accepts a secure link and later creates their own password through the active auth flow. Only Webmaster / Administrador can create global users or change global roles. Gerente de operaciones can invite lower roles inside its scope and validate branch submissions for the business line. Gerente de sucursal can only work inside the assigned branch.
+Users can be created by email invitation or with a temporary password assigned by an authorized administrator. Invitation users accept a secure link and create their own password. Temporary-password users are active immediately, but the first login forces them to change that password before entering protected modules. Authorized administrators can also reset a lost password by assigning a new temporary password, which again forces password change at login. Only Webmaster / Administrador can create global users or change global roles. CEO, Gerente de operaciones and Gerente de area can create or reset lower roles only inside their delegated scope. Gerente de sucursal can only work inside the assigned branch.
 
 Real invitation email requires private server variables:
 

@@ -1,6 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
 
 const routePath = "app/api/users/invite/route.ts";
+const resetPasswordRoutePath = "app/api/users/reset-password/route.ts";
 const branchManagersRoutePath = "app/api/users/branch-managers/route.ts";
 const mailPath = "lib/server/mail.ts";
 const databasePath = "lib/server/database.ts";
@@ -24,6 +25,7 @@ const dockerEnvExamplePath = ".env.docker.example";
 
 for (const file of [
   routePath,
+  resetPasswordRoutePath,
   branchManagersRoutePath,
   mailPath,
   databasePath,
@@ -49,6 +51,7 @@ for (const file of [
 }
 
 const route = readFileSync(routePath, "utf8");
+const resetPasswordRoute = readFileSync(resetPasswordRoutePath, "utf8");
 const branchManagersRoute = readFileSync(branchManagersRoutePath, "utf8");
 const mail = readFileSync(mailPath, "utf8");
 const database = readFileSync(databasePath, "utf8");
@@ -79,9 +82,27 @@ for (const requiredRouteText of [
   "No se pudo enviar la invitacion",
   "managedBranchManagerIds",
   "UserInvitationError",
+  "temporaryPassword",
+  "createLocalUserWithTemporaryPassword",
+  'status: "created"',
 ]) {
   if (!route.includes(requiredRouteText)) {
     throw new Error(`Invitation API route is missing: ${requiredRouteText}`);
+  }
+}
+
+for (const requiredResetPasswordRouteText of [
+  "getCurrentAuthorizationActor",
+  "getLocalUserPasswordTargetByEmail",
+  "resetLocalUserTemporaryPassword",
+  "canPerformAction",
+  "users.change_scope",
+  "temporaryPassword",
+]) {
+  if (!resetPasswordRoute.includes(requiredResetPasswordRouteText)) {
+    throw new Error(
+      `Temporary password reset route is missing: ${requiredResetPasswordRouteText}`,
+    );
   }
 }
 
@@ -148,12 +169,16 @@ for (const requiredComponentText of [
   "/api/users/invite",
   "Invitacion enviada por correo",
   "Variables pendientes",
-  "Enviando...",
+  "Guardando...",
   "Nivel de gerencia",
   "Bono base mensual",
   "managerIncentive",
   "Gerentes de sucursal a cargo",
   "managedBranchManagerIds",
+  "Contrasena temporal",
+  "/api/users/reset-password",
+  "Resetear contrasena temporal",
+  "debera cambiarla",
 ]) {
   if (!component.includes(requiredComponentText)) {
     throw new Error(`User form is missing: ${requiredComponentText}`);
@@ -234,6 +259,10 @@ for (const requiredLocalAuthText of [
   "branch.activated_by_manager",
   "requires_password_change",
   "local_password.changed",
+  "createLocalUserWithTemporaryPassword",
+  "resetLocalUserTemporaryPassword",
+  "local_user.created_with_temporary_password",
+  "local_password.temporary_reset",
   "invitation_token_hash = null",
   "user_invitation.accepted",
 ]) {

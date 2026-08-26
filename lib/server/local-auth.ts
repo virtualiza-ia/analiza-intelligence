@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 
 import {
@@ -75,6 +75,42 @@ export type AcceptInvitationInput = {
   email: string;
   password: string;
   token: string;
+};
+
+export type CreateLocalUserWithTemporaryPasswordInput = {
+  actorUserId: string;
+  email: string;
+  fullName: string;
+  managedBranchManagerIds?: string[];
+  managerIncentive?: ManagerIncentiveInput;
+  password: string;
+  roleKey: RoleKey;
+  scope: {
+    branchId?: string | null;
+    companyId?: string | null;
+    countryId?: string | null;
+    operationalAreaId?: string | null;
+    organizationId: string;
+  };
+};
+
+export type ResetLocalUserTemporaryPasswordInput = {
+  actorUserId: string;
+  email: string;
+  password: string;
+};
+
+export type LocalUserPasswordTarget = {
+  email: string;
+  roleKey: RoleKey;
+  scope: {
+    branchId?: string | null;
+    companyId?: string | null;
+    countryId?: string | null;
+    operationalAreaId?: string | null;
+    organizationId: string;
+  };
+  userId: string;
 };
 
 type ChangeAuthenticatedLocalUserPasswordInput = {
@@ -219,6 +255,64 @@ function coerceRoleKey(value: string | null | undefined): RoleKey {
   return roleKeys.includes(value as RoleKey)
     ? (value as RoleKey)
     : "viewer";
+}
+
+function nullableUuid(value: string | null | undefined) {
+  if (!value || !uuidPattern.test(value)) {
+    return null;
+  }
+
+  return value;
+}
+
+function requiredUuid(value: string | null | undefined, fieldName: string) {
+  const uuid = nullableUuid(value);
+
+  if (!uuid) {
+    throw new Error(`Falta ${fieldName} valido para crear el usuario.`);
+  }
+
+  return uuid;
+}
+
+function buildVirtualInvitation({
+  actorUserId,
+  email,
+  fullName,
+  managedBranchManagerIds = [],
+  managerIncentive,
+  roleId,
+  roleKey,
+  scope,
+}: CreateLocalUserWithTemporaryPasswordInput & { roleId: string }) {
+  return {
+    base_bonus_amount: managerIncentive?.baseBonusAmount ?? null,
+    branch_id: nullableUuid(scope.branchId),
+    company_id: nullableUuid(scope.companyId),
+    country_id: nullableUuid(scope.countryId),
+    email: normalizeEmail(email),
+    id: randomUUID(),
+    invited_by: nullableUuid(actorUserId),
+    invited_role_id: roleId,
+    management_level: managerIncentive?.managementLevel ?? null,
+    metadata: {
+      delivery_provider: "manual-temporary-password",
+      invited_name: fullName,
+      manager_incentive: managerIncentive
+        ? {
+            base_bonus_amount: managerIncentive.baseBonusAmount,
+            formula_version: managerIncentiveFormulaVersion,
+            management_level: managerIncentive.managementLevel,
+          }
+        : undefined,
+      managed_branch_manager_count: managedBranchManagerIds.length,
+      managed_branch_manager_ids: managedBranchManagerIds,
+      source: "usuarios-permisos",
+    },
+    operational_area_id: nullableUuid(scope.operationalAreaId),
+    organization_id: requiredUuid(scope.organizationId, "organizationId"),
+    role_key: roleKey,
+  } satisfies InvitationActivationRow;
 }
 
 async function assignOperationalAreaManager(
@@ -1166,6 +1260,420 @@ export async function acceptUserInvitation({
       email: user.email,
       requiresPasswordChange: false,
       roleKey: coerceRoleKey(invitation.role_key),
+      userId: user.id,
+    };
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    await resetPostgresRuntimeRole(client).catch(() => undefined);
+    client.release();
+  }
+}
+
+export async function createLocalUserWithTemporaryPassword({
+  actorUserId,
+  email,
+  fullName,
+  managedBranchManagerIds = [],
+  managerIncentive,
+  password,
+  roleKey,
+  scope,
+}: CreateLocalUserWithTemporaryPasswordInput): Promise<AuthenticatedLocalUser> {
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedFullName = fullName.trim();
+  const passwordPolicyError = getPasswordPolicyError(password);
+
+  if (!normalizedFullName) {
+    throw new Error("Completa nombre del usuario.");
+  }
+
+  if (passwordPolicyError) {
+    throw new Error(passwordPolicyError);
+  }
+
+  const pool = getPostgresPool();
+  const client = await pool.connect();
+
+  try {
+    await resetPostgresRuntimeRole(client);
+    await client.query("begin");
+
+    const existingProfileResult = await client.query<{ id: string }>(
+      `
+        select p.id
+        from public.profiles p
+        where lower(p.email) = $1
+          and p.deleted_at is null
+        limit 1
+      `,
+      [normalizedEmail],
+    );
+
+    if (existingProfileResult.rows[0]) {
+      throw new Error("Ese correo ya tiene un usuario. Usa resetear contrasena.");
+    }
+
+    const roleResult = await client.query<{ id: string }>(
+      "select id from public.roles where key = $1 limit 1",
+      [roleKey],
+    );
+    const roleId = roleResult.rows[0]?.id;
+
+    if (!roleId) {
+      throw new Error("No se encontro el rol seleccionado.");
+    }
+
+    const invitation = buildVirtualInvitation({
+      actorUserId,
+      email: normalizedEmail,
+      fullName: normalizedFullName,
+      managedBranchManagerIds,
+      managerIncentive,
+      password,
+      roleId,
+      roleKey,
+      scope,
+    });
+    const encryptedPassword = await hashPassword(password);
+    const userResult = await client.query<{ email: string; id: string }>(
+      `
+        insert into auth.users (
+          email,
+          encrypted_password,
+          email_confirmed_at
+        )
+        values ($1, $2, now())
+        on conflict (email) do update
+        set encrypted_password = excluded.encrypted_password,
+            email_confirmed_at = coalesce(auth.users.email_confirmed_at, now()),
+            updated_at = now()
+        returning id, email
+      `,
+      [normalizedEmail, encryptedPassword],
+    );
+    const user = userResult.rows[0];
+
+    if (!user) {
+      throw new Error("No se pudo crear el usuario.");
+    }
+
+    await client.query(
+      `
+        insert into public.profiles (
+          id,
+          organization_id,
+          email,
+          display_name,
+          status,
+          default_country_id,
+          default_company_id,
+          default_branch_id,
+          invited_by,
+          requires_password_change
+        )
+        values ($1, $2, $3, $4, 'active', $5, $6, $7, $8, true)
+        on conflict (id) do update
+        set organization_id = excluded.organization_id,
+            email = excluded.email,
+            display_name = excluded.display_name,
+            status = 'active',
+            default_country_id = excluded.default_country_id,
+            default_company_id = excluded.default_company_id,
+            default_branch_id = excluded.default_branch_id,
+            invited_by = coalesce(public.profiles.invited_by, excluded.invited_by),
+            requires_password_change = true,
+            deactivated_at = null,
+            deleted_at = null,
+            updated_at = now()
+      `,
+      [
+        user.id,
+        invitation.organization_id,
+        normalizedEmail,
+        normalizedFullName,
+        invitation.country_id,
+        invitation.company_id,
+        invitation.branch_id,
+        invitation.invited_by,
+      ],
+    );
+
+    await ensureActiveUserRole(client, user.id, invitation);
+    await grantScopedAccess(client, user.id, invitation);
+    await activateManagerAssignment(client, user.id, invitation);
+    await activateReportingLines(client, user.id, invitation);
+
+    await client.query(
+      `
+        insert into public.audit_logs (
+          organization_id,
+          actor_user_id,
+          action,
+          entity_table,
+          entity_id,
+          country_id,
+          company_id,
+          branch_id,
+          metadata
+        )
+        values ($1, $2, 'local_user.created_with_temporary_password', 'profiles', $3, $4, $5, $6, $7::jsonb)
+      `,
+      [
+        invitation.organization_id,
+        invitation.invited_by,
+        user.id,
+        invitation.country_id,
+        invitation.company_id,
+        invitation.branch_id,
+        JSON.stringify({
+          invited_email_domain: normalizedEmail.split("@")[1] ?? "unknown",
+          requires_password_change: true,
+          role_key: roleKey,
+          source: "usuarios-permisos",
+        }),
+      ],
+    );
+
+    await client.query("commit");
+
+    return {
+      email: user.email,
+      requiresPasswordChange: true,
+      roleKey,
+      userId: user.id,
+    };
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    await resetPostgresRuntimeRole(client).catch(() => undefined);
+    client.release();
+  }
+}
+
+export async function getLocalUserPasswordTargetByEmail(
+  email: string,
+): Promise<LocalUserPasswordTarget | null> {
+  const normalizedEmail = normalizeEmail(email);
+  const pool = getPostgresPool();
+  const client = await pool.connect();
+
+  try {
+    await resetPostgresRuntimeRole(client);
+    const result = await client.query<{
+      branch_id: string | null;
+      company_id: string | null;
+      country_id: string | null;
+      email: string;
+      id: string;
+      operational_area_id: string | null;
+      organization_id: string;
+      role_key: string | null;
+    }>(
+      `
+        select
+          p.id,
+          p.email,
+          coalesce(ur.organization_id, p.organization_id) as organization_id,
+          coalesce(ur.country_id, p.default_country_id) as country_id,
+          coalesce(ur.company_id, p.default_company_id) as company_id,
+          coalesce(ur.operational_area_id, b.operational_area_id) as operational_area_id,
+          coalesce(ur.branch_id, p.default_branch_id) as branch_id,
+          r.key as role_key
+        from public.profiles p
+        join auth.users u on u.id = p.id
+        left join public.user_roles ur
+          on ur.user_id = p.id
+          and coalesce(ur.status, 'active') = 'active'
+          and ur.deactivated_at is null
+        left join public.roles r on r.id = ur.role_id
+        left join public.branches b
+          on b.id = coalesce(ur.branch_id, p.default_branch_id)
+        where lower(coalesce(p.email, u.email)) = $1
+          and p.status = 'active'
+          and p.deactivated_at is null
+          and p.deleted_at is null
+        order by
+          case r.key
+            when 'super_admin' then 1
+            when 'webmaster_admin' then 2
+            when 'ceo' then 3
+            when 'gerente_operaciones' then 4
+            when 'gerente_area' then 5
+            when 'gerente_sucursal' then 6
+            when 'usuario_operativo' then 7
+            else 8
+          end
+        limit 1
+      `,
+      [normalizedEmail],
+    );
+    const user = result.rows[0];
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      email: user.email,
+      roleKey: coerceRoleKey(user.role_key),
+      scope: {
+        branchId: user.branch_id,
+        companyId: user.company_id,
+        countryId: user.country_id,
+        operationalAreaId: user.operational_area_id,
+        organizationId: user.organization_id,
+      },
+      userId: user.id,
+    };
+  } finally {
+    await resetPostgresRuntimeRole(client).catch(() => undefined);
+    client.release();
+  }
+}
+
+export async function resetLocalUserTemporaryPassword({
+  actorUserId,
+  email,
+  password,
+}: ResetLocalUserTemporaryPasswordInput): Promise<LocalUserPasswordTarget> {
+  const normalizedEmail = normalizeEmail(email);
+  const passwordPolicyError = getPasswordPolicyError(password);
+
+  if (passwordPolicyError) {
+    throw new Error(passwordPolicyError);
+  }
+
+  const pool = getPostgresPool();
+  const client = await pool.connect();
+
+  try {
+    await resetPostgresRuntimeRole(client);
+    await client.query("begin");
+
+    const result = await client.query<{
+      branch_id: string | null;
+      company_id: string | null;
+      country_id: string | null;
+      email: string;
+      id: string;
+      operational_area_id: string | null;
+      organization_id: string;
+      role_key: string | null;
+    }>(
+      `
+        select
+          p.id,
+          coalesce(p.email, u.email) as email,
+          coalesce(ur.organization_id, p.organization_id) as organization_id,
+          coalesce(ur.country_id, p.default_country_id) as country_id,
+          coalesce(ur.company_id, p.default_company_id) as company_id,
+          coalesce(ur.operational_area_id, b.operational_area_id) as operational_area_id,
+          coalesce(ur.branch_id, p.default_branch_id) as branch_id,
+          r.key as role_key
+        from auth.users u
+        join public.profiles p on p.id = u.id
+        left join public.user_roles ur
+          on ur.user_id = p.id
+          and coalesce(ur.status, 'active') = 'active'
+          and ur.deactivated_at is null
+        left join public.roles r on r.id = ur.role_id
+        left join public.branches b
+          on b.id = coalesce(ur.branch_id, p.default_branch_id)
+        where lower(coalesce(p.email, u.email)) = $1
+          and p.status = 'active'
+          and p.deactivated_at is null
+          and p.deleted_at is null
+        order by
+          case r.key
+            when 'super_admin' then 1
+            when 'webmaster_admin' then 2
+            when 'ceo' then 3
+            when 'gerente_operaciones' then 4
+            when 'gerente_area' then 5
+            when 'gerente_sucursal' then 6
+            when 'usuario_operativo' then 7
+            else 8
+          end
+        limit 1
+        for update of u, p
+      `,
+      [normalizedEmail],
+    );
+    const user = result.rows[0];
+
+    if (!user) {
+      throw new Error("No encontre un usuario activo con ese correo.");
+    }
+
+    const encryptedPassword = await hashPassword(password);
+
+    await client.query(
+      `
+        update auth.users
+        set encrypted_password = $1,
+            email_confirmed_at = coalesce(email_confirmed_at, now()),
+            updated_at = now()
+        where id = $2
+      `,
+      [encryptedPassword, user.id],
+    );
+
+    await client.query(
+      `
+        update public.profiles
+        set requires_password_change = true,
+            updated_at = now()
+        where id = $1
+      `,
+      [user.id],
+    );
+
+    await client.query(
+      `
+        insert into public.audit_logs (
+          organization_id,
+          actor_user_id,
+          action,
+          entity_table,
+          entity_id,
+          country_id,
+          company_id,
+          branch_id,
+          metadata
+        )
+        values ($1, $2, 'local_password.temporary_reset', 'profiles', $3, $4, $5, $6, $7::jsonb)
+      `,
+      [
+        user.organization_id,
+        nullableUuid(actorUserId),
+        user.id,
+        user.country_id,
+        user.company_id,
+        user.branch_id,
+        JSON.stringify({
+          email_domain: normalizedEmail.split("@")[1] ?? "unknown",
+          requires_password_change: true,
+          role_key: user.role_key,
+          source: "usuarios-permisos",
+        }),
+      ],
+    );
+
+    await client.query("commit");
+
+    return {
+      email: user.email,
+      roleKey: coerceRoleKey(user.role_key),
+      scope: {
+        branchId: user.branch_id,
+        companyId: user.company_id,
+        countryId: user.country_id,
+        operationalAreaId: user.operational_area_id,
+        organizationId: user.organization_id,
+      },
       userId: user.id,
     };
   } catch (error) {

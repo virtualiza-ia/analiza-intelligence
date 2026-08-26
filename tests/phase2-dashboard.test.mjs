@@ -822,10 +822,12 @@ for (const requiredBusinessText of [
 }
 
 for (const requiredUserManagementText of [
-  "Invitar usuario",
+  "Crear usuario",
   "Invitaciones y usuarios",
   "analiza:demo-users",
+  "Contrasena temporal",
   "Enviar invitacion",
+  "Resetear contrasena temporal",
   "/api/users/invite",
   "Reasignacion requerida",
   "Tu rol solo puede invitar usuarios de nivel inferior",

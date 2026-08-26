@@ -8,6 +8,7 @@ import {
   createUserInvitation,
   UserInvitationError,
 } from "@/lib/server/user-invitations";
+import { createLocalUserWithTemporaryPassword } from "@/lib/server/local-auth";
 import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
 import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
 import { canPerformAction } from "@/lib/security/authorization-policy";
@@ -27,6 +28,7 @@ type InviteUserRequest = {
   fullName?: unknown;
   managerIncentive?: unknown;
   managedBranchManagerIds?: unknown;
+  temporaryPassword?: unknown;
   roleKey?: unknown;
   scope?: unknown;
 };
@@ -201,31 +203,36 @@ export async function POST(request: Request) {
     return jsonError("Debes iniciar sesion para invitar usuarios.", 401);
   }
 
+  const payload = (await request.json().catch(() => null)) as
+    | InviteUserRequest
+    | null;
+  const temporaryPassword =
+    typeof payload?.temporaryPassword === "string"
+      ? payload.temporaryPassword
+      : "";
   const databaseMissingConfig = getMissingDatabaseConfig();
-  const smtpMissingConfig = getMissingSmtpConfig();
+  const smtpMissingConfig = temporaryPassword ? [] : getMissingSmtpConfig();
   const missingConfig = [...databaseMissingConfig, ...smtpMissingConfig];
 
   if (missingConfig.length > 0) {
     return jsonError(
-      "Faltan variables privadas para enviar invitaciones reales.",
+      temporaryPassword
+        ? "Faltan variables privadas para crear usuarios."
+        : "Faltan variables privadas para enviar invitaciones reales.",
       503,
       missingConfig,
     );
   }
 
-  const appUrl = getRequestOrigin(request);
+  const appUrl = temporaryPassword ? "" : getRequestOrigin(request);
 
-  if (!appUrl) {
+  if (!temporaryPassword && !appUrl) {
     return jsonError(
       "Falta configurar APP_URL para enviar invitaciones en produccion.",
       503,
       ["APP_URL"],
     );
   }
-
-  const payload = (await request.json().catch(() => null)) as
-    | InviteUserRequest
-    | null;
   const email =
     typeof payload?.email === "string"
       ? payload.email.trim().toLowerCase()
@@ -288,8 +295,27 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (temporaryPassword) {
+      const user = await createLocalUserWithTemporaryPassword({
+        actorUserId: actor.userId,
+        email,
+        fullName,
+        managedBranchManagerIds: managedBranchManagerResult.ids,
+        managerIncentive: managerIncentiveResult.incentive ?? undefined,
+        password: temporaryPassword,
+        roleKey: payload.roleKey,
+        scope: targetScope,
+      });
+
+      return NextResponse.json({
+        ok: true,
+        status: "created",
+        user,
+      });
+    }
+
     const invitation = await createUserInvitation({
-      appUrl,
+      appUrl: appUrl ?? "",
       email,
       fullName,
       managedBranchManagerIds: managedBranchManagerResult.ids,

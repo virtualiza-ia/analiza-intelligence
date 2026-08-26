@@ -7,6 +7,7 @@ import {
   Building2,
   CheckCircle2,
   ClipboardList,
+  KeyRound,
   LineChart,
   LockKeyhole,
   UserPlus,
@@ -125,7 +126,25 @@ type InviteUserApiResponse = {
   managedBranchManagers?: number;
   missingConfig?: string[];
   ok?: boolean;
-  status?: "sent";
+  status?: "sent" | "created";
+  user?: {
+    email?: string;
+    requiresPasswordChange?: boolean;
+    roleKey?: RoleKey;
+    userId?: string;
+  };
+};
+
+type ResetPasswordApiResponse = {
+  error?: string;
+  missingConfig?: string[];
+  ok?: boolean;
+  status?: "reset";
+  user?: {
+    email?: string;
+    roleKey?: RoleKey;
+    userId?: string;
+  };
 };
 
 type BranchManagersApiResponse = {
@@ -367,6 +386,10 @@ function getManagedBranchManagersLabel(user: DemoManagedUser) {
   return count > 0 ? `${count} a cargo` : "Sin asignar";
 }
 
+function isApiRoleKey(value: unknown): value is RoleKey {
+  return typeof value === "string" && roleKeys.includes(value as RoleKey);
+}
+
 function readInviteUserApiResponse(value: unknown): InviteUserApiResponse {
   if (typeof value !== "object" || value === null) {
     return {};
@@ -378,6 +401,12 @@ function readInviteUserApiResponse(value: unknown): InviteUserApiResponse {
         (configName): configName is string => typeof configName === "string",
       )
     : undefined;
+
+  const user =
+    typeof response.user === "object" && response.user !== null
+      ? (response.user as Record<string, unknown>)
+      : null;
+  const userRoleKey = user?.roleKey;
 
   return {
     error: typeof response.error === "string" ? response.error : undefined,
@@ -393,7 +422,50 @@ function readInviteUserApiResponse(value: unknown): InviteUserApiResponse {
         : undefined,
     missingConfig,
     ok: response.ok === true,
-    status: response.status === "sent" ? "sent" : undefined,
+    status:
+      response.status === "sent" || response.status === "created"
+        ? response.status
+        : undefined,
+    user: user
+      ? {
+          email: typeof user.email === "string" ? user.email : undefined,
+          requiresPasswordChange: user.requiresPasswordChange === true,
+          roleKey: isApiRoleKey(userRoleKey) ? userRoleKey : undefined,
+          userId: typeof user.userId === "string" ? user.userId : undefined,
+        }
+      : undefined,
+  };
+}
+
+function readResetPasswordApiResponse(value: unknown): ResetPasswordApiResponse {
+  if (typeof value !== "object" || value === null) {
+    return {};
+  }
+
+  const response = value as Record<string, unknown>;
+  const missingConfig = Array.isArray(response.missingConfig)
+    ? response.missingConfig.filter(
+        (configName): configName is string => typeof configName === "string",
+      )
+    : undefined;
+  const user =
+    typeof response.user === "object" && response.user !== null
+      ? (response.user as Record<string, unknown>)
+      : null;
+  const userRoleKey = user?.roleKey;
+
+  return {
+    error: typeof response.error === "string" ? response.error : undefined,
+    missingConfig,
+    ok: response.ok === true,
+    status: response.status === "reset" ? "reset" : undefined,
+    user: user
+      ? {
+          email: typeof user.email === "string" ? user.email : undefined,
+          roleKey: isApiRoleKey(userRoleKey) ? userRoleKey : undefined,
+          userId: typeof user.userId === "string" ? user.userId : undefined,
+        }
+      : undefined,
   };
 }
 
@@ -745,6 +817,9 @@ function UsersAndPermissionsManager({
   );
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetTemporaryPassword, setResetTemporaryPassword] = useState("");
   const [roleKey, setRoleKey] = useState<RoleKey>("gerente_area");
   const [managementLevel, setManagementLevel] =
     useState<ManagementLevel>("middle");
@@ -773,6 +848,7 @@ function UsersAndPermissionsManager({
     [],
   );
   const [isCreatingBranch, setIsCreatingBranch] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [branchMessage, setBranchMessage] = useState("");
   const [message, setMessage] = useState("");
 
@@ -1354,6 +1430,7 @@ function UsersAndPermissionsManager({
           managerIncentive: managerIncentive ?? undefined,
           roleKey,
           scope: targetScope,
+          temporaryPassword: temporaryPassword || undefined,
         }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
@@ -1375,7 +1452,10 @@ function UsersAndPermissionsManager({
 
       const nextUsers: DemoManagedUser[] = [
         {
-          id: inviteResult.invitationId ?? `demo-user-${Date.now()}`,
+          id:
+            inviteResult.user?.userId ??
+            inviteResult.invitationId ??
+            `demo-user-${Date.now()}`,
           fullName: normalizedName,
           email: normalizedEmail,
           organizationScope: "Grupo Analiza DEMO",
@@ -1386,7 +1466,8 @@ function UsersAndPermissionsManager({
           businessScope: targetBusinessScope,
           areaScope: targetAreaScope,
           branchScope: targetBranchScope,
-          invitationStatus: "Pendiente",
+          invitationStatus:
+            inviteResult.status === "created" ? undefined : "Pendiente",
           managedBranchManagerCount:
             roleKey === "gerente_area"
               ? inviteResult.managedBranchManagers ??
@@ -1396,7 +1477,10 @@ function UsersAndPermissionsManager({
             roleKey === "gerente_area"
               ? [...managedBranchManagerIds]
               : undefined,
-          status: "Pendiente invitacion",
+          status:
+            inviteResult.status === "created"
+              ? "Activo"
+              : "Pendiente invitacion",
           createdAt: todayIsoDate(),
         },
         ...users,
@@ -1408,6 +1492,7 @@ function UsersAndPermissionsManager({
       }
       setFullName("");
       setEmail("");
+      setTemporaryPassword("");
       setRoleKey(getDefaultRoleForActor(activeRole));
       setManagementLevel("middle");
       setBaseBonusAmount(String(getDefaultBaseBonusAmount("middle")));
@@ -1421,7 +1506,9 @@ function UsersAndPermissionsManager({
           ? ` Quedan ${selectedManagedBranchManagerIds.length} gerentes de sucursal preasignados a cargo.`
           : "";
       setMessage(
-        inviteResult.expiresAt
+        inviteResult.status === "created"
+          ? `Usuario creado con contrasena temporal. Al ingresar debera cambiarla.${managedBranchMessage}`
+          : inviteResult.expiresAt
           ? `Invitacion enviada por correo. La cuenta queda pendiente hasta aceptar antes del ${inviteResult.expiresAt}.${managedBranchMessage}`
           : `Invitacion enviada por correo. La cuenta queda pendiente hasta aceptar.${managedBranchMessage}`,
       );
@@ -1433,6 +1520,80 @@ function UsersAndPermissionsManager({
       );
     } finally {
       setIsInviting(false);
+    }
+  }
+
+  async function resetUserPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const normalizedEmail = resetEmail.trim().toLowerCase();
+
+    if (!canCreateUsers) {
+      setMessage("Tu rol actual no tiene delegacion para resetear usuarios.");
+      return;
+    }
+
+    if (!normalizedEmail || !resetTemporaryPassword) {
+      setMessage("Completa correo y nueva contrasena temporal.");
+      return;
+    }
+
+    setIsResettingPassword(true);
+
+    try {
+      const response = await fetch("/api/users/reset-password", {
+        body: JSON.stringify({
+          email: normalizedEmail,
+          temporaryPassword: resetTemporaryPassword,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const resetResult = readResetPasswordApiResponse(
+        await response.json().catch(() => null),
+      );
+
+      if (!response.ok || !resetResult.ok) {
+        const missingConfig =
+          resetResult.missingConfig && resetResult.missingConfig.length > 0
+            ? ` Variables pendientes: ${resetResult.missingConfig.join(", ")}.`
+            : "";
+
+        throw new Error(
+          `${resetResult.error ?? "No se pudo resetear la contrasena."}${missingConfig}`,
+        );
+      }
+
+      setUsers((currentUsers) => {
+        const nextUsers = currentUsers.map((user) =>
+          user.email.toLowerCase() === normalizedEmail
+            ? {
+                ...user,
+                invitationStatus: undefined,
+                status: "Activo" as const,
+              }
+            : user,
+        );
+
+        if (enableDemoFixtures) {
+          persistDemoUsers(nextUsers);
+        }
+
+        return nextUsers;
+      });
+      setResetEmail("");
+      setResetTemporaryPassword("");
+      setMessage(
+        "Contrasena temporal actualizada. El usuario debera cambiarla al ingresar.",
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo resetear la contrasena.",
+      );
+    } finally {
+      setIsResettingPassword(false);
     }
   }
 
@@ -1699,13 +1860,13 @@ function UsersAndPermissionsManager({
           <div className="grid gap-2">
             <div className="flex items-center gap-2 text-lg font-semibold tracking-normal">
               <UserPlus className="size-5 text-primary" />
-              Invitar usuario
+              Crear usuario
             </div>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Crea usuarios por invitacion y define su alcance por pais, linea de
-              negocio, gerencia de area y sucursal. Para gerentes, define nivel
-              y bono base; para gerentes de area, asigna los gerentes de sucursal
-              a cargo.
+              Crea usuarios con invitacion por correo o con contrasena temporal,
+              y define su alcance por pais, linea de negocio, gerencia de area y
+              sucursal. Para gerentes, define nivel y bono base; para gerentes
+              de area, asigna los gerentes de sucursal a cargo.
             </p>
           </div>
           <Badge variant={canCreateUsers ? "outline" : "secondary"}>
@@ -1716,7 +1877,7 @@ function UsersAndPermissionsManager({
         {!canCreateUsers ? (
           <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
             <LockKeyhole className="mt-0.5 size-4 shrink-0" />
-            Tu rol actual no tiene delegacion para invitar usuarios.
+            Tu rol actual no tiene delegacion para crear usuarios.
           </div>
         ) : null}
 
@@ -1735,9 +1896,9 @@ function UsersAndPermissionsManager({
         </div>
 
         <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm leading-6 text-emerald-900">
-          <strong>Correo y contrasena:</strong> el sistema no manda contrasenas
-          manuales. Envia una invitacion segura por correo y la cuenta queda
-          pendiente hasta que la persona acepte el acceso.
+          <strong>Correo y contrasena:</strong> si escribes una contrasena
+          temporal, el usuario queda activo y debera cambiarla al ingresar. Si
+          la dejas vacia, se envia invitacion por correo.
         </div>
 
         <div className="grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-4">
@@ -1762,6 +1923,24 @@ function UsersAndPermissionsManager({
               type="email"
               value={email}
             />
+          </label>
+
+          <label className="grid min-w-0 gap-2 text-sm xl:col-span-2">
+            <span className="font-medium">Contrasena temporal</span>
+            <Input
+              autoComplete="new-password"
+              className="h-10"
+              disabled={!canCreateUsers}
+              minLength={10}
+              onChange={(event) => setTemporaryPassword(event.target.value)}
+              placeholder="Minimo 10 caracteres con letras y numeros"
+              type="password"
+              value={temporaryPassword}
+            />
+            <span className="text-xs leading-5 text-muted-foreground">
+              Opcional: si la completas, no se envia invitacion y el usuario
+              debera cambiarla al primer ingreso.
+            </span>
           </label>
 
           <label className="grid min-w-0 gap-2 text-sm">
@@ -2007,13 +2186,77 @@ function UsersAndPermissionsManager({
             </div>
           ) : (
             <span className="text-sm text-muted-foreground">
-              La invitacion quedara pendiente hasta que el usuario la acepte.
+              Puedes crear el usuario con contrasena temporal o enviar invitacion.
             </span>
           )}
 
           <Button disabled={!canCreateUsers || isInviting} type="submit">
             <UserPlus className="size-4" />
-            {isInviting ? "Enviando..." : "Enviar invitacion"}
+            {isInviting
+              ? "Guardando..."
+              : temporaryPassword
+                ? "Crear usuario"
+                : "Enviar invitacion"}
+          </Button>
+        </div>
+      </form>
+
+      <form
+        className="grid min-w-0 gap-4 rounded-md border bg-card p-4"
+        onSubmit={resetUserPassword}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="grid gap-2">
+            <div className="flex items-center gap-2 text-lg font-semibold tracking-normal">
+              <KeyRound className="size-5 text-primary" />
+              Resetear contrasena temporal
+            </div>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+              Actualiza la contrasena temporal cuando un usuario pierde acceso.
+              En el siguiente ingreso se le pedira crear una nueva.
+            </p>
+          </div>
+          <Badge variant={canCreateUsers ? "outline" : "secondary"}>
+            Cambio obligatorio al ingresar
+          </Badge>
+        </div>
+
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          <label className="grid min-w-0 gap-2 text-sm xl:col-span-2">
+            <span className="font-medium">Correo del usuario</span>
+            <Input
+              className="h-10"
+              disabled={!canCreateUsers}
+              onChange={(event) => setResetEmail(event.target.value)}
+              placeholder="usuario@analiza.com"
+              type="email"
+              value={resetEmail}
+            />
+          </label>
+
+          <label className="grid min-w-0 gap-2 text-sm xl:col-span-2">
+            <span className="font-medium">Nueva contrasena temporal</span>
+            <Input
+              autoComplete="new-password"
+              className="h-10"
+              disabled={!canCreateUsers}
+              minLength={10}
+              onChange={(event) => setResetTemporaryPassword(event.target.value)}
+              placeholder="Minimo 10 caracteres con letras y numeros"
+              type="password"
+              value={resetTemporaryPassword}
+            />
+          </label>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t pt-4">
+          <Button
+            disabled={!canCreateUsers || isResettingPassword}
+            type="submit"
+            variant="outline"
+          >
+            <KeyRound className="size-4" />
+            {isResettingPassword ? "Reseteando..." : "Resetear contrasena"}
           </Button>
         </div>
       </form>
