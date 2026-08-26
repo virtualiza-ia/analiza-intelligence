@@ -212,6 +212,7 @@ export default async function ModulePage({
     return (
       <BusinessModuleDashboard
         allowDemoRoleSwitch={actor.allowDemoRoleSwitch}
+        actorScope={actor.scope}
         enableDemoFixtures={isDemoRuntimeEnvironment()}
         module={module}
         roleKey={actor.roleKey}

@@ -77,6 +77,7 @@ type StoredContext = {
 
 type BusinessModuleDashboardProps = {
   allowDemoRoleSwitch: boolean;
+  actorScope: ScopeBoundary;
   enableDemoFixtures?: boolean;
   module: string;
   roleKey: RoleKey;
@@ -310,11 +311,13 @@ function buildScopeBoundary({
   branchScope,
   businessScope,
   countryScope,
+  organizationId = demoOrganizationId,
 }: {
   areaScope?: string;
   branchScope: string;
   businessScope: string;
   countryScope: string;
+  organizationId?: string;
 }): ScopeBoundary {
   return {
     branchId: branchScope === allBranchScope ? null : branchScope,
@@ -322,7 +325,7 @@ function buildScopeBoundary({
     countryId: countryScope === allCountryScope ? null : countryScope,
     operationalAreaId:
       !areaScope || areaScope === allAreaScope ? null : areaScope,
-    organizationId: demoOrganizationId,
+    organizationId,
   };
 }
 
@@ -333,6 +336,7 @@ function buildDelegationActor(
     branchScope: string;
     businessScope: string;
     countryScope: string;
+    organizationId?: string;
   },
 ): DelegationActor {
   return {
@@ -802,11 +806,13 @@ function ModuleRows({ config }: { config: ModuleConfig }) {
 
 function UsersAndPermissionsManager({
   allowDemoRoleSwitch,
+  actorScope,
   context,
   enableDemoFixtures,
   roleKey: initialRoleKey,
 }: {
   allowDemoRoleSwitch: boolean;
+  actorScope: ScopeBoundary;
   context: StoredContext | null;
   enableDemoFixtures: boolean;
   roleKey: RoleKey;
@@ -1010,20 +1016,41 @@ function UsersAndPermissionsManager({
       : areaScope !== allAreaScope
         ? selectedArea?.countryId ?? countryScope
         : countryScope;
+  const organizationId = actorScope.organizationId || demoOrganizationId;
+  const createScopeBoundary = (scope: {
+    areaScope?: string;
+    branchScope: string;
+    businessScope: string;
+    countryScope: string;
+  }) => buildScopeBoundary({ ...scope, organizationId });
   const actor = useMemo(
-    () =>
-      buildDelegationActor(activeRole, {
+    () => {
+      if (!allowDemoRoleSwitch) {
+        return {
+          canInviteOperationalUsers: activeRole === "gerente_sucursal",
+          roleKey: activeRole,
+          scope: actorScope,
+          userId: "active-user",
+        } satisfies DelegationActor;
+      }
+
+      return buildDelegationActor(activeRole, {
         areaScope: actorAreaScope,
         branchScope,
         businessScope: actorBusinessScope,
         countryScope: actorCountryScope,
-      }),
+        organizationId,
+      });
+    },
     [
+      actorScope,
       activeRole,
+      allowDemoRoleSwitch,
       actorAreaScope,
       actorBusinessScope,
       actorCountryScope,
       branchScope,
+      organizationId,
     ],
   );
   const creatableRoles = useMemo(
@@ -1036,7 +1063,7 @@ function UsersAndPermissionsManager({
   const canCreateUsers = creatableRoles.length > 0;
   const canCreateBranchesForScope = canCreateBranch(
     actor,
-    buildScopeBoundary({
+    createScopeBoundary({
       areaScope: actorAreaScope,
       branchScope: allBranchScope,
       businessScope: actorBusinessScope,
@@ -1045,14 +1072,14 @@ function UsersAndPermissionsManager({
   );
   const canCreateAreasForScope = canCreateOperationalArea(
     actor,
-    buildScopeBoundary({
+    createScopeBoundary({
       areaScope: allAreaScope,
       branchScope: allBranchScope,
       businessScope: actorBusinessScope,
       countryScope: actorCountryScope,
     }),
   );
-  const branchCreationScope = buildScopeBoundary({
+  const branchCreationScope = createScopeBoundary({
     areaScope: branchAreaScope,
     branchScope: allBranchScope,
     businessScope: branchBusinessScope,
@@ -1366,7 +1393,7 @@ function UsersAndPermissionsManager({
       return;
     }
 
-    const targetScope = buildScopeBoundary({
+    const targetScope = createScopeBoundary({
       areaScope: targetAreaScope,
       branchScope: targetBranchScope,
       businessScope: targetBusinessScope,
@@ -1605,7 +1632,7 @@ function UsersAndPermissionsManager({
       return;
     }
 
-    const nextScope = buildScopeBoundary({
+    const nextScope = createScopeBoundary({
       areaScope: userToUpdate.areaScope,
       branchScope: userToUpdate.branchScope,
       businessScope: userToUpdate.businessScope,
@@ -1671,7 +1698,7 @@ function UsersAndPermissionsManager({
           : 0,
       target: {
         roleKey: userToDeactivate.roleKey,
-        scope: buildScopeBoundary({
+        scope: createScopeBoundary({
           areaScope: userToDeactivate.areaScope,
           branchScope: userToDeactivate.branchScope,
           businessScope: userToDeactivate.businessScope,
@@ -2301,7 +2328,7 @@ function UsersAndPermissionsManager({
                   user.status !== "Inactivo" &&
                   canInviteUser(actor, {
                     roleKey: user.roleKey,
-                    scope: buildScopeBoundary({
+                    scope: createScopeBoundary({
                       areaScope: user.areaScope,
                       branchScope: user.branchScope,
                       businessScope: user.businessScope,
@@ -2391,6 +2418,7 @@ function UsersAndPermissionsManager({
 
 export function BusinessModuleDashboard({
   allowDemoRoleSwitch,
+  actorScope,
   enableDemoFixtures = true,
   module,
   roleKey,
@@ -2462,6 +2490,7 @@ export function BusinessModuleDashboard({
       {module === "usuarios-permisos" ? (
         <UsersAndPermissionsManager
           allowDemoRoleSwitch={allowDemoRoleSwitch}
+          actorScope={actorScope}
           context={context}
           enableDemoFixtures={enableDemoFixtures}
           roleKey={roleKey}
