@@ -104,6 +104,10 @@ assert(
 
 assert(
   branchDashboard.includes("isBranchManagerScopedAccess") &&
+    branchDashboard.includes("/api/context/options") &&
+    branchDashboard.includes("allowedBranchOptions") &&
+    branchDashboard.includes("recordMatchesBranchOption") &&
+    branchDashboard.includes("recordMatchesContextBranch") &&
     branchDashboard.includes("No hay filtros para cambiar de sucursal") &&
     branchDashboard.includes("Sin cierre cargado para esta sucursal") &&
     !branchDashboard.includes("screen.records.slice(0, 1)") &&

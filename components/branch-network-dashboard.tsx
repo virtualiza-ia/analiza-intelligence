@@ -19,6 +19,11 @@ import {
   type BusinessLineSlug,
 } from "@/lib/analytics/business-line-operations";
 import {
+  globalContextChangeEvent as contextChangeEvent,
+  globalContextStorageKey as storageKey,
+  isAllFilterValue,
+} from "@/lib/analytics/global-filters";
+import {
   roleKeys,
   type RoleKey,
 } from "@/lib/tenant/demo-context";
@@ -38,11 +43,22 @@ import {
 import { formatCurrency, formatRate } from "@/lib/analytics/el-salvador-result-templates";
 import { cn } from "@/lib/utils";
 
-const storageKey = "analiza:selected-context";
-const contextChangeEvent = "analiza:context-change";
 const roleStorageKey = "analiza:demo-role";
 const roleChangeEvent = "analiza:role-change";
 const allOption = "Todos";
+
+type AllowedBranchOption = {
+  code?: string;
+  id: string;
+  name: string;
+};
+
+type ContextOptionsResponse = {
+  ok?: boolean;
+  options?: {
+    branches?: AllowedBranchOption[];
+  };
+};
 
 type StoredContext = {
   branchId?: string;
@@ -201,6 +217,53 @@ function branchNamesMatch(left: string, right: string) {
     normalizedLeft === normalizedRight ||
     normalizedLeft.includes(normalizedRight) ||
     normalizedRight.includes(normalizedLeft)
+  );
+}
+
+function recordMatchesBranchOption(
+  record: BranchNetworkRecord,
+  branch: AllowedBranchOption,
+) {
+  const branchValues = [branch.id, branch.name, branch.code ?? ""].filter(
+    (value) => value.length > 0,
+  );
+  const recordValues = [record.id, record.branch, record.city].filter(
+    (value) => value.length > 0,
+  );
+
+  return branchValues.some((branchValue) =>
+    recordValues.some(
+      (recordValue) =>
+        normalizeBranchText(recordValue) === normalizeBranchText(branchValue) ||
+        branchNamesMatch(recordValue, branchValue),
+    ),
+  );
+}
+
+function recordMatchesContextBranch(
+  record: BranchNetworkRecord,
+  context: StoredContext | null,
+) {
+  if (
+    isAllFilterValue(context?.branchId) &&
+    isAllFilterValue(context?.branchName)
+  ) {
+    return true;
+  }
+
+  const branchValues = [context?.branchId ?? "", context?.branchName ?? ""].filter(
+    (value) => value.length > 0,
+  );
+
+  if (branchValues.length === 0) {
+    return true;
+  }
+
+  return branchValues.some(
+    (branchValue) =>
+      normalizeBranchText(record.id) === normalizeBranchText(branchValue) ||
+      branchNamesMatch(record.branch, branchValue) ||
+      branchNamesMatch(record.city, branchValue),
   );
 }
 
@@ -1223,6 +1286,9 @@ export function BranchNetworkDashboard() {
   const [context, setContext] = useState<StoredContext | null>(null);
   const [currentUserAccess, setCurrentUserAccess] =
     useState<CurrentUserAccess | null>(null);
+  const [allowedBranchOptions, setAllowedBranchOptions] = useState<
+    AllowedBranchOption[] | null
+  >(null);
   const [activeRole, setActiveRole] = useState<RoleKey>("super_admin");
   const [filters, setFilters] = useState<BranchFilters>(() => createDefaultFilters());
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
@@ -1242,39 +1308,64 @@ export function BranchNetworkDashboard() {
     });
   }, [context, scopedBranchAccess]);
   const screen = useMemo(() => getBranchNetworkScreen(lineSlug), [lineSlug]);
-  const branchScopedRecords = useMemo(() => {
-    if (!isBranchManagerView) {
+  const allowedRecords = useMemo(() => {
+    if (!currentUserAccess || context?.isDemo === true) {
       return screen.records;
     }
 
+    if (!allowedBranchOptions) {
+      return [];
+    }
+
+    if (allowedBranchOptions.length === 0) {
+      return [];
+    }
+
+    return screen.records.filter((record) =>
+      allowedBranchOptions.some((branch) =>
+        recordMatchesBranchOption(record, branch),
+      ),
+    );
+  }, [
+    allowedBranchOptions,
+    context?.isDemo,
+    currentUserAccess,
+    screen.records,
+  ]);
+  const branchScopedRecords = useMemo(() => {
+    const records = allowedRecords;
+
     const scopedBranchId = scopedBranchAccess?.scope.branchId ?? context?.branchId;
     const contextBranchName =
-      context?.branchName && context.branchName !== "Todas las sucursales"
+      context?.branchName && !isAllFilterValue(context.branchName)
         ? context.branchName
         : "";
     const scopedBranchName =
       scopedBranchAccess?.scope.branchName ?? contextBranchName;
 
-    if (!scopedBranchId && !scopedBranchName) {
-      return [];
+    if (isBranchManagerView) {
+      if (!scopedBranchId && !scopedBranchName) {
+        return [];
+      }
+
+      return records.filter((record) => {
+        return (
+          (scopedBranchId ? record.id === scopedBranchId : false) ||
+          (scopedBranchName
+            ? branchNamesMatch(record.branch, scopedBranchName) ||
+              branchNamesMatch(record.city, scopedBranchName)
+            : false)
+        );
+      });
     }
 
-    return screen.records.filter((record) => {
-      return (
-        (scopedBranchId ? record.id === scopedBranchId : false) ||
-        (scopedBranchName
-          ? branchNamesMatch(record.branch, scopedBranchName) ||
-            branchNamesMatch(record.city, scopedBranchName)
-          : false)
-      );
-    });
+    return records.filter((record) => recordMatchesContextBranch(record, context));
   }, [
-    context?.branchId,
-    context?.branchName,
+    allowedRecords,
+    context,
     isBranchManagerView,
     scopedBranchAccess?.scope.branchId,
     scopedBranchAccess?.scope.branchName,
-    screen.records,
   ]);
   const filteredRecords = useMemo(() => {
     if (isBranchManagerView) {
@@ -1367,6 +1458,46 @@ export function BranchNetworkDashboard() {
   }, []);
 
   useEffect(() => {
+    if (!currentUserAccess || context?.isDemo === true) {
+      setAllowedBranchOptions(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    fetch("/api/context/options", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+
+        return (await response.json().catch(() => null)) as
+          | ContextOptionsResponse
+          | null;
+      })
+      .then((payload) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setAllowedBranchOptions(
+          payload?.ok === true && payload.options?.branches
+            ? payload.options.branches
+            : [],
+        );
+      })
+      .catch(() => {
+        if (isMounted) {
+          setAllowedBranchOptions([]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [context?.isDemo, currentUserAccess]);
+
+  useEffect(() => {
     setFilters(createDefaultFilters());
     setSelectedBranchId(null);
     setTrendBranchIds(branchScopedRecords.slice(0, 5).map((record) => record.id));
@@ -1387,7 +1518,7 @@ export function BranchNetworkDashboard() {
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
-              Entorno DEMO
+              {context?.isDemo === false ? "Datos oficiales" : "Entorno DEMO"}
             </Badge>
             <Badge variant="outline">Sucursales</Badge>
             <Badge variant="outline">{screen.subtitle}</Badge>
