@@ -13,27 +13,37 @@ import {
 } from "lucide-react";
 
 import {
+  consolidatedCompanyId,
   demoBranches,
   demoBusinessLineOptions,
   demoCompanyOptions,
   demoCountryOptions,
   demoOperationalAreas,
-  getBusinessLineForCompany,
-  getCompanyForBusinessLine,
   getDefaultPeriod,
-  consolidatedCompanyId,
+  type BranchOption,
+  type BusinessLineOption,
+  type CompanyOption,
+  type CountryOption,
+  type OperationalAreaOption,
 } from "@/lib/tenant/demo-context";
 import {
+  allBranchesLabel,
   allBranchesValue,
+  allChannelsLabel,
   allChannelsValue,
+  allManagersLabel,
   allManagersValue,
+  allOperationalAreasLabel,
   allOperationalAreasValue,
+  allPayersLabel,
   allPayersValue,
+  allProfessionalsLabel,
   allProfessionalsValue,
+  allServicesLabel,
   allServicesValue,
   createGlobalFilterContextFromSearchParams,
   demoChannelOptions,
-  demoManagerOptions as managerOptions,
+  demoManagerOptions,
   demoPayerOptions,
   demoProfessionalOptions,
   demoServiceOptions,
@@ -51,6 +61,43 @@ import {
 
 const demoBusinessLineStorageKey = "analiza:demo-business-line";
 const roleChangeEvent = "analiza:role-change";
+
+type NamedFilterOption = {
+  id: string;
+  name: string;
+};
+
+type HeaderContextOptions = {
+  branches: readonly BranchOption[];
+  businessLines: readonly BusinessLineOption[];
+  companies: readonly CompanyOption[];
+  countries: readonly CountryOption[];
+  managers: readonly NamedFilterOption[];
+  operationalAreas: readonly OperationalAreaOption[];
+};
+
+type OfficialContextOptionsResponse = {
+  ok?: boolean;
+  options?: HeaderContextOptions;
+};
+
+const demoHeaderContextOptions: HeaderContextOptions = {
+  branches: demoBranches,
+  businessLines: demoBusinessLineOptions,
+  companies: demoCompanyOptions,
+  countries: demoCountryOptions,
+  managers: demoManagerOptions,
+  operationalAreas: demoOperationalAreas,
+};
+
+const emptyOfficialContextOptions: HeaderContextOptions = {
+  branches: [],
+  businessLines: [],
+  companies: [],
+  countries: [],
+  managers: [],
+  operationalAreas: [],
+};
 
 type StoredContext = {
   countryId: string;
@@ -117,8 +164,16 @@ function formatPeriodLabel(periodStart: string, periodEnd: string) {
   return `${periodStart} a ${periodEnd}`;
 }
 
-function findBusinessLineByCompanyScope(companyId?: string | null, companyName?: string | null) {
-  const lineByCompanyId = companyId ? getBusinessLineForCompany(companyId) : null;
+function findBusinessLineByCompanyScope(
+  businessLines: readonly BusinessLineOption[],
+  companyId?: string | null,
+  companyName?: string | null,
+) {
+  const lineOptions =
+    businessLines.length > 0 ? businessLines : demoBusinessLineOptions;
+  const lineByCompanyId = companyId
+    ? lineOptions.find((line) => line.companyId === companyId)
+    : null;
 
   if (lineByCompanyId && !lineByCompanyId.isConsolidated) {
     return lineByCompanyId;
@@ -128,14 +183,16 @@ function findBusinessLineByCompanyScope(companyId?: string | null, companyName?:
 
   if (normalizedCompanyName.includes("laboratorio")) {
     return (
-      demoBusinessLineOptions.find((line) => line.code === "LABORATORY") ??
+      lineOptions.find((line) => line.code === "LABORATORY") ??
+      lineOptions[0] ??
       demoBusinessLineOptions[0]
     );
   }
 
   if (normalizedCompanyName.includes("fisioterapia")) {
     return (
-      demoBusinessLineOptions.find((line) => line.code === "PHYSIOTHERAPY") ??
+      lineOptions.find((line) => line.code === "PHYSIOTHERAPY") ??
+      lineOptions[0] ??
       demoBusinessLineOptions[0]
     );
   }
@@ -145,12 +202,37 @@ function findBusinessLineByCompanyScope(companyId?: string | null, companyName?:
     normalizedCompanyName.includes("image")
   ) {
     return (
-      demoBusinessLineOptions.find((line) => line.code === "IMAGING") ??
+      lineOptions.find((line) => line.code === "IMAGING") ??
+      lineOptions[0] ??
       demoBusinessLineOptions[0]
     );
   }
 
-  return demoBusinessLineOptions[0];
+  return lineOptions[0] ?? demoBusinessLineOptions[0];
+}
+
+function findCompanyForBusinessLine(
+  businessLines: readonly BusinessLineOption[],
+  companies: readonly CompanyOption[],
+  businessLineId: string,
+) {
+  const businessLine =
+    businessLines.find((line) => line.id === businessLineId) ?? null;
+
+  if (!businessLine || businessLine.isConsolidated || !businessLine.companyId) {
+    return (
+      companies.find((company) => company.isConsolidated) ??
+      companies[0] ??
+      demoCompanyOptions[0]
+    );
+  }
+
+  return (
+    companies.find((company) => company.id === businessLine.companyId) ??
+    companies.find((company) => company.isConsolidated) ??
+    companies[0] ??
+    demoCompanyOptions[0]
+  );
 }
 
 type TenantContextHeaderProps = {
@@ -185,6 +267,16 @@ export function TenantContextHeader({
   const [periodEnd, setPeriodEnd] = useState(`${getDefaultPeriod()}-31`);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [routeContextReady, setRouteContextReady] = useState(false);
+  const [officialContextOptions, setOfficialContextOptions] =
+    useState<HeaderContextOptions | null>(null);
+  const contextOptions = isDemoEnvironment
+    ? demoHeaderContextOptions
+    : officialContextOptions ?? emptyOfficialContextOptions;
+  const countryOptions = contextOptions.countries;
+  const companyOptions = contextOptions.companies;
+  const businessLineOptions = contextOptions.businessLines;
+  const branchOptions = contextOptions.branches;
+  const operationalAreaOptions = contextOptions.operationalAreas;
   const scopedBranchAccess = isBranchManagerScopedAccess(currentUserAccess)
     ? currentUserAccess
     : null;
@@ -199,38 +291,93 @@ export function TenantContextHeader({
       : null;
   const scopedBusinessLine = scopedCompanyAccess
     ? findBusinessLineByCompanyScope(
+        businessLineOptions,
         scopedCompanyAccess.scope.companyId,
         scopedCompanyAccess.scope.companyName,
       )
     : null;
   const demoScopedBusinessLine =
     isDemoEnvironment && demoBusinessLineCode && !scopedCompanyAccess
-      ? demoBusinessLineOptions.find(
+      ? businessLineOptions.find(
           (line) =>
             line.code === demoBusinessLineCode && !line.isConsolidated,
         ) ?? null
       : null;
-  const selectedCountry = demoCountryOptions.find(
+  const managerFilterOptions = useMemo<NamedFilterOption[]>(() => {
+    if (isDemoEnvironment) {
+      return contextOptions.managers.length > 0
+        ? [...contextOptions.managers]
+        : [...demoManagerOptions];
+    }
+
+    const allManagersOption = {
+      id: allManagersValue,
+      name: scopedCompanyAccess
+        ? "Todos los gerentes permitidos"
+        : allManagersLabel,
+    };
+
+    return [
+      allManagersOption,
+      ...contextOptions.managers.filter(
+        (manager) => manager.id !== allManagersValue,
+      ),
+    ];
+  }, [contextOptions.managers, isDemoEnvironment, scopedCompanyAccess]);
+  const professionalOptions = useMemo<readonly NamedFilterOption[]>(
+    () =>
+      isDemoEnvironment
+        ? demoProfessionalOptions
+        : [{ id: allProfessionalsValue, name: allProfessionalsLabel }],
+    [isDemoEnvironment],
+  );
+  const serviceOptions = useMemo<readonly NamedFilterOption[]>(
+    () =>
+      isDemoEnvironment
+        ? demoServiceOptions
+        : [{ id: allServicesValue, name: allServicesLabel }],
+    [isDemoEnvironment],
+  );
+  const payerOptions = useMemo<readonly NamedFilterOption[]>(
+    () =>
+      isDemoEnvironment
+        ? demoPayerOptions
+        : [{ id: allPayersValue, name: allPayersLabel }],
+    [isDemoEnvironment],
+  );
+  const channelOptions = useMemo<readonly NamedFilterOption[]>(
+    () =>
+      isDemoEnvironment
+        ? demoChannelOptions
+        : [{ id: allChannelsValue, name: allChannelsLabel }],
+    [isDemoEnvironment],
+  );
+  const selectedCountry = countryOptions.find(
     (country) => country.id === countryId,
   );
-  const selectedCompany = demoCompanyOptions.find(
+  const selectedCompany = companyOptions.find(
     (company) => company.id === companyId,
   );
   const selectedManager =
-    managerOptions.find((manager) => manager.id === managerId) ??
-    managerOptions[0];
+    managerFilterOptions.find((manager) => manager.id === managerId) ??
+    managerFilterOptions[0] ??
+    { id: allManagersValue, name: allManagersLabel };
   const selectedProfessional =
-    demoProfessionalOptions.find((professional) => professional.id === professionalId) ??
-    demoProfessionalOptions[0];
+    professionalOptions.find((professional) => professional.id === professionalId) ??
+    professionalOptions[0] ??
+    { id: allProfessionalsValue, name: allProfessionalsLabel };
   const selectedService =
-    demoServiceOptions.find((service) => service.id === serviceId) ??
-    demoServiceOptions[0];
+    serviceOptions.find((service) => service.id === serviceId) ??
+    serviceOptions[0] ??
+    { id: allServicesValue, name: allServicesLabel };
   const selectedPayer =
-    demoPayerOptions.find((payer) => payer.id === payerId) ??
-    demoPayerOptions[0];
+    payerOptions.find((payer) => payer.id === payerId) ??
+    payerOptions[0] ??
+    { id: allPayersValue, name: allPayersLabel };
   const selectedChannel =
-    demoChannelOptions.find((channel) => channel.id === channelId) ??
-    demoChannelOptions[0];
+    channelOptions.find((channel) => channel.id === channelId) ??
+    channelOptions[0] ??
+    { id: allChannelsValue, name: allChannelsLabel };
   const replaceRouteSearchParams = useCallback(
     (searchParams: URLSearchParams) => {
       const serializedParams = searchParams.toString();
@@ -250,12 +397,12 @@ export function TenantContextHeader({
   const countryBranches = useMemo(
     () =>
       selectedCountry?.scope === "regional"
-        ? demoBranches
-        : demoBranches.filter((branch) => branch.countryId === countryId),
-    [countryId, selectedCountry?.scope],
+        ? branchOptions
+        : branchOptions.filter((branch) => branch.countryId === countryId),
+    [branchOptions, countryId, selectedCountry?.scope],
   );
 
-  const companies = useMemo(() => demoCompanyOptions, []);
+  const companies = useMemo(() => companyOptions, [companyOptions]);
 
   const branches = useMemo(
     () =>
@@ -267,7 +414,7 @@ export function TenantContextHeader({
 
   const operationalAreas = useMemo(
     () =>
-      demoOperationalAreas.filter(
+      operationalAreaOptions.filter(
         (area) =>
           (selectedCountry?.scope === "regional" || area.countryId === countryId) &&
           (selectedCompany?.isConsolidated || area.companyId === companyId),
@@ -275,6 +422,7 @@ export function TenantContextHeader({
     [
       companyId,
       countryId,
+      operationalAreaOptions,
       selectedCompany?.isConsolidated,
       selectedCountry?.scope,
     ],
@@ -293,6 +441,46 @@ export function TenantContextHeader({
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (isDemoEnvironment) {
+      setOfficialContextOptions(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    fetch("/api/context/options", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+
+        return (await response.json().catch(() => null)) as
+          | OfficialContextOptionsResponse
+          | null;
+      })
+      .then((payload) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setOfficialContextOptions(
+          payload?.ok === true && payload.options
+            ? payload.options
+            : emptyOfficialContextOptions,
+        );
+      })
+      .catch(() => {
+        if (isMounted) {
+          setOfficialContextOptions(emptyOfficialContextOptions);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isDemoEnvironment]);
 
   useEffect(() => {
     function syncDemoBusinessLine() {
@@ -341,7 +529,33 @@ export function TenantContextHeader({
   }, [isDemoEnvironment, routeSearchParams]);
 
   useEffect(() => {
-    if (scopedCompanyAccess) {
+    if (scopedCompanyAccess || countryOptions.length === 0) {
+      return;
+    }
+
+    const nextCountryId = countryOptions[0]?.id ?? "";
+    setCountryId((currentCountryId) =>
+      countryOptions.some((country) => country.id === currentCountryId)
+        ? currentCountryId
+        : nextCountryId,
+    );
+  }, [countryOptions, scopedCompanyAccess]);
+
+  useEffect(() => {
+    if (scopedCompanyAccess || businessLineOptions.length === 0) {
+      return;
+    }
+
+    const nextBusinessLineId = businessLineOptions[0]?.id ?? "";
+    setBusinessLineId((currentBusinessLineId) =>
+      businessLineOptions.some((line) => line.id === currentBusinessLineId)
+        ? currentBusinessLineId
+        : nextBusinessLineId,
+    );
+  }, [businessLineOptions, scopedCompanyAccess]);
+
+  useEffect(() => {
+    if (scopedCompanyAccess || companies.length === 0) {
       return;
     }
 
@@ -380,12 +594,54 @@ export function TenantContextHeader({
   }, [operationalAreas, scopedBranchAccess]);
 
   useEffect(() => {
+    setManagerId((currentManagerId) =>
+      managerFilterOptions.some((manager) => manager.id === currentManagerId)
+        ? currentManagerId
+        : allManagersValue,
+    );
+  }, [managerFilterOptions]);
+
+  useEffect(() => {
+    setProfessionalId((currentProfessionalId) =>
+      professionalOptions.some(
+        (professional) => professional.id === currentProfessionalId,
+      )
+        ? currentProfessionalId
+        : allProfessionalsValue,
+    );
+  }, [professionalOptions]);
+
+  useEffect(() => {
+    setServiceId((currentServiceId) =>
+      serviceOptions.some((service) => service.id === currentServiceId)
+        ? currentServiceId
+        : allServicesValue,
+    );
+  }, [serviceOptions]);
+
+  useEffect(() => {
+    setPayerId((currentPayerId) =>
+      payerOptions.some((payer) => payer.id === currentPayerId)
+        ? currentPayerId
+        : allPayersValue,
+    );
+  }, [payerOptions]);
+
+  useEffect(() => {
+    setChannelId((currentChannelId) =>
+      channelOptions.some((channel) => channel.id === currentChannelId)
+        ? currentChannelId
+        : allChannelsValue,
+    );
+  }, [channelOptions]);
+
+  useEffect(() => {
     if (!scopedBranchAccess) {
       return;
     }
 
     setAdvancedFiltersOpen(false);
-    setBusinessLineId(scopedBusinessLine?.id ?? demoBusinessLineOptions[0]?.id ?? "");
+    setBusinessLineId(scopedBusinessLine?.id ?? businessLineOptions[0]?.id ?? "");
     setCompanyId(scopedBranchAccess.scope.companyId ?? scopedBusinessLine?.companyId ?? "");
     setCountryId(scopedBranchAccess.scope.countryId ?? getInitialCountryId());
     setBranchId(scopedBranchAccess.scope.branchId ?? scopedBranchAccess.scope.branchName);
@@ -397,6 +653,7 @@ export function TenantContextHeader({
     setChannelId(allChannelsValue);
   }, [
     scopedBranchAccess,
+    businessLineOptions,
     scopedBusinessLine?.companyId,
     scopedBusinessLine?.id,
   ]);
@@ -406,7 +663,7 @@ export function TenantContextHeader({
       return;
     }
 
-    setBusinessLineId(scopedBusinessLine?.id ?? demoBusinessLineOptions[0]?.id ?? "");
+    setBusinessLineId(scopedBusinessLine?.id ?? businessLineOptions[0]?.id ?? "");
     setCompanyId(scopedCompanyAccess.scope.companyId ?? scopedBusinessLine?.companyId ?? "");
     setCountryId(scopedCompanyAccess.scope.countryId ?? getInitialCountryId());
     setOperationalAreaId(
@@ -416,6 +673,7 @@ export function TenantContextHeader({
   }, [
     scopedAreaAccess?.scope.operationalAreaId,
     scopedBranchAccess,
+    businessLineOptions,
     scopedBusinessLine?.companyId,
     scopedBusinessLine?.id,
     scopedCompanyAccess,
@@ -433,7 +691,7 @@ export function TenantContextHeader({
     }
 
     setBusinessLineId((currentBusinessLineId) => {
-      const currentBusinessLine = demoBusinessLineOptions.find(
+      const currentBusinessLine = businessLineOptions.find(
         (line) => line.id === currentBusinessLineId,
       );
 
@@ -442,33 +700,42 @@ export function TenantContextHeader({
         : currentBusinessLineId;
     });
     setCompanyId((currentCompanyId) => {
-      const currentCompany = demoCompanyOptions.find(
+      const currentCompany = companyOptions.find(
         (company) => company.id === currentCompanyId,
       );
-      const demoCompany = getCompanyForBusinessLine(demoScopedBusinessLine.id);
+      const demoCompany = findCompanyForBusinessLine(
+        businessLineOptions,
+        companyOptions,
+        demoScopedBusinessLine.id,
+      );
 
       return !currentCompany || currentCompany.isConsolidated
         ? demoCompany.id
         : currentCompanyId;
     });
-  }, [demoScopedBusinessLine, scopedBranchAccess]);
+  }, [
+    businessLineOptions,
+    companyOptions,
+    demoScopedBusinessLine,
+    scopedBranchAccess,
+  ]);
 
   useEffect(() => {
     if (!routeContextReady) {
       return;
     }
 
-    const country = demoCountryOptions.find((item) => item.id === countryId);
-    const company = demoCompanyOptions.find((item) => item.id === companyId);
+    const country = countryOptions.find((item) => item.id === countryId);
+    const company = companyOptions.find((item) => item.id === companyId);
     const businessLine =
       scopedBusinessLine ??
-      demoBusinessLineOptions.find((item) => item.id === businessLineId);
+      businessLineOptions.find((item) => item.id === businessLineId);
     const businessLineCompany =
-      isDemoEnvironment && businessLine?.companyId
-        ? demoCompanyOptions.find((item) => item.id === businessLine.companyId)
+      businessLine?.companyId
+        ? companyOptions.find((item) => item.id === businessLine.companyId)
         : company;
-    const branch = demoBranches.find((item) => item.id === branchId);
-    const operationalArea = demoOperationalAreas.find(
+    const branch = branchOptions.find((item) => item.id === branchId);
+    const operationalArea = operationalAreaOptions.find(
       (item) => item.id === operationalAreaId,
     );
 
@@ -476,12 +743,15 @@ export function TenantContextHeader({
       return;
     }
 
+    const contextBranchFallbackName = scopedAreaAccess
+      ? "Todas mis sucursales"
+      : country?.scope === "regional"
+        ? "Todas las sucursales de la region"
+        : "Todas las sucursales permitidas";
     const branchName =
       scopedBranchAccess?.scope.branchName ??
       branch?.name ??
-      (country?.scope === "regional"
-        ? "Todas las sucursales de la region"
-        : "Todas las sucursales permitidas");
+      contextBranchFallbackName;
     const contextBranchId =
       scopedBranchAccess?.scope.branchId ??
       scopedBranchAccess?.scope.branchName ??
@@ -490,7 +760,10 @@ export function TenantContextHeader({
       scopedCompanyAccess?.scope.countryId ?? country?.id ?? getInitialCountryId();
     const contextCompanyId =
       scopedCompanyAccess?.scope.companyId ??
-      (isDemoEnvironment ? businessLineCompany?.id ?? "" : consolidatedCompanyId);
+      businessLineCompany?.id ??
+      company?.id ??
+      companyOptions.find((item) => item.isConsolidated)?.id ??
+      consolidatedCompanyId;
     const context = resolveGlobalFilterContext({
       branchId: contextBranchId,
       branchName,
@@ -500,9 +773,9 @@ export function TenantContextHeader({
       companyId: contextCompanyId,
       companyName:
         scopedCompanyAccess?.scope.companyName ??
-        (isDemoEnvironment
-          ? businessLineCompany?.name ?? businessLine.name
-          : "Vista consolidada"),
+        businessLineCompany?.name ??
+        company?.name ??
+        businessLine.name,
       countryId: contextCountryId,
       countryName:
         scopedCompanyAccess?.scope.countryName ?? country?.name ?? "Pais asignado",
@@ -525,6 +798,17 @@ export function TenantContextHeader({
       professionalId,
       serviceId,
       channelId,
+    }, {
+      branches: branchOptions,
+      businessLines: businessLineOptions,
+      channels: channelOptions,
+      companies: companyOptions,
+      countries: countryOptions,
+      managers: managerFilterOptions,
+      operationalAreas: operationalAreaOptions,
+      payers: payerOptions,
+      professionals: professionalOptions,
+      services: serviceOptions,
     });
 
     window.localStorage.setItem(storageKey, JSON.stringify(context));
@@ -536,15 +820,24 @@ export function TenantContextHeader({
   }, [
     branchId,
     businessLineId,
+    businessLineOptions,
+    branchOptions,
     channelId,
+    channelOptions,
     companyId,
+    companyOptions,
     countryId,
+    countryOptions,
     managerId,
+    managerFilterOptions,
     operationalAreaId,
+    operationalAreaOptions,
     payerId,
+    payerOptions,
     periodEnd,
     periodStart,
     professionalId,
+    professionalOptions,
     routeContextReady,
     currentUserAccess,
     scopedBranchAccess,
@@ -555,12 +848,17 @@ export function TenantContextHeader({
     replaceRouteSearchParams,
     selectedManager.name,
     serviceId,
+    serviceOptions,
   ]);
 
   function handleBusinessLineChange(nextBusinessLineId: string) {
-    const nextCompanyId = isDemoEnvironment
-      ? getCompanyForBusinessLine(nextBusinessLineId).id
-      : scopedCompanyAccess?.scope.companyId ?? consolidatedCompanyId;
+    const nextCompanyId =
+      scopedCompanyAccess?.scope.companyId ??
+      findCompanyForBusinessLine(
+        businessLineOptions,
+        companyOptions,
+        nextBusinessLineId,
+      ).id;
 
     setBusinessLineId(nextBusinessLineId);
     setCompanyId(nextCompanyId);
@@ -569,20 +867,26 @@ export function TenantContextHeader({
     setManagerId(allManagersValue);
   }
 
-  const selectedBranch = demoBranches.find((item) => item.id === branchId);
-  const selectedOperationalArea = demoOperationalAreas.find(
+  const selectedBranch = branchOptions.find((item) => item.id === branchId);
+  const selectedOperationalArea = operationalAreaOptions.find(
     (item) => item.id === operationalAreaId,
   );
+  const branchAllLabel = scopedAreaAccess
+    ? "Todas mis sucursales"
+    : selectedCountry?.scope === "regional"
+      ? "Todas las sucursales de la region"
+      : allBranchesLabel;
+  const areaAllLabel = scopedAreaAccess
+    ? "Mis areas asignadas"
+    : allOperationalAreasLabel;
   const branchName =
     scopedBranchAccess?.scope.branchName ??
     selectedBranch?.name ??
-    (selectedCountry?.scope === "regional"
-      ? "Todas las sucursales de la region"
-      : "Todas las sucursales");
+    branchAllLabel;
   const periodLabel = formatPeriodLabel(periodStart, periodEnd);
   const lineLabel =
     scopedBusinessLine?.name ??
-    demoBusinessLineOptions.find((line) => line.id === businessLineId)?.name ??
+    businessLineOptions.find((line) => line.id === businessLineId)?.name ??
     "Linea asignada";
   const companyLabel =
     scopedCompanyAccess?.scope.companyName ??
@@ -595,8 +899,10 @@ export function TenantContextHeader({
   const areaLabel =
     scopedAreaAccess?.scope.operationalAreaName ??
     selectedOperationalArea?.name ??
-    "Todas las areas";
+    areaAllLabel;
   const isLineLocked = Boolean(scopedCompanyAccess);
+  const isAreaLocked = Boolean(scopedAreaAccess && operationalAreas.length <= 1);
+  const isSecondaryFilterDisabled = !isDemoEnvironment;
 
   if (scopedBranchAccess) {
     return (
@@ -651,7 +957,7 @@ export function TenantContextHeader({
                 value={businessLineId}
                 onChange={(event) => handleBusinessLineChange(event.target.value)}
               >
-                {demoBusinessLineOptions.map((line) => (
+                {businessLineOptions.map((line) => (
                   <option key={line.id} value={line.id}>
                     {line.name}
                   </option>
@@ -671,7 +977,7 @@ export function TenantContextHeader({
               value={countryId}
               onChange={(event) => setCountryId(event.target.value)}
             >
-              {demoCountryOptions.map((country) => (
+              {countryOptions.map((country) => (
                 <option key={country.id} value={country.id}>
                   {country.name}
                 </option>
@@ -717,10 +1023,11 @@ export function TenantContextHeader({
             <select
               aria-label="Area operativa"
               className="min-w-48 bg-transparent outline-none"
+              disabled={isAreaLocked}
               value={operationalAreaId}
               onChange={(event) => setOperationalAreaId(event.target.value)}
             >
-              <option value={allOperationalAreasValue}>Todas las areas</option>
+              <option value={allOperationalAreasValue}>{areaAllLabel}</option>
               {operationalAreas.map((area) => (
                 <option key={area.id} value={area.id}>
                   {area.name}
@@ -736,11 +1043,7 @@ export function TenantContextHeader({
               value={branchId}
               onChange={(event) => setBranchId(event.target.value)}
             >
-              <option value={allBranchesValue}>
-                {selectedCountry?.scope === "regional"
-                  ? "Todas las sucursales de la region"
-                  : "Todas las sucursales"}
-              </option>
+              <option value={allBranchesValue}>{branchAllLabel}</option>
               {branches.map((branch) => (
                 <option key={branch.id} value={branch.id}>
                   {branch.name}
@@ -757,7 +1060,7 @@ export function TenantContextHeader({
               value={managerId}
               onChange={(event) => setManagerId(event.target.value)}
             >
-              {managerOptions.map((manager) => (
+              {managerFilterOptions.map((manager) => (
                 <option key={manager.id} value={manager.id}>
                   {manager.name}
                 </option>
@@ -770,10 +1073,11 @@ export function TenantContextHeader({
             <select
               aria-label="Profesional"
               className="min-w-44 bg-transparent outline-none"
+              disabled={isSecondaryFilterDisabled}
               value={professionalId}
               onChange={(event) => setProfessionalId(event.target.value)}
             >
-              {demoProfessionalOptions.map((professional) => (
+              {professionalOptions.map((professional) => (
                 <option key={professional.id} value={professional.id}>
                   {professional.name}
                 </option>
@@ -786,10 +1090,11 @@ export function TenantContextHeader({
             <select
               aria-label="Servicio"
               className="min-w-44 bg-transparent outline-none"
+              disabled={isSecondaryFilterDisabled}
               value={serviceId}
               onChange={(event) => setServiceId(event.target.value)}
             >
-              {demoServiceOptions.map((service) => (
+              {serviceOptions.map((service) => (
                 <option key={service.id} value={service.id}>
                   {service.name}
                 </option>
@@ -802,10 +1107,11 @@ export function TenantContextHeader({
             <select
               aria-label="Pagador"
               className="min-w-40 bg-transparent outline-none"
+              disabled={isSecondaryFilterDisabled}
               value={payerId}
               onChange={(event) => setPayerId(event.target.value)}
             >
-              {demoPayerOptions.map((payer) => (
+              {payerOptions.map((payer) => (
                 <option key={payer.id} value={payer.id}>
                   {payer.name}
                 </option>
@@ -818,10 +1124,11 @@ export function TenantContextHeader({
             <select
               aria-label="Canal"
               className="min-w-40 bg-transparent outline-none"
+              disabled={isSecondaryFilterDisabled}
               value={channelId}
               onChange={(event) => setChannelId(event.target.value)}
             >
-              {demoChannelOptions.map((channel) => (
+              {channelOptions.map((channel) => (
                 <option key={channel.id} value={channel.id}>
                   {channel.name}
                 </option>

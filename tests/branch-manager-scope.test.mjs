@@ -7,6 +7,8 @@ const headerPath = "components/tenant-context-header.tsx";
 const branchDashboardPath = "components/branch-network-dashboard.tsx";
 const currentAccessPath = "lib/tenant/current-user-access.ts";
 const contextPagePath = "app/protected/context/page.tsx";
+const contextOptionsRoutePath = "app/api/context/options/route.ts";
+const officialContextOptionsPath = "lib/server/official-context-options.ts";
 const sessionRoutePath = "app/api/auth/local-session/route.ts";
 const localAuthPath = "lib/server/local-auth.ts";
 
@@ -17,7 +19,9 @@ for (const file of [
   headerPath,
   branchDashboardPath,
   contextPagePath,
+  contextOptionsRoutePath,
   currentAccessPath,
+  officialContextOptionsPath,
   sessionRoutePath,
   localAuthPath,
 ]) {
@@ -30,7 +34,9 @@ const sidebar = readFileSync(sidebarPath, "utf8");
 const header = readFileSync(headerPath, "utf8");
 const branchDashboard = readFileSync(branchDashboardPath, "utf8");
 const contextPage = readFileSync(contextPagePath, "utf8");
+const contextOptionsRoute = readFileSync(contextOptionsRoutePath, "utf8");
 const currentAccess = readFileSync(currentAccessPath, "utf8");
+const officialContextOptions = readFileSync(officialContextOptionsPath, "utf8");
 const sessionRoute = readFileSync(sessionRoutePath, "utf8");
 const localAuth = readFileSync(localAuthPath, "utf8");
 
@@ -81,8 +87,14 @@ for (const requiredLocalAuthText of [
 
 assert(
   header.includes("fetchCurrentUserAccess") &&
+    header.includes("/api/context/options") &&
     header.includes("isBranchManagerScopedAccess") &&
     header.includes("scopedCompanyAccess") &&
+    header.includes("branchOptions") &&
+    header.includes("operationalAreaOptions") &&
+    header.includes("managerFilterOptions") &&
+    header.includes("isSecondaryFilterDisabled") &&
+    header.includes("Todas mis sucursales") &&
     header.includes("isLineLocked") &&
     header.includes("Acceso de sucursal") &&
     header.includes("Linea asignada") &&
@@ -100,14 +112,17 @@ assert(
 );
 
 assert(
-  contextPage.includes("buildOfficialBranchAccessPredicate") &&
-    contextPage.includes("public.manager_assignments") &&
-    contextPage.includes("public.user_branch_access") &&
-    contextPage.includes("r.key = 'gerente_area'") &&
-    contextPage.includes("ma.operational_area_id = b.operational_area_id") &&
-    contextPage.includes("b.status = 'active'") &&
-    contextPage.includes("b.deleted_at is null") &&
-    contextPage.includes("c.id = any($1::uuid[])") &&
-    contextPage.includes("co.id = any($1::uuid[])"),
+  contextPage.includes("getOfficialContextOptions") &&
+    contextOptionsRoute.includes("getOfficialContextOptions") &&
+    contextOptionsRoute.includes("requiresPasswordChange") &&
+    officialContextOptions.includes("buildOfficialBranchAccessPredicate") &&
+    officialContextOptions.includes("public.manager_assignments") &&
+    officialContextOptions.includes("public.user_branch_access") &&
+    officialContextOptions.includes("r.key = 'gerente_area'") &&
+    officialContextOptions.includes("ma.operational_area_id = b.operational_area_id") &&
+    officialContextOptions.includes("b.status = 'active'") &&
+    officialContextOptions.includes("b.deleted_at is null") &&
+    officialContextOptions.includes("c.id = any($1::uuid[])") &&
+    officialContextOptions.includes("co.id = any($1::uuid[])"),
   "Official context options must be scoped to active assigned branches before countries and companies are built.",
 );

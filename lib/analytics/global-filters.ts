@@ -120,6 +120,24 @@ export type GlobalFilterContext = {
   isDemo: boolean;
 };
 
+type NamedFilterOption = {
+  id: string;
+  name: string;
+};
+
+export type GlobalFilterOptions = {
+  branches?: readonly BranchOption[];
+  businessLines?: readonly BusinessLineOption[];
+  channels?: readonly NamedFilterOption[];
+  companies?: readonly CompanyOption[];
+  countries?: readonly CountryOption[];
+  managers?: readonly NamedFilterOption[];
+  operationalAreas?: readonly OperationalAreaOption[];
+  payers?: readonly NamedFilterOption[];
+  professionals?: readonly NamedFilterOption[];
+  services?: readonly NamedFilterOption[];
+};
+
 export const demoProfessionalOptions = [
   { id: allProfessionalsValue, name: allProfessionalsLabel },
   { id: "prof-physio-red-sv", name: "Fisioterapeutas red SV" },
@@ -255,23 +273,37 @@ function findByIdOrName<T extends { id: string; name: string }>(
   return undefined;
 }
 
-function findCountry(input: GlobalFilterInput): CountryOption {
+function findCountry(
+  input: GlobalFilterInput,
+  options: readonly CountryOption[],
+): CountryOption {
   return (
-    findByIdOrName(demoCountryOptions, input.countryId, input.countryName) ??
+    findByIdOrName(options, input.countryId, input.countryName) ??
+    options.find((country) => country.scope === "regional") ??
+    options[0] ??
     regionalCountry
   );
 }
 
-function findCompany(input: GlobalFilterInput): CompanyOption {
+function findCompany(
+  input: GlobalFilterInput,
+  options: readonly CompanyOption[],
+): CompanyOption {
   return (
-    findByIdOrName(demoCompanyOptions, input.companyId, input.companyName) ??
+    findByIdOrName(options, input.companyId, input.companyName) ??
+    options.find((company) => company.isConsolidated) ??
+    options[0] ??
     consolidatedCompany
   );
 }
 
-function findBusinessLine(input: GlobalFilterInput, company: CompanyOption) {
+function findBusinessLine(
+  input: GlobalFilterInput,
+  company: CompanyOption,
+  options: readonly BusinessLineOption[],
+) {
   const lineByIdOrName = findByIdOrName(
-    demoBusinessLineOptions,
+    options,
     input.businessLineId,
     input.businessLineName,
   );
@@ -282,27 +314,33 @@ function findBusinessLine(input: GlobalFilterInput, company: CompanyOption) {
 
   if (!company.isConsolidated) {
     return (
-      demoBusinessLineOptions.find((line) => line.companyId === company.id) ??
+      options.find((line) => line.companyId === company.id) ??
+      options.find((line) => !line.isConsolidated) ??
+      options[0] ??
       demoBusinessLineOptions[0]
     );
   }
 
   if (input.businessLineCode) {
     return (
-      demoBusinessLineOptions.find(
-        (line) => line.code === input.businessLineCode,
-      ) ?? demoBusinessLineOptions[0]
+      options.find((line) => line.code === input.businessLineCode) ??
+      options[0] ??
+      demoBusinessLineOptions[0]
     );
   }
 
-  return demoBusinessLineOptions[0];
+  return options[0] ?? demoBusinessLineOptions[0];
 }
 
-function getBranchOptions(country: CountryOption, company: CompanyOption) {
+function getBranchOptions(
+  country: CountryOption,
+  company: CompanyOption,
+  options: readonly BranchOption[],
+) {
   const countryBranches =
     country.scope === "regional"
-      ? demoBranches
-      : demoBranches.filter((branch) => branch.countryId === country.id);
+      ? options
+      : options.filter((branch) => branch.countryId === country.id);
 
   if (company.isConsolidated) {
     return countryBranches;
@@ -312,7 +350,7 @@ function getBranchOptions(country: CountryOption, company: CompanyOption) {
 }
 
 function findBranch(
-  branches: BranchOption[],
+  branches: readonly BranchOption[],
   input: GlobalFilterInput,
 ): BranchOption | undefined {
   if (isAllFilterValue(input.branchId) && isAllFilterValue(input.branchName)) {
@@ -327,6 +365,7 @@ function findOperationalArea(
   branch: BranchOption | undefined,
   country: CountryOption,
   company: CompanyOption,
+  options: readonly OperationalAreaOption[],
 ): OperationalAreaOption | undefined {
   if (
     isAllFilterValue(input.operationalAreaId) &&
@@ -336,7 +375,7 @@ function findOperationalArea(
     return undefined;
   }
 
-  const areaOptions = demoOperationalAreas.filter(
+  const areaOptions = options.filter(
     (area) =>
       (country.scope === "regional" || area.countryId === country.id) &&
       (company.isConsolidated || area.companyId === company.id),
@@ -355,12 +394,23 @@ function resolveNamedOption(
   value: string | null | undefined,
   fallbackLabel: string,
   options: readonly { id: string; name: string }[],
+  strict = false,
 ) {
   if (isAllFilterValue(value)) {
-    return { id: options[0]?.id ?? value ?? "", name: fallbackLabel };
+    return {
+      id: options[0]?.id ?? value ?? "",
+      name: options[0]?.name ?? fallbackLabel,
+    };
   }
 
   const found = findByIdOrName(options, value, value);
+
+  if (!found && strict) {
+    return {
+      id: options[0]?.id ?? "",
+      name: options[0]?.name ?? fallbackLabel,
+    };
+  }
 
   return {
     id: found?.id ?? value ?? options[0]?.id ?? "",
@@ -374,46 +424,74 @@ function coalesceFilterValue(...values: (string | null | undefined)[]) {
 
 export function resolveGlobalFilterContext(
   input: GlobalFilterInput = {},
+  options: GlobalFilterOptions = {},
 ): GlobalFilterContext {
-  const country = findCountry(input);
-  const company = findCompany(input);
-  const businessLine = findBusinessLine(input, company);
-  const branches = getBranchOptions(country, company);
+  const countryOptions = options.countries ?? demoCountryOptions;
+  const companyOptions = options.companies ?? demoCompanyOptions;
+  const businessLineOptions = options.businessLines ?? demoBusinessLineOptions;
+  const branchOptions = options.branches ?? demoBranches;
+  const operationalAreaOptions = options.operationalAreas ?? demoOperationalAreas;
+  const managerOptions = options.managers ?? demoManagerOptions;
+  const professionalOptions = options.professionals ?? demoProfessionalOptions;
+  const serviceOptions = options.services ?? demoServiceOptions;
+  const payerOptions = options.payers ?? demoPayerOptions;
+  const channelOptions = options.channels ?? demoChannelOptions;
+  const hasStrictBranchOptions = options.branches !== undefined;
+  const country = findCountry(input, countryOptions);
+  const company = findCompany(input, companyOptions);
+  const businessLine = findBusinessLine(input, company, businessLineOptions);
+  const branches = getBranchOptions(country, company, branchOptions);
   const branch = findBranch(branches, input);
-  const operationalArea = findOperationalArea(input, branch, country, company);
+  const operationalArea = findOperationalArea(
+    input,
+    branch,
+    country,
+    company,
+    operationalAreaOptions,
+  );
   const manager = resolveNamedOption(
     coalesceFilterValue(input.managerId, input.managerName),
     allManagersLabel,
-    demoManagerOptions,
+    managerOptions,
+    options.managers !== undefined,
   );
   const professional = resolveNamedOption(
     coalesceFilterValue(input.professionalId, input.professionalName),
     allProfessionalsLabel,
-    demoProfessionalOptions,
+    professionalOptions,
+    options.professionals !== undefined,
   );
   const service = resolveNamedOption(
     coalesceFilterValue(input.serviceId, input.serviceName),
     allServicesLabel,
-    demoServiceOptions,
+    serviceOptions,
+    options.services !== undefined,
   );
   const payer = resolveNamedOption(
     coalesceFilterValue(input.payerId, input.payerName),
     allPayersLabel,
-    demoPayerOptions,
+    payerOptions,
+    options.payers !== undefined,
   );
   const channel = resolveNamedOption(
     coalesceFilterValue(input.channelId, input.channelName),
     allChannelsLabel,
-    demoChannelOptions,
+    channelOptions,
+    options.channels !== undefined,
   );
   const periodStart = input.dateFrom ?? input.periodStart ?? defaultPeriodStart;
   const periodEnd = input.dateTo ?? input.periodEnd ?? defaultPeriodEnd;
 
   return {
-    branchId: branch?.id ?? (isAllFilterValue(input.branchId) ? allBranchesValue : input.branchId ?? allBranchesValue),
+    branchId:
+      branch?.id ??
+      (isAllFilterValue(input.branchId) || hasStrictBranchOptions
+        ? allBranchesValue
+        : input.branchId ?? allBranchesValue),
     branchName:
       branch?.name ??
-      (isAllFilterValue(input.branchName ?? input.branchId)
+      (isAllFilterValue(input.branchName ?? input.branchId) ||
+      hasStrictBranchOptions
         ? allBranchesLabel
         : input.branchName ?? input.branchId ?? allBranchesLabel),
     businessLineCode: businessLine.code,
@@ -504,5 +582,5 @@ export function getBranchOptionsForContext(context: GlobalFilterContext) {
       ? consolidatedCompany
       : consolidatedCompany);
 
-  return getBranchOptions(country, company);
+  return getBranchOptions(country, company, demoBranches);
 }
