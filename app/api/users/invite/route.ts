@@ -8,7 +8,10 @@ import {
   createUserInvitation,
   UserInvitationError,
 } from "@/lib/server/user-invitations";
-import { createLocalUserWithTemporaryPassword } from "@/lib/server/local-auth";
+import {
+  createLocalUserWithTemporaryPassword,
+  LocalAuthRequestError,
+} from "@/lib/server/local-auth";
 import { roleKeys, type RoleKey } from "@/lib/tenant/demo-context";
 import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
 import { canPerformAction } from "@/lib/security/authorization-policy";
@@ -340,6 +343,10 @@ export async function POST(request: Request) {
       status: "sent",
     });
   } catch (error) {
+    if (error instanceof LocalAuthRequestError) {
+      return jsonError(error.message, error.status);
+    }
+
     if (error instanceof UserInvitationError) {
       return jsonError(error.message, error.status);
     }

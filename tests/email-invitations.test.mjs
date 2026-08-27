@@ -82,6 +82,7 @@ for (const requiredRouteText of [
   "No se pudo enviar la invitacion",
   "managedBranchManagerIds",
   "UserInvitationError",
+  "LocalAuthRequestError",
   "temporaryPassword",
   "createLocalUserWithTemporaryPassword",
   'status: "created"',
@@ -263,6 +264,8 @@ for (const requiredLocalAuthText of [
   "resetLocalUserTemporaryPassword",
   "local_user.created_with_temporary_password",
   "local_password.temporary_reset",
+  "LocalAuthRequestError",
+  "Este correo ya esta registrado. Utiliza Recuperar acceso",
   "invitation_token_hash = null",
   "user_invitation.accepted",
 ]) {

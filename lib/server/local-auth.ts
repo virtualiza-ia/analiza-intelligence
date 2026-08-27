@@ -71,6 +71,15 @@ export type AuthenticatedLocalUser = {
   userId: string;
 };
 
+export class LocalAuthRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status = 400,
+  ) {
+    super(message);
+  }
+}
+
 export type AcceptInvitationInput = {
   email: string;
   password: string;
@@ -1286,11 +1295,11 @@ export async function createLocalUserWithTemporaryPassword({
   const passwordPolicyError = getPasswordPolicyError(password);
 
   if (!normalizedFullName) {
-    throw new Error("Completa nombre del usuario.");
+    throw new LocalAuthRequestError("Completa nombre del usuario.");
   }
 
   if (passwordPolicyError) {
-    throw new Error(passwordPolicyError);
+    throw new LocalAuthRequestError(passwordPolicyError);
   }
 
   const pool = getPostgresPool();
@@ -1312,7 +1321,10 @@ export async function createLocalUserWithTemporaryPassword({
     );
 
     if (existingProfileResult.rows[0]) {
-      throw new Error("Ese correo ya tiene un usuario. Usa resetear contrasena.");
+      throw new LocalAuthRequestError(
+        "Este correo ya esta registrado. Utiliza Recuperar acceso o resetea la contrasena del usuario existente.",
+        409,
+      );
     }
 
     const roleResult = await client.query<{ id: string }>(
