@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Home, PanelLeftClose, PanelLeftOpen } from "lucide-react";
@@ -212,6 +213,43 @@ export function AppSidebar({ allowDemoRoleSwitch, roleKey }: AppSidebarProps) {
                 </div>
               </div>
             </>
+          )}
+        </div>
+        <div
+          className={cn(
+            "mt-3 border-t border-white/10 pt-3",
+            collapsed && "mt-0 border-t-0 pt-0",
+          )}
+        >
+          {collapsed ? (
+            <div
+              className="flex justify-center"
+              title="InteractiveCore - Todos los derechos reservados"
+            >
+              <Image
+                alt="InteractiveCore"
+                className="h-8 w-7 rounded-md bg-white p-1 object-contain"
+                height={128}
+                src="/interactive-core/interactive-core-mark.png"
+                width={113}
+              />
+            </div>
+          ) : (
+            <div className="grid justify-items-start gap-2 text-[0.62rem] leading-4 text-white/45">
+              <Image
+                alt="InteractiveCore"
+                className="h-auto w-[92px] rounded-md bg-white px-1.5 py-1 object-contain"
+                height={151}
+                src="/interactive-core/interactive-core-logo.png"
+                width={360}
+              />
+              <div>
+                <div className="font-medium text-white/65">
+                  InteractiveCore
+                </div>
+                <div>Todos los derechos reservados</div>
+              </div>
+            </div>
           )}
         </div>
       </div>
