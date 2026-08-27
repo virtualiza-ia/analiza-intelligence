@@ -10,6 +10,7 @@ import {
   KeyRound,
   LineChart,
   LockKeyhole,
+  Save,
   UserPlus,
 } from "lucide-react";
 
@@ -153,6 +154,41 @@ type BranchManagersApiResponse = {
   error?: string;
   missingConfig?: string[];
   ok?: boolean;
+};
+
+type ManagerIncentiveAssignment = {
+  assignmentId: string;
+  baseBonusAmount: number | null;
+  branchName: string | null;
+  businessName: string | null;
+  canEdit: boolean;
+  countryName: string | null;
+  email: string | null;
+  fullName: string;
+  id: string;
+  managementLevel: ManagementLevel | null;
+  operationalAreaName: string | null;
+  roleKey: RoleKey;
+  roleName: string;
+};
+
+type ManagerIncentivesApiResponse = {
+  error?: string;
+  managerIncentives?: ManagerIncentiveAssignment[];
+  missingConfig?: string[];
+  ok?: boolean;
+};
+
+type UpdateManagerIncentiveApiResponse = {
+  error?: string;
+  managerIncentive?: {
+    assignmentId?: string;
+    baseBonusAmount?: number;
+    managementLevel?: ManagementLevel;
+  };
+  missingConfig?: string[];
+  ok?: boolean;
+  status?: "updated";
 };
 
 type CreateBranchApiResponse = {
@@ -540,6 +576,123 @@ function readBranchManagersApiResponse(
   };
 }
 
+function readManagerIncentiveAssignment(
+  value: unknown,
+): ManagerIncentiveAssignment | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const assignment = value as Record<string, unknown>;
+
+  if (
+    typeof assignment.assignmentId !== "string" ||
+    typeof assignment.fullName !== "string" ||
+    !isApiRoleKey(assignment.roleKey)
+  ) {
+    return null;
+  }
+
+  return {
+    assignmentId: assignment.assignmentId,
+    baseBonusAmount:
+      typeof assignment.baseBonusAmount === "number"
+        ? assignment.baseBonusAmount
+        : null,
+    branchName: readNullableString(assignment.branchName),
+    businessName: readNullableString(assignment.businessName),
+    canEdit: assignment.canEdit === true,
+    countryName: readNullableString(assignment.countryName),
+    email: readNullableString(assignment.email),
+    fullName: assignment.fullName,
+    id:
+      typeof assignment.id === "string"
+        ? assignment.id
+        : assignment.assignmentId,
+    managementLevel: isManagementLevel(assignment.managementLevel)
+      ? assignment.managementLevel
+      : null,
+    operationalAreaName: readNullableString(assignment.operationalAreaName),
+    roleKey: assignment.roleKey,
+    roleName:
+      typeof assignment.roleName === "string"
+        ? assignment.roleName
+        : demoRoleProfiles[assignment.roleKey].label,
+  };
+}
+
+function readManagerIncentivesApiResponse(
+  value: unknown,
+): ManagerIncentivesApiResponse {
+  if (typeof value !== "object" || value === null) {
+    return {};
+  }
+
+  const response = value as Record<string, unknown>;
+  const missingConfig = Array.isArray(response.missingConfig)
+    ? response.missingConfig.filter(
+        (configName): configName is string => typeof configName === "string",
+      )
+    : undefined;
+  const managerIncentives = Array.isArray(response.managerIncentives)
+    ? response.managerIncentives
+        .map(readManagerIncentiveAssignment)
+        .filter(
+          (assignment): assignment is ManagerIncentiveAssignment =>
+            Boolean(assignment),
+        )
+    : undefined;
+
+  return {
+    error: typeof response.error === "string" ? response.error : undefined,
+    managerIncentives,
+    missingConfig,
+    ok: response.ok === true,
+  };
+}
+
+function readUpdateManagerIncentiveApiResponse(
+  value: unknown,
+): UpdateManagerIncentiveApiResponse {
+  if (typeof value !== "object" || value === null) {
+    return {};
+  }
+
+  const response = value as Record<string, unknown>;
+  const missingConfig = Array.isArray(response.missingConfig)
+    ? response.missingConfig.filter(
+        (configName): configName is string => typeof configName === "string",
+      )
+    : undefined;
+  const managerIncentive =
+    typeof response.managerIncentive === "object" &&
+    response.managerIncentive !== null
+      ? (response.managerIncentive as Record<string, unknown>)
+      : null;
+
+  return {
+    error: typeof response.error === "string" ? response.error : undefined,
+    managerIncentive: managerIncentive
+      ? {
+          assignmentId:
+            typeof managerIncentive.assignmentId === "string"
+              ? managerIncentive.assignmentId
+              : undefined,
+          baseBonusAmount:
+            typeof managerIncentive.baseBonusAmount === "number"
+              ? managerIncentive.baseBonusAmount
+              : undefined,
+          managementLevel: isManagementLevel(managerIncentive.managementLevel)
+            ? managerIncentive.managementLevel
+            : undefined,
+        }
+      : undefined,
+    missingConfig,
+    ok: response.ok === true,
+    status: response.status === "updated" ? "updated" : undefined,
+  };
+}
+
 function readCreateBranchApiResponse(value: unknown): CreateBranchApiResponse {
   if (typeof value !== "object" || value === null) {
     return {};
@@ -835,6 +988,12 @@ function UsersAndPermissionsManager({
   const [assignableBranchManagers, setAssignableBranchManagers] = useState<
     AssignableBranchManager[]
   >([]);
+  const [managerIncentives, setManagerIncentives] = useState<
+    ManagerIncentiveAssignment[]
+  >([]);
+  const [managerIncentiveEdits, setManagerIncentiveEdits] = useState<
+    Record<string, { baseBonusAmount: string; managementLevel: ManagementLevel }>
+  >({});
   const [managedBranchManagerIds, setManagedBranchManagerIds] = useState<
     string[]
   >([]);
@@ -855,6 +1014,9 @@ function UsersAndPermissionsManager({
   );
   const [isCreatingBranch, setIsCreatingBranch] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [savingManagerIncentiveId, setSavingManagerIncentiveId] = useState<
+    string | null
+  >(null);
   const [branchMessage, setBranchMessage] = useState("");
   const [message, setMessage] = useState("");
 
@@ -1172,6 +1334,60 @@ function UsersAndPermissionsManager({
       isActive = false;
     };
   }, [activeRole, canCreateUsers]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadManagerIncentives() {
+      if (
+        activeRole === "gerente_sucursal" ||
+        activeRole === "usuario_operativo" ||
+        activeRole === "viewer"
+      ) {
+        setManagerIncentives([]);
+        setManagerIncentiveEdits({});
+        return;
+      }
+
+      const response = await fetch("/api/users/manager-incentives", {
+        cache: "no-store",
+      }).catch(() => null);
+
+      if (!response?.ok) {
+        if (isActive) {
+          setManagerIncentives([]);
+          setManagerIncentiveEdits({});
+        }
+        return;
+      }
+
+      const incentiveResult = readManagerIncentivesApiResponse(
+        await response.json().catch(() => null),
+      );
+      const incentives = incentiveResult.managerIncentives ?? [];
+
+      if (isActive) {
+        setManagerIncentives(incentives);
+        setManagerIncentiveEdits(
+          Object.fromEntries(
+            incentives.map((incentive) => [
+              incentive.assignmentId,
+              {
+                baseBonusAmount: String(incentive.baseBonusAmount ?? ""),
+                managementLevel: incentive.managementLevel ?? "middle",
+              },
+            ]),
+          ),
+        );
+      }
+    }
+
+    void loadManagerIncentives();
+
+    return () => {
+      isActive = false;
+    };
+  }, [activeRole]);
 
   useEffect(() => {
     const availableIds = new Set(
@@ -1663,6 +1879,100 @@ function UsersAndPermissionsManager({
       );
     } finally {
       setIsResettingPassword(false);
+    }
+  }
+
+  function updateManagerIncentiveDraft(
+    assignmentId: string,
+    nextDraft: Partial<{ baseBonusAmount: string; managementLevel: ManagementLevel }>,
+  ) {
+    setManagerIncentiveEdits((currentDrafts) => {
+      const currentDraft = currentDrafts[assignmentId] ?? {
+        baseBonusAmount: "",
+        managementLevel: "middle" as ManagementLevel,
+      };
+
+      return {
+        ...currentDrafts,
+        [assignmentId]: {
+          ...currentDraft,
+          ...nextDraft,
+        },
+      };
+    });
+  }
+
+  async function saveManagerIncentive(assignmentId: string) {
+    const draft = managerIncentiveEdits[assignmentId];
+
+    if (!draft) {
+      setMessage("No encontre los cambios de bono para guardar.");
+      return;
+    }
+
+    const normalizedBaseBonusAmount = normalizeBaseBonusAmount(
+      Number(draft.baseBonusAmount),
+    );
+
+    if (!normalizedBaseBonusAmount) {
+      setMessage("Ingresa un bono base valido para este gerente.");
+      return;
+    }
+
+    setSavingManagerIncentiveId(assignmentId);
+
+    try {
+      const response = await fetch("/api/users/manager-incentives", {
+        body: JSON.stringify({
+          assignmentId,
+          baseBonusAmount: normalizedBaseBonusAmount,
+          managementLevel: draft.managementLevel,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      });
+      const updateResult = readUpdateManagerIncentiveApiResponse(
+        await response.json().catch(() => null),
+      );
+
+      if (!response.ok || !updateResult.ok) {
+        const missingConfig =
+          updateResult.missingConfig && updateResult.missingConfig.length > 0
+            ? ` Variables pendientes: ${updateResult.missingConfig.join(", ")}.`
+            : "";
+
+        throw new Error(
+          `${updateResult.error ?? "No se pudo actualizar el bono."}${missingConfig}`,
+        );
+      }
+
+      setManagerIncentives((currentIncentives) =>
+        currentIncentives.map((incentive) =>
+          incentive.assignmentId === assignmentId
+            ? {
+                ...incentive,
+                baseBonusAmount: normalizedBaseBonusAmount,
+                managementLevel: draft.managementLevel,
+              }
+            : incentive,
+        ),
+      );
+      setManagerIncentiveEdits((currentDrafts) => ({
+        ...currentDrafts,
+        [assignmentId]: {
+          baseBonusAmount: String(normalizedBaseBonusAmount),
+          managementLevel: draft.managementLevel,
+        },
+      }));
+      setMessage("Bono base actualizado y registrado en historial.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar el bono.",
+      );
+    } finally {
+      setSavingManagerIncentiveId(null);
     }
   }
 
@@ -2329,6 +2639,139 @@ function UsersAndPermissionsManager({
           </Button>
         </div>
       </form>
+
+      {managerIncentives.length > 0 ? (
+        <section className="grid min-w-0 gap-4 rounded-md border bg-card p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="grid gap-1">
+              <div className="flex items-center gap-2 text-lg font-semibold tracking-normal">
+                <BarChart3 className="size-5 text-primary" />
+                Bonos configurados
+              </div>
+              <p className="text-sm leading-6 text-muted-foreground">
+                Edita nivel y bono base de gerentes bajo tu jerarquia. El bono
+                recomendado usa bono base por cumplimiento de meta.
+              </p>
+            </div>
+            <Badge variant="outline">{managerIncentives.length} asignaciones</Badge>
+          </div>
+
+          <div className="min-w-0 overflow-x-auto">
+            <table className="w-full min-w-[1180px] table-fixed text-left text-sm">
+              <thead className="text-xs text-muted-foreground">
+                <tr className="border-b">
+                  <th className="w-[240px] py-2 pr-4 font-medium">Gerente</th>
+                  <th className="w-[170px] py-2 pr-4 font-medium">Rol</th>
+                  <th className="w-[260px] py-2 pr-4 font-medium">Alcance</th>
+                  <th className="w-[150px] py-2 pr-4 font-medium">Nivel</th>
+                  <th className="w-[160px] py-2 pr-4 font-medium">Bono base</th>
+                  <th className="w-[150px] py-2 pr-4 font-medium">Permiso</th>
+                  <th className="w-[120px] py-2 pr-4 font-medium">Accion</th>
+                </tr>
+              </thead>
+              <tbody>
+                {managerIncentives.map((incentive) => {
+                  const draft = managerIncentiveEdits[incentive.assignmentId] ?? {
+                    baseBonusAmount: String(incentive.baseBonusAmount ?? ""),
+                    managementLevel: incentive.managementLevel ?? "middle",
+                  };
+                  const scopeLabel =
+                    incentive.branchName ??
+                    incentive.operationalAreaName ??
+                    incentive.businessName ??
+                    incentive.countryName ??
+                    "Alcance asignado";
+
+                  return (
+                    <tr className="border-b last:border-b-0" key={incentive.assignmentId}>
+                      <td className="py-3 pr-4 align-top">
+                        <div className="truncate font-medium">
+                          {incentive.fullName}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {incentive.email ?? "Sin correo"}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 align-top">
+                        {demoRoleProfiles[incentive.roleKey].label}
+                      </td>
+                      <td className="py-3 pr-4 align-top">
+                        <div className="truncate">{scopeLabel}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {[incentive.countryName, incentive.businessName]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 align-top">
+                        <select
+                          className={tableSelectClassName}
+                          disabled={!incentive.canEdit}
+                          onChange={(event) => {
+                            const nextLevel = event.target.value;
+
+                            if (isManagementLevel(nextLevel)) {
+                              updateManagerIncentiveDraft(
+                                incentive.assignmentId,
+                                { managementLevel: nextLevel },
+                              );
+                            }
+                          }}
+                          value={draft.managementLevel}
+                        >
+                          {managementLevels.map((level) => (
+                            <option key={level} value={level}>
+                              {managementLevelLabels[level]}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-3 pr-4 align-top">
+                        <Input
+                          className="h-9"
+                          disabled={!incentive.canEdit}
+                          max={10000}
+                          min={1}
+                          onChange={(event) =>
+                            updateManagerIncentiveDraft(incentive.assignmentId, {
+                              baseBonusAmount: event.target.value,
+                            })
+                          }
+                          step={1}
+                          type="number"
+                          value={draft.baseBonusAmount}
+                        />
+                      </td>
+                      <td className="py-3 pr-4 align-top">
+                        <Badge variant={incentive.canEdit ? "outline" : "secondary"}>
+                          {incentive.canEdit ? "Editable" : "Solo lectura"}
+                        </Badge>
+                      </td>
+                      <td className="py-3 pr-4 align-top">
+                        <Button
+                          disabled={
+                            !incentive.canEdit ||
+                            savingManagerIncentiveId === incentive.assignmentId
+                          }
+                          onClick={() => saveManagerIncentive(incentive.assignmentId)}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          <Save className="size-4" />
+                          {savingManagerIncentiveId === incentive.assignmentId
+                            ? "Guardando"
+                            : "Guardar"}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid min-w-0 gap-4 rounded-md border bg-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
