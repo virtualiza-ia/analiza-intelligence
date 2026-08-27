@@ -6,6 +6,7 @@ const sidebarPath = "components/app-sidebar.tsx";
 const headerPath = "components/tenant-context-header.tsx";
 const branchDashboardPath = "components/branch-network-dashboard.tsx";
 const currentAccessPath = "lib/tenant/current-user-access.ts";
+const contextPagePath = "app/protected/context/page.tsx";
 const sessionRoutePath = "app/api/auth/local-session/route.ts";
 const localAuthPath = "lib/server/local-auth.ts";
 
@@ -15,6 +16,7 @@ for (const file of [
   sidebarPath,
   headerPath,
   branchDashboardPath,
+  contextPagePath,
   currentAccessPath,
   sessionRoutePath,
   localAuthPath,
@@ -27,6 +29,7 @@ const authorization = readFileSync(authorizationPath, "utf8");
 const sidebar = readFileSync(sidebarPath, "utf8");
 const header = readFileSync(headerPath, "utf8");
 const branchDashboard = readFileSync(branchDashboardPath, "utf8");
+const contextPage = readFileSync(contextPagePath, "utf8");
 const currentAccess = readFileSync(currentAccessPath, "utf8");
 const sessionRoute = readFileSync(sessionRoutePath, "utf8");
 const localAuth = readFileSync(localAuthPath, "utf8");
@@ -94,4 +97,17 @@ assert(
     !branchDashboard.includes("screen.records.slice(0, 1)") &&
     !branchDashboard.includes("??\n    screen.records[0]"),
   "Branch dashboard must not fall back to full-network data for branch managers.",
+);
+
+assert(
+  contextPage.includes("buildOfficialBranchAccessPredicate") &&
+    contextPage.includes("public.manager_assignments") &&
+    contextPage.includes("public.user_branch_access") &&
+    contextPage.includes("r.key = 'gerente_area'") &&
+    contextPage.includes("ma.operational_area_id = b.operational_area_id") &&
+    contextPage.includes("b.status = 'active'") &&
+    contextPage.includes("b.deleted_at is null") &&
+    contextPage.includes("c.id = any($1::uuid[])") &&
+    contextPage.includes("co.id = any($1::uuid[])"),
+  "Official context options must be scoped to active assigned branches before countries and companies are built.",
 );

@@ -57,6 +57,13 @@ type OfficialContextOptions = {
   countries: CountryOption[];
 };
 
+const unrestrictedOfficialContextRoles = new Set([
+  "super_admin",
+  "webmaster_admin",
+  "ceo",
+  "gerente_operaciones",
+]);
+
 const officialLineByUnitType: Record<
   Exclude<CompanyOption["unitType"], "consolidado">,
   BusinessLineCode
@@ -70,6 +77,77 @@ function lineCodeForUnitType(unitType: CompanyOption["unitType"]) {
   return unitType === "consolidado"
     ? "CONSOLIDATED"
     : officialLineByUnitType[unitType];
+}
+
+function canReadAllOfficialContext(actor: AuthorizationActor) {
+  return unrestrictedOfficialContextRoles.has(actor.roleKey);
+}
+
+function buildOfficialBranchAccessPredicate(actor: AuthorizationActor) {
+  if (canReadAllOfficialContext(actor)) {
+    return {
+      parameters: [],
+      predicate: "true",
+    };
+  }
+
+  return {
+    parameters: [actor.userId],
+    predicate: `
+      (
+        exists (
+          select 1
+          from public.user_branch_access uba
+          where uba.user_id = $1::uuid
+            and uba.branch_id = b.id
+        )
+        or exists (
+          select 1
+          from public.manager_assignments ma
+          join public.roles r on r.id = ma.role_id
+          where ma.profile_id = $1::uuid
+            and ma.status = 'active'
+            and ma.deactivated_at is null
+            and ma.organization_id = b.organization_id
+            and ma.country_id = b.country_id
+            and ma.company_id = b.company_id
+            and (
+              (
+                r.key = 'gerente_area'
+                and ma.branch_id is null
+                and ma.operational_area_id = b.operational_area_id
+              )
+              or (
+                r.key = 'gerente_sucursal'
+                and ma.branch_id = b.id
+              )
+            )
+        )
+        or exists (
+          select 1
+          from public.user_roles ur
+          join public.roles r on r.id = ur.role_id
+          where ur.user_id = $1::uuid
+            and coalesce(ur.status, 'active') = 'active'
+            and ur.deactivated_at is null
+            and ur.organization_id = b.organization_id
+            and (ur.country_id is null or ur.country_id = b.country_id)
+            and (ur.company_id is null or ur.company_id = b.company_id)
+            and (
+              (
+                r.key = 'gerente_area'
+                and ur.operational_area_id = b.operational_area_id
+                and (ur.branch_id is null or ur.branch_id = b.id)
+              )
+              or (
+                r.key = 'gerente_sucursal'
+                and ur.branch_id = b.id
+              )
+            )
+        )
+      )
+    `,
+  };
 }
 
 function buildOfficialOptions({
@@ -180,7 +258,41 @@ async function getOfficialContextOptions(
 
   try {
     return await withPostgresRlsContext(client, actor, async () => {
-      const [countries, companies, branches] = await Promise.all([
+      const branchAccess = buildOfficialBranchAccessPredicate(actor);
+      const branches = await client.query<OfficialBranchRow>(
+        `
+          select
+            b.id,
+            b.country_id,
+            b.company_id,
+            b.operational_area_id,
+            b.code,
+            b.name,
+            b.city,
+            co.unit_type
+          from public.branches b
+          join public.companies co on co.id = b.company_id
+          where b.is_demo = false
+            and b.status = 'active'
+            and b.deleted_at is null
+            and co.is_demo = false
+            and ${branchAccess.predicate}
+          order by b.name
+        `,
+        branchAccess.parameters,
+      );
+      const countryIds = Array.from(
+        new Set(branches.rows.map((branch) => branch.country_id)),
+      );
+      const companyIds = Array.from(
+        new Set(branches.rows.map((branch) => branch.company_id)),
+      );
+
+      if (countryIds.length === 0 || companyIds.length === 0) {
+        return { branches: [], businessLines: [], companies: [], countries: [] };
+      }
+
+      const [countries, companies] = await Promise.all([
         client.query<OfficialCountryRow>(
           `
             select distinct
@@ -193,8 +305,10 @@ async function getOfficialContextOptions(
             from public.countries c
             left join public.currencies cu on cu.id = c.currency_id
             where c.is_demo = false
+              and c.id = any($1::uuid[])
             order by c.name
           `,
+          [countryIds],
         ),
         client.query<OfficialCompanyRow>(
           `
@@ -205,26 +319,10 @@ async function getOfficialContextOptions(
               co.unit_type
             from public.companies co
             where co.is_demo = false
+              and co.id = any($1::uuid[])
             order by co.name
           `,
-        ),
-        client.query<OfficialBranchRow>(
-          `
-            select
-              b.id,
-              b.country_id,
-              b.company_id,
-              b.operational_area_id,
-              b.code,
-              b.name,
-              b.city,
-              co.unit_type
-            from public.branches b
-            join public.companies co on co.id = b.company_id
-            where b.is_demo = false
-              and co.is_demo = false
-            order by b.name
-          `,
+          [companyIds],
         ),
       ]);
 
