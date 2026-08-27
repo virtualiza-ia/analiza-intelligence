@@ -95,6 +95,9 @@ assert(
     header.includes("managerFilterOptions") &&
     header.includes("isSecondaryFilterDisabled") &&
     header.includes("Todas mis sucursales") &&
+    header.includes("effectiveCompanyId") &&
+    header.includes("effectiveCountryId") &&
+    header.includes("officialContextOptions === null") &&
     header.includes("isLineLocked") &&
     header.includes("Acceso de sucursal") &&
     header.includes("Linea asignada") &&

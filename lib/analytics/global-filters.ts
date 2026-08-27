@@ -530,11 +530,12 @@ export function resolveGlobalFilterContext(
 export function createGlobalFilterContextFromSearchParams(
   searchParams: URLSearchParams,
   storedContext?: GlobalFilterInput | null,
+  options: GlobalFilterOptions = {},
 ) {
   return resolveGlobalFilterContext({
     ...storedContext,
     ...globalFilterInputFromSearch(readGlobalFilterSearchParams(searchParams)),
-  });
+  }, options);
 }
 
 export function toGlobalFilterSearchParams(context: GlobalFilterContext) {

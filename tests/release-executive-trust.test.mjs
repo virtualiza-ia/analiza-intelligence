@@ -136,7 +136,9 @@ assert.ok(
     resultsPage.includes("line={params.line}") &&
     monthlyRouter.includes('normalizedValue === "business-line-imagenes"') &&
     monthlyRouter.includes('normalizedValue === "business-line-laboratorio"') &&
-    monthlyRouter.includes('normalizedValue === "business-line-fisioterapia"'),
+    monthlyRouter.includes('normalizedValue === "business-line-fisioterapia"') &&
+    monthlyRouter.includes('normalizedValue?.includes("laboratorio")') &&
+    officialBi.includes('normalizedLine?.includes("laboratorio")'),
   "Resultados must receive the active line from URL context and route every business line correctly.",
 );
 

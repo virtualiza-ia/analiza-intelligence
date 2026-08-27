@@ -3,9 +3,13 @@ import type { RoleKey } from "@/lib/tenant/demo-context";
 export type ScopeBoundary = {
   organizationId: string;
   countryId?: string | null;
+  countryName?: string | null;
   companyId?: string | null;
+  companyName?: string | null;
   operationalAreaId?: string | null;
+  operationalAreaName?: string | null;
   branchId?: string | null;
+  branchName?: string | null;
 };
 
 export type DelegationActor = {

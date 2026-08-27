@@ -85,9 +85,13 @@ function toScopeBoundary(scope: CurrentUserScope): ScopeBoundary | null {
 
   return {
     branchId: scope.branchId,
+    branchName: scope.branchName,
     companyId: scope.companyId,
+    companyName: scope.companyName,
     countryId: scope.countryId,
+    countryName: scope.countryName,
     operationalAreaId: scope.operationalAreaId,
+    operationalAreaName: scope.operationalAreaName,
     organizationId: scope.organizationId,
   };
 }

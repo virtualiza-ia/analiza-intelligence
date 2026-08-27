@@ -218,22 +218,30 @@ export function ContextSelectionForm({
       return;
     }
 
-    const context = resolveGlobalFilterContext({
-      branchId,
-      businessLineCode: selectedBusinessLine.code,
-      businessLineId: selectedBusinessLine.id,
-      businessLineName: selectedBusinessLine.name,
-      companyId: selectedCompany.id,
-      companyName: selectedCompany.name,
-      countryId: selectedCountry.id,
-      countryName: selectedCountry.name,
-      dateFrom: periodStart,
-      dateTo: periodEnd,
-      isDemo: isDemoEnvironment,
-      period: `${periodStart} a ${periodEnd}`,
-      periodStart,
-      periodEnd,
-    });
+    const context = resolveGlobalFilterContext(
+      {
+        branchId,
+        businessLineCode: selectedBusinessLine.code,
+        businessLineId: selectedBusinessLine.id,
+        businessLineName: selectedBusinessLine.name,
+        companyId: selectedCompany.id,
+        companyName: selectedCompany.name,
+        countryId: selectedCountry.id,
+        countryName: selectedCountry.name,
+        dateFrom: periodStart,
+        dateTo: periodEnd,
+        isDemo: isDemoEnvironment,
+        period: `${periodStart} a ${periodEnd}`,
+        periodStart,
+        periodEnd,
+      },
+      {
+        branches,
+        businessLines,
+        companies,
+        countries,
+      },
+    );
 
     window.localStorage.setItem(storageKey, JSON.stringify(context));
     window.sessionStorage.setItem(storageKey, JSON.stringify(context));

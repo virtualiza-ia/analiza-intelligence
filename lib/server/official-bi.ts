@@ -167,16 +167,46 @@ function isRevenueKpi(kpiId: string, label: string) {
   );
 }
 
+function normalizeBusinessLineFilter(value?: string) {
+  return value
+    ?.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 function resolveFilterLine(filter: OfficialDashboardFilter) {
-  if (filter.businessLineId === "business-line-fisioterapia") {
+  const normalizedLine = normalizeBusinessLineFilter(filter.businessLineId);
+
+  if (
+    normalizedLine === "business-line-fisioterapia" ||
+    normalizedLine === "fisioterapia" ||
+    normalizedLine === "physiotherapy" ||
+    normalizedLine?.includes("fisioterapia") ||
+    normalizedLine?.includes("physiotherapy")
+  ) {
     return "PHYSIOTHERAPY";
   }
 
-  if (filter.businessLineId === "business-line-laboratorio") {
+  if (
+    normalizedLine === "business-line-laboratorio" ||
+    normalizedLine === "laboratorio" ||
+    normalizedLine === "laboratory" ||
+    normalizedLine?.includes("laboratorio") ||
+    normalizedLine?.includes("laboratory")
+  ) {
     return "LABORATORY";
   }
 
-  if (filter.businessLineId === "business-line-imagenes") {
+  if (
+    normalizedLine === "business-line-imagenes" ||
+    normalizedLine === "imagenes" ||
+    normalizedLine === "imagen" ||
+    normalizedLine === "imaging" ||
+    normalizedLine?.includes("imagenes") ||
+    normalizedLine?.includes("imagen") ||
+    normalizedLine?.includes("imaging")
+  ) {
     return "IMAGING";
   }
 

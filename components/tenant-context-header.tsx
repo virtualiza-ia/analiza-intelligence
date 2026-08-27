@@ -352,11 +352,15 @@ export function TenantContextHeader({
         : [{ id: allChannelsValue, name: allChannelsLabel }],
     [isDemoEnvironment],
   );
+  const effectiveCountryId =
+    scopedCompanyAccess?.scope.countryId ?? countryId;
+  const effectiveCompanyId =
+    scopedCompanyAccess?.scope.companyId ?? companyId;
   const selectedCountry = countryOptions.find(
-    (country) => country.id === countryId,
+    (country) => country.id === effectiveCountryId,
   );
   const selectedCompany = companyOptions.find(
-    (company) => company.id === companyId,
+    (company) => company.id === effectiveCompanyId,
   );
   const selectedManager =
     managerFilterOptions.find((manager) => manager.id === managerId) ??
@@ -398,8 +402,10 @@ export function TenantContextHeader({
     () =>
       selectedCountry?.scope === "regional"
         ? branchOptions
-        : branchOptions.filter((branch) => branch.countryId === countryId),
-    [branchOptions, countryId, selectedCountry?.scope],
+        : branchOptions.filter(
+            (branch) => branch.countryId === effectiveCountryId,
+          ),
+    [branchOptions, effectiveCountryId, selectedCountry?.scope],
   );
 
   const companies = useMemo(() => companyOptions, [companyOptions]);
@@ -408,20 +414,24 @@ export function TenantContextHeader({
     () =>
       selectedCompany?.isConsolidated
         ? countryBranches
-        : countryBranches.filter((branch) => branch.companyId === companyId),
-    [companyId, countryBranches, selectedCompany?.isConsolidated],
+        : countryBranches.filter(
+            (branch) => branch.companyId === effectiveCompanyId,
+          ),
+    [countryBranches, effectiveCompanyId, selectedCompany?.isConsolidated],
   );
 
   const operationalAreas = useMemo(
     () =>
       operationalAreaOptions.filter(
         (area) =>
-          (selectedCountry?.scope === "regional" || area.countryId === countryId) &&
-          (selectedCompany?.isConsolidated || area.companyId === companyId),
+          (selectedCountry?.scope === "regional" ||
+            area.countryId === effectiveCountryId) &&
+          (selectedCompany?.isConsolidated ||
+            area.companyId === effectiveCompanyId),
       ),
     [
-      companyId,
-      countryId,
+      effectiveCompanyId,
+      effectiveCountryId,
       operationalAreaOptions,
       selectedCompany?.isConsolidated,
       selectedCountry?.scope,
@@ -506,11 +516,27 @@ export function TenantContextHeader({
   }, [isDemoEnvironment]);
 
   useEffect(() => {
+    if (!isDemoEnvironment && officialContextOptions === null) {
+      return;
+    }
+
     const searchParams = new URLSearchParams(routeSearchParams.toString());
     const storedContext = isDemoEnvironment ? readStoredContext() : null;
     const nextContext = createGlobalFilterContextFromSearchParams(
       searchParams,
       storedContext,
+      {
+        branches: branchOptions,
+        businessLines: businessLineOptions,
+        channels: channelOptions,
+        companies: companyOptions,
+        countries: countryOptions,
+        managers: managerFilterOptions,
+        operationalAreas: operationalAreaOptions,
+        payers: payerOptions,
+        professionals: professionalOptions,
+        services: serviceOptions,
+      },
     );
 
     setCountryId(nextContext.countryId);
@@ -526,7 +552,21 @@ export function TenantContextHeader({
     setPeriodStart(nextContext.periodStart);
     setPeriodEnd(nextContext.periodEnd);
     setRouteContextReady(true);
-  }, [isDemoEnvironment, routeSearchParams]);
+  }, [
+    branchOptions,
+    businessLineOptions,
+    channelOptions,
+    companyOptions,
+    countryOptions,
+    isDemoEnvironment,
+    managerFilterOptions,
+    operationalAreaOptions,
+    officialContextOptions,
+    payerOptions,
+    professionalOptions,
+    routeSearchParams,
+    serviceOptions,
+  ]);
 
   useEffect(() => {
     if (scopedCompanyAccess || countryOptions.length === 0) {
@@ -725,8 +765,18 @@ export function TenantContextHeader({
       return;
     }
 
-    const country = countryOptions.find((item) => item.id === countryId);
-    const company = companyOptions.find((item) => item.id === companyId);
+    if (
+      !isDemoEnvironment &&
+      (officialContextOptions === null ||
+        countryOptions.length === 0 ||
+        companyOptions.length === 0 ||
+        businessLineOptions.length === 0)
+    ) {
+      return;
+    }
+
+    const country = countryOptions.find((item) => item.id === effectiveCountryId);
+    const company = companyOptions.find((item) => item.id === effectiveCompanyId);
     const businessLine =
       scopedBusinessLine ??
       businessLineOptions.find((item) => item.id === businessLineId);
@@ -757,7 +807,10 @@ export function TenantContextHeader({
       scopedBranchAccess?.scope.branchName ??
       branchId;
     const contextCountryId =
-      scopedCompanyAccess?.scope.countryId ?? country?.id ?? getInitialCountryId();
+      scopedCompanyAccess?.scope.countryId ??
+      country?.id ??
+      effectiveCountryId ??
+      getInitialCountryId();
     const contextCompanyId =
       scopedCompanyAccess?.scope.companyId ??
       businessLineCompany?.id ??
@@ -828,6 +881,8 @@ export function TenantContextHeader({
     companyOptions,
     countryId,
     countryOptions,
+    effectiveCompanyId,
+    effectiveCountryId,
     managerId,
     managerFilterOptions,
     operationalAreaId,
@@ -845,6 +900,7 @@ export function TenantContextHeader({
     scopedAreaAccess,
     scopedCompanyAccess,
     isDemoEnvironment,
+    officialContextOptions,
     replaceRouteSearchParams,
     selectedManager.name,
     serviceId,
@@ -974,7 +1030,7 @@ export function TenantContextHeader({
               aria-label="Pais o region"
               className="min-w-0 flex-1 bg-transparent outline-none"
               disabled={Boolean(scopedCompanyAccess?.scope.countryId)}
-              value={countryId}
+              value={effectiveCountryId}
               onChange={(event) => setCountryId(event.target.value)}
             >
               {countryOptions.map((country) => (

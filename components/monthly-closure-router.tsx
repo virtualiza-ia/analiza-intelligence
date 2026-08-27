@@ -23,14 +23,21 @@ type MonthlyClosureRouterProps = {
 
 function requestedLine(value: string | string[] | undefined) {
   const rawValue = Array.isArray(value) ? value[0] : value;
-  const normalizedValue = rawValue?.trim().toLowerCase();
+  const normalizedValue = rawValue
+    ?.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 
   if (
     normalizedValue === "business-line-imagenes" ||
     normalizedValue === "imagenes" ||
     normalizedValue === "imagen" ||
     normalizedValue === "imaging" ||
-    normalizedValue === "img"
+    normalizedValue === "img" ||
+    normalizedValue?.includes("imagenes") ||
+    normalizedValue?.includes("imagen") ||
+    normalizedValue?.includes("imaging")
   ) {
     return "imagenes";
   }
@@ -39,7 +46,9 @@ function requestedLine(value: string | string[] | undefined) {
     normalizedValue === "business-line-laboratorio" ||
     normalizedValue === "laboratorio" ||
     normalizedValue === "laboratory" ||
-    normalizedValue === "lab"
+    normalizedValue === "lab" ||
+    normalizedValue?.includes("laboratorio") ||
+    normalizedValue?.includes("laboratory")
   ) {
     return "laboratorio";
   }
@@ -48,7 +57,9 @@ function requestedLine(value: string | string[] | undefined) {
     normalizedValue === "business-line-fisioterapia" ||
     normalizedValue === "fisioterapia" ||
     normalizedValue === "physiotherapy" ||
-    normalizedValue === "fisio"
+    normalizedValue === "fisio" ||
+    normalizedValue?.includes("fisioterapia") ||
+    normalizedValue?.includes("physiotherapy")
   ) {
     return "fisioterapia";
   }
@@ -56,8 +67,16 @@ function requestedLine(value: string | string[] | undefined) {
   return null;
 }
 
+function requestedLineFromText(value: string | null | undefined) {
+  return requestedLine(value ?? undefined);
+}
+
 function scopedCompanyUnit(actor: AuthorizationActor) {
-  return getBusinessLineForCompany(actor.scope.companyId ?? "").unitType;
+  return (
+    requestedLineFromText(actor.scope.companyName) ??
+    requestedLineFromText(actor.scope.companyId) ??
+    getBusinessLineForCompany(actor.scope.companyId ?? "").unitType
+  );
 }
 
 export function MonthlyClosureRouter({
