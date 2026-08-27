@@ -376,95 +376,92 @@ export async function getOfficialContextOptions(
         return getEmptyOfficialContextOptions();
       }
 
-      const [countries, companies, operationalAreas, managers] =
-        await Promise.all([
-          client.query<OfficialCountryRow>(
-            `
-              select distinct
-                c.id,
-                c.iso2,
-                c.name,
-                c.time_zone,
-                c.date_format,
-                cu.code as currency_code
-              from public.countries c
-              left join public.currencies cu on cu.id = c.currency_id
-              where c.is_demo = false
-                and c.id = any($1::uuid[])
-              order by c.name
-            `,
-            [countryIds],
-          ),
-          client.query<OfficialCompanyRow>(
-            `
-              select distinct
-                co.id,
-                co.key,
-                co.name,
-                co.unit_type
-              from public.companies co
-              where co.is_demo = false
-                and co.id = any($1::uuid[])
-              order by co.name
-            `,
-            [companyIds],
-          ),
-          client.query<OfficialOperationalAreaRow>(
-            `
-              select distinct
-                oa.id,
-                oa.organization_id,
-                oa.country_id,
-                oa.company_id,
-                oa.code,
-                oa.name,
-                coalesce(manager.display_name, oa.name) as manager_name,
-                co.unit_type
-              from public.operational_areas oa
-              join public.companies co on co.id = oa.company_id
-              left join public.profiles manager on manager.id = oa.manager_profile_id
-              where oa.status = 'active'
-                and oa.deleted_at is null
-                and oa.id = any($1::uuid[])
-              order by oa.name
-            `,
-            [operationalAreaIds],
-          ),
-          client.query<OfficialManagerRow>(
-            `
-              with allowed_manager_ids as (
-                select oa.manager_profile_id as profile_id
-                from public.operational_areas oa
-                where oa.manager_profile_id is not null
-                  and oa.id = any($2::uuid[])
-                union
-                select ma.profile_id
-                from public.manager_assignments ma
-                join public.roles r on r.id = ma.role_id
-                where ma.status = 'active'
-                  and ma.deactivated_at is null
-                  and r.key in ('gerente_area', 'gerente_sucursal')
-                  and (
-                    ma.branch_id = any($1::uuid[])
-                    or (
-                      ma.branch_id is null
-                      and ma.operational_area_id = any($2::uuid[])
-                    )
-                  )
+      const countries = await client.query<OfficialCountryRow>(
+        `
+          select distinct
+            c.id,
+            c.iso2,
+            c.name,
+            c.time_zone,
+            c.date_format,
+            cu.code as currency_code
+          from public.countries c
+          left join public.currencies cu on cu.id = c.currency_id
+          where c.is_demo = false
+            and c.id = any($1::uuid[])
+          order by c.name
+        `,
+        [countryIds],
+      );
+      const companies = await client.query<OfficialCompanyRow>(
+        `
+          select distinct
+            co.id,
+            co.key,
+            co.name,
+            co.unit_type
+          from public.companies co
+          where co.is_demo = false
+            and co.id = any($1::uuid[])
+          order by co.name
+        `,
+        [companyIds],
+      );
+      const operationalAreas = await client.query<OfficialOperationalAreaRow>(
+        `
+          select distinct
+            oa.id,
+            oa.organization_id,
+            oa.country_id,
+            oa.company_id,
+            oa.code,
+            oa.name,
+            coalesce(manager.display_name, oa.name) as manager_name,
+            co.unit_type
+          from public.operational_areas oa
+          join public.companies co on co.id = oa.company_id
+          left join public.profiles manager on manager.id = oa.manager_profile_id
+          where oa.status = 'active'
+            and oa.deleted_at is null
+            and oa.id = any($1::uuid[])
+          order by oa.name
+        `,
+        [operationalAreaIds],
+      );
+      const managers = await client.query<OfficialManagerRow>(
+        `
+          with allowed_manager_ids as (
+            select oa.manager_profile_id as profile_id
+            from public.operational_areas oa
+            where oa.manager_profile_id is not null
+              and oa.id = any($2::uuid[])
+            union
+            select ma.profile_id
+            from public.manager_assignments ma
+            join public.roles r on r.id = ma.role_id
+            where ma.status = 'active'
+              and ma.deactivated_at is null
+              and r.key in ('gerente_area', 'gerente_sucursal')
+              and (
+                ma.branch_id = any($1::uuid[])
+                or (
+                  ma.branch_id is null
+                  and ma.operational_area_id = any($2::uuid[])
+                )
               )
-              select distinct
-                p.id,
-                coalesce(nullif(p.display_name, ''), p.email, p.id::text) as name
-              from allowed_manager_ids ami
-              join public.profiles p on p.id = ami.profile_id
-              where p.status = 'active'
-                and p.deactivated_at is null
-                and p.deleted_at is null
-              order by name
-            `,
-            [branchIds, operationalAreaIds],
-          ),
-        ]);
+          )
+          select distinct
+            p.id,
+            coalesce(nullif(p.display_name, ''), p.email, p.id::text) as name
+          from allowed_manager_ids ami
+          join public.profiles p on p.id = ami.profile_id
+          where p.status = 'active'
+            and p.deactivated_at is null
+            and p.deleted_at is null
+          order by name
+        `,
+        [branchIds, operationalAreaIds],
+      );
 
       return buildOfficialOptions({
         branches: branches.rows,
