@@ -11,6 +11,7 @@ import { isSuperAdministrator } from "@/lib/tenant/delegation-policy";
 import type { RoleKey } from "@/lib/tenant/demo-context";
 
 type BranchManagerRow = {
+  assignment_id: string;
   area_id: string | null;
   area_name: string | null;
   base_bonus_amount: number | string | null;
@@ -92,7 +93,8 @@ export async function GET() {
 
     const result = await client.query<BranchManagerRow>(
       `
-        select distinct on (p.id)
+        select
+          ma.id as assignment_id,
           p.id as profile_id,
           p.display_name,
           p.email,
@@ -141,7 +143,7 @@ export async function GET() {
             or ma.branch_id = $5::uuid
             or $6 = true
           )
-        order by p.id, ma.created_at desc
+        order by p.display_name, b.name, ma.created_at desc
       `,
       [
         organizationId,
@@ -155,6 +157,7 @@ export async function GET() {
 
     return NextResponse.json({
       branchManagers: result.rows.map((row) => ({
+        assignmentId: row.assignment_id,
         areaId: row.area_id,
         areaName: row.area_name,
         baseBonusAmount: readNumberLike(row.base_bonus_amount),

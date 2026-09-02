@@ -106,6 +106,7 @@ type DemoManagedUser = {
 };
 
 type AssignableBranchManager = {
+  assignmentId: string;
   areaId: string | null;
   areaName: string | null;
   baseBonusAmount: number | null;
@@ -528,6 +529,10 @@ function readAssignableBranchManager(value: unknown): AssignableBranchManager | 
   }
 
   return {
+    assignmentId:
+      typeof manager.assignmentId === "string"
+        ? manager.assignmentId
+        : manager.id,
     areaId: readNullableString(manager.areaId),
     areaName: readNullableString(manager.areaName),
     baseBonusAmount:
@@ -1114,6 +1119,7 @@ function UsersAndPermissionsManager({
         )
         .map(
           (branch): AssignableBranchManager => ({
+            assignmentId: `demo-assignment-${branch.id}`,
             areaId: branch.operationalAreaId ?? null,
             areaName: getAreaScopeLabel(branch.operationalAreaId),
             baseBonusAmount: null,
@@ -1593,7 +1599,7 @@ function UsersAndPermissionsManager({
 
   function selectAllManagedBranchManagers() {
     setManagedBranchManagerIds(
-      scopedBranchManagerOptions.map((manager) => manager.id),
+      [...new Set(scopedBranchManagerOptions.map((manager) => manager.id))],
     );
   }
 
@@ -2528,7 +2534,7 @@ function UsersAndPermissionsManager({
                   {scopedBranchManagerOptions.map((manager) => (
                     <label
                       className="flex min-w-0 items-start gap-3 rounded-md border bg-muted/30 p-3"
-                      key={manager.id}
+                      key={manager.assignmentId}
                     >
                       <Checkbox
                         checked={managedBranchManagerIds.includes(manager.id)}
@@ -2543,6 +2549,11 @@ function UsersAndPermissionsManager({
                         </span>
                         <span className="truncate text-xs text-muted-foreground">
                           {manager.branchName ?? "Sucursal sin nombre"}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {[manager.businessName, manager.areaName]
+                            .filter(Boolean)
+                            .join(" · ") || "Linea y area pendientes"}
                         </span>
                         <span className="truncate text-xs text-muted-foreground">
                           {manager.baseBonusAmount

@@ -473,9 +473,26 @@ async function replaceActiveReportingLines({
           ends_at = coalesce(ends_at, now())
       where subordinate_profile_id = any($1::uuid[])
         and manager_profile_id is distinct from $2
+        and organization_id = $3
+        and country_id is not distinct from $4::uuid
+        and company_id is not distinct from $5::uuid
+        and operational_area_id is not distinct from $6::uuid
+        and (
+          $7::uuid is null
+          or branch_id is null
+          or branch_id = $7::uuid
+        )
         and status = 'active'
     `,
-    [subordinateProfileIds, managerProfileId],
+    [
+      subordinateProfileIds,
+      managerProfileId,
+      invitation.organization_id,
+      invitation.country_id,
+      invitation.company_id,
+      invitation.operational_area_id,
+      invitation.branch_id,
+    ],
   );
 
   const insertedResult = await client.query<{ subordinate_profile_id: string }>(
@@ -484,17 +501,26 @@ async function replaceActiveReportingLines({
         organization_id,
         manager_profile_id,
         subordinate_profile_id,
+        country_id,
+        company_id,
+        operational_area_id,
+        branch_id,
         status,
         starts_at,
         created_by
       )
-      select $2, $3, selected.subordinate_profile_id, 'active', now(), $4
+      select $2, $3, selected.subordinate_profile_id, $5, $6, $7, $8, 'active', now(), $4
       from unnest($1::uuid[]) as selected(subordinate_profile_id)
       where not exists (
         select 1
         from public.reporting_lines rl
         where rl.manager_profile_id = $3
           and rl.subordinate_profile_id = selected.subordinate_profile_id
+          and rl.organization_id = $2
+          and rl.country_id is not distinct from $5::uuid
+          and rl.company_id is not distinct from $6::uuid
+          and rl.operational_area_id is not distinct from $7::uuid
+          and rl.branch_id is not distinct from $8::uuid
           and rl.status = 'active'
       )
       returning subordinate_profile_id
@@ -504,6 +530,10 @@ async function replaceActiveReportingLines({
       invitation.organization_id,
       managerProfileId,
       invitation.invited_by,
+      invitation.country_id,
+      invitation.company_id,
+      invitation.operational_area_id,
+      invitation.branch_id,
     ],
   );
   const insertedProfileIds = insertedResult.rows.map(
@@ -530,7 +560,11 @@ async function replaceActiveReportingLines({
       managerProfileId,
       JSON.stringify({
         inserted_subordinate_profile_ids: insertedProfileIds,
+        branch_id: invitation.branch_id,
+        company_id: invitation.company_id,
+        country_id: invitation.country_id,
         manager_profile_id: managerProfileId,
+        operational_area_id: invitation.operational_area_id,
         source: "invitation-activation",
         subordinate_profile_ids: subordinateProfileIds,
       }),
@@ -562,7 +596,11 @@ async function replaceActiveReportingLines({
       invitation.branch_id,
       JSON.stringify({
         inserted_subordinate_profile_ids: insertedProfileIds,
+        branch_id: invitation.branch_id,
+        company_id: invitation.company_id,
+        country_id: invitation.country_id,
         manager_profile_id: managerProfileId,
+        operational_area_id: invitation.operational_area_id,
         source: "invitation-activation",
         subordinate_profile_ids: subordinateProfileIds,
       }),
