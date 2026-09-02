@@ -9,6 +9,7 @@ function read(path) {
 const environment = read("lib/security/environment.ts");
 const database = read("lib/server/database.ts");
 const officialBi = read("lib/server/official-bi.ts");
+const officialBiSnapshot = read("lib/server/official-bi-snapshot.ts");
 const dashboardValidationAgent = read(
   "lib/analytics/dashboard-validation-agent.ts",
 );
@@ -54,14 +55,15 @@ assert.ok(
     officialBi.includes("closing_versions") &&
     officialBi.includes("closing_kpi_results") &&
     officialBi.includes("kpi_targets") &&
-    officialBi.includes("generated_insights") &&
-    officialBi.includes("cv.status = 'PUBLISHED'") &&
-    officialBi.includes("approved_at is not null") &&
-    officialBi.includes("cv.is_demo = false") &&
-    officialBi.includes("mc.is_demo = false") &&
-    officialBi.includes("isScopeWildcard"),
-  "Official BI snapshot must use published closings, calculated KPIs, approved targets and official insights only.",
-);
+	  officialBi.includes("generated_insights") &&
+	    officialBi.includes("cv.status = 'PUBLISHED'") &&
+	    officialBi.includes("approved_at is not null") &&
+	    officialBi.includes("cv.is_demo = false") &&
+	    officialBi.includes("mc.is_demo = false") &&
+	    officialBiSnapshot.includes("isScopeWildcard") &&
+	    officialBiSnapshot.includes("buildOfficialExecutiveSnapshot"),
+	  "Official BI snapshot must use published closings, calculated KPIs, approved targets and official insights only.",
+	);
 
 assert.ok(
   !dashboardValidationAgent.includes("demo-dashboard"),
@@ -135,12 +137,12 @@ assert.ok(
     resultsPage.includes("<ResultsGate searchParams={searchParams} />") &&
     resultsPage.includes("line={params.line}") &&
     monthlyRouter.includes('normalizedValue === "business-line-imagenes"') &&
-    monthlyRouter.includes('normalizedValue === "business-line-laboratorio"') &&
-    monthlyRouter.includes('normalizedValue === "business-line-fisioterapia"') &&
-    monthlyRouter.includes('normalizedValue?.includes("laboratorio")') &&
-    officialBi.includes('normalizedLine?.includes("laboratorio")'),
-  "Resultados must receive the active line from URL context and route every business line correctly.",
-);
+	    monthlyRouter.includes('normalizedValue === "business-line-laboratorio"') &&
+	    monthlyRouter.includes('normalizedValue === "business-line-fisioterapia"') &&
+	    monthlyRouter.includes('normalizedValue?.includes("laboratorio")') &&
+	    officialBiSnapshot.includes('normalizedLine.includes("laboratorio")'),
+	  "Resultados must receive the active line from URL context and route every business line correctly.",
+	);
 
 assert.ok(
   roleHome.includes("isDemoEnvironment") &&

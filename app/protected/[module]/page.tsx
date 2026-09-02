@@ -1,27 +1,17 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
-import { BranchNetworkDashboard } from "@/components/branch-network-dashboard";
 import { BusinessModuleDashboard } from "@/components/business-module-dashboard";
-import { CapacityOccupancyDashboard } from "@/components/capacity-occupancy-dashboard";
 import { AccountProfileDashboard } from "@/components/account-profile-dashboard";
 import { CrmConnectorsDashboard } from "@/components/crm-connectors-dashboard";
-import { DataQualityAnaliaDashboard } from "@/components/data-quality-analia-dashboard";
-import { ExecutiveOperationDashboard } from "@/components/executive-operation-dashboard";
-import { ImagingPresentationDashboard } from "@/components/imaging-presentation-dashboard";
 import { ImportOperationsDashboard } from "@/components/import-operations-dashboard";
-import { LaboratoryPresentationDashboard } from "@/components/laboratory-presentation-dashboard";
 import { MonthlyClosureRouter } from "@/components/monthly-closure-router";
-import { OperationsModule } from "@/components/operations-modules";
-import { PatientFlowDemandDashboard } from "@/components/patient-flow-demand-dashboard";
-import { PhysiotherapyPresentationDashboard } from "@/components/physiotherapy-presentation-dashboard";
-import { ProfessionalPerformanceDashboard } from "@/components/professional-performance-dashboard";
-import { ServicePortfolioDashboard } from "@/components/service-portfolio-dashboard";
 import { Badge } from "@/components/ui/badge";
 import { moduleConfigs } from "@/lib/analytics/demo-business-modules";
 import { navigationItems } from "@/lib/navigation";
 import { requireProtectedPath } from "@/lib/server/authorization";
 import { getOfficialExecutiveSnapshot } from "@/lib/server/official-bi";
+import type { OfficialDashboardMode } from "@/lib/server/official-bi";
 import { isDemoRuntimeEnvironment } from "@/lib/security/environment";
 
 type ModulePageProps = {
@@ -61,14 +51,15 @@ export function generateStaticParams() {
 }
 
 async function renderOfficialDataModule(
-  mode: "finances" | "insights" | "targets",
+  mode: OfficialDashboardMode,
   actor: Awaited<ReturnType<typeof requireProtectedPath>>,
   searchParams: ModulePageProps["searchParams"],
+  businessLineIdOverride?: string,
 ) {
   const params = searchParams ? await searchParams : {};
   const snapshot = await getOfficialExecutiveSnapshot(actor, {
     branchId: params.branch,
-    businessLineId: params.line,
+    businessLineId: businessLineIdOverride ?? params.line,
     companyId: params.company,
     countryId: params.country,
     periodEnd: params.to,
@@ -101,34 +92,113 @@ export default async function ModulePage({
   const Icon = item.icon;
 
   if (module === "citas") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule("appointments", actor, searchParams);
+    }
+
+    const { PatientFlowDemandDashboard } = await import(
+      "@/components/patient-flow-demand-dashboard"
+    );
+
     return <PatientFlowDemandDashboard />;
   }
 
   if (module === "capacidad") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule("capacity", actor, searchParams);
+    }
+
+    const { CapacityOccupancyDashboard } = await import(
+      "@/components/capacity-occupancy-dashboard"
+    );
+
     return <CapacityOccupancyDashboard />;
   }
 
   if (module === "sucursales") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule("branches", actor, searchParams);
+    }
+
+    const { BranchNetworkDashboard } = await import(
+      "@/components/branch-network-dashboard"
+    );
+
     return <BranchNetworkDashboard />;
   }
 
   if (module === "profesionales") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule("professionals", actor, searchParams);
+    }
+
+    const { ProfessionalPerformanceDashboard } = await import(
+      "@/components/professional-performance-dashboard"
+    );
+
     return <ProfessionalPerformanceDashboard />;
   }
 
   if (module === "servicios") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule("services", actor, searchParams);
+    }
+
+    const { ServicePortfolioDashboard } = await import(
+      "@/components/service-portfolio-dashboard"
+    );
+
     return <ServicePortfolioDashboard />;
   }
 
   if (module === "laboratorio") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule(
+        "laboratory",
+        actor,
+        searchParams,
+        "business-line-laboratorio",
+      );
+    }
+
+    const { LaboratoryPresentationDashboard } = await import(
+      "@/components/laboratory-presentation-dashboard"
+    );
+
     return <LaboratoryPresentationDashboard />;
   }
 
   if (module === "fisioterapia") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule(
+        "physiotherapy",
+        actor,
+        searchParams,
+        "business-line-fisioterapia",
+      );
+    }
+
+    const { PhysiotherapyPresentationDashboard } = await import(
+      "@/components/physiotherapy-presentation-dashboard"
+    );
+
     return <PhysiotherapyPresentationDashboard />;
   }
 
   if (module === "imagenes") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule(
+        "imaging",
+        actor,
+        searchParams,
+        "business-line-imagenes",
+      );
+    }
+
+    const { ImagingPresentationDashboard } = await import(
+      "@/components/imaging-presentation-dashboard"
+    );
+
     return <ImagingPresentationDashboard />;
   }
 
@@ -165,6 +235,14 @@ export default async function ModulePage({
   }
 
   if (module === "calidad-datos") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule("quality", actor, searchParams);
+    }
+
+    const { DataQualityAnaliaDashboard } = await import(
+      "@/components/data-quality-analia-dashboard"
+    );
+
     return <DataQualityAnaliaDashboard />;
   }
 
@@ -189,10 +267,24 @@ export default async function ModulePage({
       module as (typeof operationsModuleSlugs)[number],
     )
   ) {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule("managers", actor, searchParams);
+    }
+
+    const { OperationsModule } = await import("@/components/operations-modules");
+
     return <OperationsModule module={module} />;
   }
 
   if (module === "operacion") {
+    if (!isDemoRuntimeEnvironment()) {
+      return renderOfficialDataModule("operations", actor, searchParams);
+    }
+
+    const { ExecutiveOperationDashboard } = await import(
+      "@/components/executive-operation-dashboard"
+    );
+
     return <ExecutiveOperationDashboard />;
   }
 
