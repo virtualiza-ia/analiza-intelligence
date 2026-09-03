@@ -215,7 +215,12 @@ export default async function ModulePage({
   }
 
   if (module === "importaciones") {
-    return <ImportOperationsDashboard roleKey={actor.roleKey} />;
+    return (
+      <ImportOperationsDashboard
+        isDemoEnvironment={isDemoRuntimeEnvironment()}
+        roleKey={actor.roleKey}
+      />
+    );
   }
 
   if (module === "plantillas") {

@@ -25,7 +25,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ImagingVerticalDashboard } from "@/components/imaging-vertical-dashboard";
+import { LaboratoryVerticalDashboard } from "@/components/laboratory-vertical-dashboard";
 import { ManualMonthlyEntryDashboard } from "@/components/manual-monthly-entry-dashboard";
+import { PhysiotherapyVerticalDashboard } from "@/components/physiotherapy-vertical-dashboard";
 import { ReadableTabs } from "@/components/readable-tabs";
 import {
   bulkImportDocuments,
@@ -139,6 +142,7 @@ type ImportLineFilter = ImportBusinessLine | typeof allLines;
 type StatusFilter = BulkImportStatus | typeof allStatuses;
 type FrequencyFilter = ImportFrequency | typeof allFrequencies;
 type ImportOperationsDashboardProps = {
+  isDemoEnvironment?: boolean;
   roleKey?: RoleKey;
 };
 
@@ -902,6 +906,54 @@ function InfoList({
   );
 }
 
+function OfficialMonthlyClosureForm({
+  selectedLine,
+}: {
+  selectedLine: ImportLineFilter;
+}) {
+  if (selectedLine === "Laboratorio") {
+    return <LaboratoryVerticalDashboard embedded mode="new-closure" />;
+  }
+
+  if (selectedLine === "Fisioterapia") {
+    return <PhysiotherapyVerticalDashboard embedded mode="new-closure" />;
+  }
+
+  if (selectedLine === "Imagenes") {
+    return <ImagingVerticalDashboard embedded mode="new-closure" />;
+  }
+
+  return (
+    <section className="rounded-md border border-dashed bg-card p-6 text-sm">
+      <div className="grid gap-2">
+        <h2 className="text-lg font-semibold tracking-normal">
+          Selecciona una linea operativa
+        </h2>
+        <p className="max-w-2xl leading-6 text-muted-foreground">
+          El cierre mensual oficial se abre cuando el contexto activo pertenece
+          a Laboratorio, Fisioterapia o Imagenes.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function MonthlyFormEntry({
+  isDemoEnvironment,
+  roleKey,
+  selectedLine,
+}: {
+  isDemoEnvironment: boolean;
+  roleKey?: RoleKey;
+  selectedLine: ImportLineFilter;
+}) {
+  if (isDemoEnvironment) {
+    return <ManualMonthlyEntryDashboard roleKey={roleKey} />;
+  }
+
+  return <OfficialMonthlyClosureForm selectedLine={selectedLine} />;
+}
+
 function BulkUploadPanel({
   documents,
   lineage,
@@ -1230,6 +1282,7 @@ function GovernanceSection() {
 }
 
 export function ImportOperationsDashboard({
+  isDemoEnvironment = false,
   roleKey,
 }: ImportOperationsDashboardProps = {}) {
   const [context, setContext] = useState<StoredContext | null>(null);
@@ -1614,8 +1667,15 @@ export function ImportOperationsDashboard({
       <div className="grid gap-4 xl:grid-cols-[1fr_360px] xl:items-end">
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
-              Entorno DEMO
+            <Badge
+              className={cn(
+                "w-fit",
+                isDemoEnvironment
+                  ? "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                  : "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
+              )}
+            >
+              {isDemoEnvironment ? "Entorno DEMO" : "Entorno oficial"}
             </Badge>
             <Badge variant="outline">Gerente de operaciones</Badge>
             <Badge variant="outline">Webmaster / Administrador</Badge>
@@ -1641,8 +1701,14 @@ export function ImportOperationsDashboard({
           {
             id: "formulario-importaciones",
             label: "Formulario de importaciones",
-            description: "Entrada principal que alimenta el sistema por sucursal.",
-            children: <ManualMonthlyEntryDashboard />,
+            description: "Entrada principal que alimenta KPIs por sucursal.",
+            children: (
+              <MonthlyFormEntry
+                isDemoEnvironment={isDemoEnvironment}
+                roleKey={roleKey}
+                selectedLine={selectedLine}
+              />
+            ),
           },
           {
             id: "control-importaciones",

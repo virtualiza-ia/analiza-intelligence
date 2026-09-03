@@ -82,6 +82,10 @@ type ManualMetricCardProps = {
   value: string;
 };
 
+type ManualMonthlyEntryDashboardProps = {
+  roleKey?: RoleKey;
+};
+
 type AutomaticQualityAlert = {
   title: string;
   reason: string;
@@ -1279,12 +1283,16 @@ function HistoryTable({ entries }: { entries: ManualMonthlyHistoryEntry[] }) {
   );
 }
 
-export function ManualMonthlyEntryDashboard() {
+export function ManualMonthlyEntryDashboard({
+  roleKey,
+}: ManualMonthlyEntryDashboardProps = {}) {
   const activeBusinessLine = useActiveBusinessLine();
   const activeLine = toImportBusinessLine(activeBusinessLine.line);
   const formTopRef = useRef<HTMLElement | null>(null);
   const [context, setContext] = useState<StoredContext | null>(null);
-  const [activeRole, setActiveRole] = useState<RoleKey>("super_admin");
+  const [activeRole, setActiveRole] = useState<RoleKey>(
+    roleKey ?? "super_admin",
+  );
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [localHistory, setLocalHistory] = useState<LocalManualMonthlySubmission[]>(
@@ -1301,7 +1309,7 @@ export function ManualMonthlyEntryDashboard() {
     }
 
     function refreshRole() {
-      setActiveRole(readActiveDemoRole());
+      setActiveRole(roleKey ?? readActiveDemoRole());
     }
 
     refreshContext();
@@ -1317,7 +1325,7 @@ export function ManualMonthlyEntryDashboard() {
       window.removeEventListener("storage", refreshRole);
       window.removeEventListener(roleChangeEvent, refreshRole);
     };
-  }, []);
+  }, [roleKey]);
 
   useEffect(() => {
     setLocalHistory(readLocalManualHistory());

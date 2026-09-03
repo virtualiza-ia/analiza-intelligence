@@ -92,8 +92,21 @@ assert(
   "Manual monthly dashboard must return to the form top when changing steps.",
 );
 assert(
-  importDashboard.includes("ManualMonthlyEntryDashboard"),
-  "Import operations must render the manual monthly dashboard.",
+  importDashboard.includes("MonthlyFormEntry") &&
+    importDashboard.includes("OfficialMonthlyClosureForm") &&
+    importDashboard.includes("LaboratoryVerticalDashboard") &&
+    importDashboard.includes("PhysiotherapyVerticalDashboard") &&
+    importDashboard.includes("ImagingVerticalDashboard"),
+  "Import operations must render official monthly closure forms outside DEMO.",
+);
+assert(
+  importDashboard.includes("<ManualMonthlyEntryDashboard roleKey={roleKey} />"),
+  "Import operations must keep the manual monthly dashboard only as the DEMO fallback.",
+);
+assert(
+  component.includes("type ManualMonthlyEntryDashboardProps") &&
+    component.includes("roleKey ?? readActiveDemoRole()"),
+  "Manual monthly fallback must use the server role when it is provided.",
 );
 assert(
   modulePage.includes('module === "importaciones"') &&
