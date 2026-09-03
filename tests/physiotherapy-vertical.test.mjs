@@ -411,7 +411,7 @@ for (const apiRoute of [
 const navigation = readWorkspaceFile("lib/navigation.ts");
 for (const href of [
   "/protected/mi-sucursal",
-  "/protected/importaciones",
+  "/protected/plantillas",
   "/protected/cierres",
   "/protected/resultados",
 ]) {
@@ -425,7 +425,7 @@ assert.deepEqual(
   branchNavigation,
   [
     "/protected/mi-sucursal",
-    "/protected/importaciones",
+    "/protected/plantillas",
     "/protected/cierres",
     "/protected/resultados",
     "/protected/configuracion",

@@ -117,14 +117,17 @@ assert(
 );
 assert(
   newClosurePage.includes('from "next/navigation"') &&
-    newClosurePage.includes("redirect(`/protected/importaciones"),
-  "The legacy new closure route must redirect to Importaciones.",
+    newClosurePage.includes("/protected/plantillas") &&
+    newClosurePage.includes("/protected/importaciones"),
+  "The legacy new closure route must send branch operators to Formulario mensual and operations to Importaciones.",
 );
 assert(
   navigation.includes('title: "Importaciones"') &&
     navigation.includes('href: "/protected/importaciones"') &&
+    navigation.includes('title: "Formulario mensual"') &&
+    navigation.includes('href: "/protected/plantillas"') &&
     !navigation.includes('title: "Nuevo cierre mensual"'),
-  "Navigation must expose Importaciones instead of Nuevo cierre mensual.",
+  "Navigation must separate Importaciones from the branch monthly form.",
 );
 assert(
   importOperations.includes("manualMonthlyFormSteps") &&

@@ -48,7 +48,10 @@ import {
   type ImportFrequency,
 } from "@/lib/analytics/import-operations";
 import type { IngestionDatasetType } from "@/lib/data-ingestion/templates";
-import type { RoleKey } from "@/lib/tenant/demo-context";
+import {
+  demoRoleProfiles,
+  type RoleKey,
+} from "@/lib/tenant/demo-context";
 import { cn } from "@/lib/utils";
 
 const storageKey = "analiza:selected-context";
@@ -188,6 +191,18 @@ const lineColors: Record<ImportBusinessLine, string> = {
   Imagenes: "bg-sky-600",
   Laboratorio: "bg-indigo-600",
 };
+
+const importOperationsRoles = new Set<RoleKey>([
+  "super_admin",
+  "webmaster_admin",
+  "gerente_operaciones",
+  "gerente_area",
+]);
+
+const connectorAdminRoles = new Set<RoleKey>([
+  "super_admin",
+  "webmaster_admin",
+]);
 
 function serverImportStatusLabel(status: ServerImportRecord["status"] | string) {
   if (status === "RAW_RECEIVED") {
@@ -1351,7 +1366,13 @@ export function ImportOperationsDashboard({
     () => getConnectorsForLine(selectedLine),
     [selectedLine],
   );
-  const showConnectorTab = roleKey !== "gerente_operaciones";
+  const canUseImportOperations =
+    !roleKey || importOperationsRoles.has(roleKey);
+  const showConnectorTab =
+    !roleKey || connectorAdminRoles.has(roleKey);
+  const roleBadgeLabel = roleKey
+    ? demoRoleProfiles[roleKey]?.label ?? roleKey
+    : "Rol operativo";
 
   useEffect(() => {
     const currentDocumentIsVisible = filteredDocuments.some(
@@ -1677,8 +1698,7 @@ export function ImportOperationsDashboard({
             >
               {isDemoEnvironment ? "Entorno DEMO" : "Entorno oficial"}
             </Badge>
-            <Badge variant="outline">Gerente de operaciones</Badge>
-            <Badge variant="outline">Webmaster / Administrador</Badge>
+            <Badge variant="outline">{roleBadgeLabel}</Badge>
           </div>
           <div className="grid gap-2">
             <h1 className="text-3xl font-semibold tracking-normal">
@@ -1710,90 +1730,94 @@ export function ImportOperationsDashboard({
               />
             ),
           },
-          {
-            id: "control-importaciones",
-            label: "Control de carga",
-            description: "Pendientes, errores y cobertura por linea.",
-            children: (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                  <MetricCard
-                    icon={FileSpreadsheet}
-                    label="Documentos requeridos"
-                    note="Obligatorios para que los KPIs no queden incompletos."
-                    value={`${currentSummary.requiredDocuments}`}
-                  />
-                  <MetricCard
-                    icon={Clock3}
-                    label="Pendientes requeridos"
-                    note={`Proxima fecha: ${currentSummary.nextDueAt}.`}
-                    value={`${currentSummary.pendingRequired}`}
-                  />
-                  <MetricCard
-                    icon={CheckCircle2}
-                    label="Validados/importados"
-                    note="Listos para alimentar dashboards publicados."
-                    value={`${currentSummary.validatedOrImported}`}
-                  />
-                  <MetricCard
-                    icon={DatabaseZap}
-                    label={
-                      showConnectorTab
-                        ? "Conectores pendientes"
-                        : "Fuentes automaticas pendientes"
-                    }
-                    note="Mientras tanto se usa importacion manual."
-                    value={`${currentSummary.pendingConnectors}`}
-                  />
-                  <MetricCard
-                    icon={AlertTriangle}
-                    label="Con errores"
-                    note="No publican datos hasta corregirlos."
-                    value={`${currentSummary.errorDocuments}`}
-                  />
-                </div>
-                <CoverageByLine statusOverrides={statusOverrides} />
-              </>
-            ),
-          },
-          {
-            id: "carga-importaciones",
-            label: "Carga masiva",
-            description: "Uso excepcional para Excel/CSV.",
-            children: (
-              <>
-                <ImportFilters
-                  frequencyFilter={frequencyFilter}
-                  selectedLine={selectedLine}
-                  setFrequencyFilter={setFrequencyFilter}
-                  setSelectedLine={setSelectedLine}
-                  setStatusFilter={setStatusFilter}
-                  statusFilter={statusFilter}
-                />
-                <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                  {notice}
-                </div>
-                <BulkUploadPanel
-                  documents={visibleDocuments}
-                  lineage={selectedLineage}
-                  latestResult={latestServerResult}
-                  onDownload={downloadTemplate}
-                  onFileChange={handleFileChange}
-                  onLineage={fetchLineage}
-                  onPublish={publishDocument}
-                  onReplace={replaceDocument}
-                  onRollback={rollbackDocument}
-                  onSelectDocument={(importDocument) =>
-                    setSelectedDocumentId(importDocument.id)
-                  }
-                  onValidate={validateDocument}
-                  selectedDocument={selectedDocument}
-                  selectedFileName={selectedFileName}
-                  statusOverrides={statusOverrides}
-                />
-              </>
-            ),
-          },
+          ...(canUseImportOperations
+            ? [
+                {
+                  id: "control-importaciones",
+                  label: "Control de carga",
+                  description: "Pendientes, errores y cobertura por linea.",
+                  children: (
+                    <>
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                        <MetricCard
+                          icon={FileSpreadsheet}
+                          label="Documentos requeridos"
+                          note="Obligatorios para que los KPIs no queden incompletos."
+                          value={`${currentSummary.requiredDocuments}`}
+                        />
+                        <MetricCard
+                          icon={Clock3}
+                          label="Pendientes requeridos"
+                          note={`Proxima fecha: ${currentSummary.nextDueAt}.`}
+                          value={`${currentSummary.pendingRequired}`}
+                        />
+                        <MetricCard
+                          icon={CheckCircle2}
+                          label="Validados/importados"
+                          note="Listos para alimentar dashboards publicados."
+                          value={`${currentSummary.validatedOrImported}`}
+                        />
+                        <MetricCard
+                          icon={DatabaseZap}
+                          label={
+                            showConnectorTab
+                              ? "Conectores pendientes"
+                              : "Fuentes automaticas pendientes"
+                          }
+                          note="Mientras tanto se usa importacion manual."
+                          value={`${currentSummary.pendingConnectors}`}
+                        />
+                        <MetricCard
+                          icon={AlertTriangle}
+                          label="Con errores"
+                          note="No publican datos hasta corregirlos."
+                          value={`${currentSummary.errorDocuments}`}
+                        />
+                      </div>
+                      <CoverageByLine statusOverrides={statusOverrides} />
+                    </>
+                  ),
+                },
+                {
+                  id: "carga-importaciones",
+                  label: "Carga masiva",
+                  description: "Uso excepcional para Excel/CSV.",
+                  children: (
+                    <>
+                      <ImportFilters
+                        frequencyFilter={frequencyFilter}
+                        selectedLine={selectedLine}
+                        setFrequencyFilter={setFrequencyFilter}
+                        setSelectedLine={setSelectedLine}
+                        setStatusFilter={setStatusFilter}
+                        statusFilter={statusFilter}
+                      />
+                      <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                        {notice}
+                      </div>
+                      <BulkUploadPanel
+                        documents={visibleDocuments}
+                        lineage={selectedLineage}
+                        latestResult={latestServerResult}
+                        onDownload={downloadTemplate}
+                        onFileChange={handleFileChange}
+                        onLineage={fetchLineage}
+                        onPublish={publishDocument}
+                        onReplace={replaceDocument}
+                        onRollback={rollbackDocument}
+                        onSelectDocument={(importDocument) =>
+                          setSelectedDocumentId(importDocument.id)
+                        }
+                        onValidate={validateDocument}
+                        selectedDocument={selectedDocument}
+                        selectedFileName={selectedFileName}
+                        statusOverrides={statusOverrides}
+                      />
+                    </>
+                  ),
+                },
+              ]
+            : []),
           ...(showConnectorTab
             ? [
                 {
@@ -1816,18 +1840,22 @@ export function ImportOperationsDashboard({
                 },
               ]
             : []),
-          {
-            id: "historial-importaciones",
-            label: "Historial y gobierno",
-            description: "Pipeline, auditoria y reglas.",
-            children: (
-              <>
-                <PipelineSection />
-                <BatchHistorySection />
-                <GovernanceSection />
-              </>
-            ),
-          },
+          ...(canUseImportOperations
+            ? [
+                {
+                  id: "historial-importaciones",
+                  label: "Historial y gobierno",
+                  description: "Pipeline, auditoria y reglas.",
+                  children: (
+                    <>
+                      <PipelineSection />
+                      <BatchHistorySection />
+                      <GovernanceSection />
+                    </>
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
     </section>

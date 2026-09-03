@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { requireProtectedPath } from "@/lib/server/authorization";
+
 type NewClosurePageProps = {
   searchParams?: Promise<{
     line?: string | string[];
@@ -17,9 +19,15 @@ function readFirstParam(value: string | string[] | undefined) {
 export default async function NewClosurePage({
   searchParams,
 }: NewClosurePageProps) {
+  const actor = await requireProtectedPath("/protected/cierres/nuevo");
   const params = searchParams ? await searchParams : {};
   const line = readFirstParam(params.line);
   const query = new URLSearchParams();
+  const destination =
+    actor.roleKey === "gerente_sucursal" ||
+    actor.roleKey === "usuario_operativo"
+      ? "/protected/plantillas"
+      : "/protected/importaciones";
 
   if (line) {
     query.set("line", line);
@@ -27,5 +35,5 @@ export default async function NewClosurePage({
 
   const queryString = query.toString();
 
-  redirect(`/protected/importaciones${queryString ? `?${queryString}` : ""}`);
+  redirect(`${destination}${queryString ? `?${queryString}` : ""}`);
 }

@@ -122,6 +122,17 @@ export const navigationItems: NavigationItem[] = [
     allowedRoles: ["gerente_sucursal"],
   },
   {
+    title: "Formulario mensual",
+    href: "/protected/plantillas",
+    icon: ClipboardCheck,
+    group: "operacion",
+    allowedRoles: [
+      ...adminRoles,
+      "gerente_sucursal",
+      "usuario_operativo",
+    ],
+  },
+  {
     title: "Importaciones",
     href: "/protected/importaciones",
     icon: Import,
@@ -130,8 +141,6 @@ export const navigationItems: NavigationItem[] = [
       ...adminRoles,
       "gerente_operaciones",
       "gerente_area",
-      "gerente_sucursal",
-      "usuario_operativo",
     ],
   },
   {
@@ -262,16 +271,6 @@ export const navigationItems: NavigationItem[] = [
     icon: Lightbulb,
     group: "direccion",
     allowedRoles: insightReadRoles,
-  },
-  {
-    title: "Formulario mensual",
-    href: "/protected/plantillas",
-    icon: ClipboardCheck,
-    group: "datos",
-    allowedRoles: [
-      ...adminRoles,
-      "usuario_operativo",
-    ],
   },
   {
     title: "Conectores",

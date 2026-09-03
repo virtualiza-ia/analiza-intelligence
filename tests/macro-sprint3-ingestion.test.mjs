@@ -342,20 +342,20 @@ const otherBranchCsv = validLabCsv("ORD-BRANCH-SCOPE").replace(
   labBranchName,
   "SS - Escalon - L001",
 );
-const deniedBranch = ingestTabularFile({
-  actor: branchManager,
-  buffer: Buffer.from(otherBranchCsv, "utf8"),
-  contentType: "text/csv",
-  datasetType: "laboratory",
-  fileName: "otra-sucursal.csv",
-  period: "2026-07",
-  scope,
-  sourceId: "branch-scope",
-});
-assert.equal(deniedBranch.importRecord.status, "BLOCKED");
-assert.equal(
-  deniedBranch.issues.some((issue) => issue.code === "branch_scope_mismatch"),
-  true,
+assert.throws(
+  () =>
+    ingestTabularFile({
+      actor: branchManager,
+      buffer: Buffer.from(otherBranchCsv, "utf8"),
+      contentType: "text/csv",
+      datasetType: "laboratory",
+      fileName: "otra-sucursal.csv",
+      period: "2026-07",
+      scope,
+      sourceId: "branch-scope",
+    }),
+  /Actor no autorizado/,
+  "Branch managers must use the controlled monthly closure form, not bulk imports.",
 );
 
 const billingConnector = getDataConnector("billing-demo-adapter");

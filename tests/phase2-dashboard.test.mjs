@@ -188,11 +188,14 @@ for (const requiredUploadRole of [
   "webmaster_admin",
   "gerente_operaciones",
   "gerente_area",
-  "gerente_sucursal",
 ]) {
   if (!navigation.includes(`"${requiredUploadRole}"`)) {
     throw new Error(`Upload navigation is missing: ${requiredUploadRole}`);
   }
+}
+
+if (!navigation.includes('title: "Formulario mensual"')) {
+  throw new Error("Branch operators must have a dedicated monthly form route.");
 }
 
 if (!navigation.includes("connectorAdminRoles")) {

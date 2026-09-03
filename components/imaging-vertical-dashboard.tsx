@@ -1743,7 +1743,7 @@ export function ImagingVerticalDashboard({
           <aside className="grid gap-3 rounded-md border bg-card p-4">
             <div className="text-sm font-medium">Accion principal</div>
             <Button asChild>
-              <Link href="/protected/importaciones">
+              <Link href="/protected/plantillas">
                 <ClipboardCheck className="size-4" />
                 Completar cierre mensual
               </Link>

@@ -6,7 +6,7 @@ Vertical 1 implements the Fisioterapia monthly closing flow end to end for DEMO 
 
 The implemented chain is:
 
-Gerente de Sucursal -> Importaciones -> Formulario Fisioterapia -> Validacion server-side -> Preview -> Publicacion -> KPIs automaticos -> Meta vs Real -> Insights -> Dashboard Sucursal -> Consolidacion Gerente Area, Gerente Operaciones y CEO.
+Gerente de Sucursal -> Formulario mensual -> Formulario Fisioterapia -> Validacion server-side -> Preview -> Publicacion -> KPIs automaticos -> Meta vs Real -> Insights -> Dashboard Sucursal -> Consolidacion Gerente Area, Gerente Operaciones y CEO.
 
 ## User Experience By Role
 
@@ -202,11 +202,11 @@ The service enforces:
 
 Navigation visibility is aligned with RBAC, but the server remains the source of authorization.
 
-For Gerente de Sucursal, navigation is intentionally reduced to the Fisioterapia closure flow: Mi sucursal, Importaciones, Historial, Resultados and Mi cuenta. Metas, Insights and Gerentes y bonos are hidden and blocked for this role because the branch report already contains its goals, progress, insights and evidence.
+For Gerente de Sucursal, navigation is intentionally reduced to the Fisioterapia closure flow: Mi sucursal, Formulario mensual, Historial, Resultados and Mi cuenta. Importaciones, Conectores, Metas, Insights and Gerentes y bonos are hidden and blocked for this role because the branch report already contains its goals, progress, insights and evidence.
 
 ## Executive Screen Review
 
-- KEEP: Mi sucursal, Importaciones, Historial de cierres, Resultados and Resumen ejecutivo because each screen answers a concrete operating decision without duplicating the branch manager view.
+- KEEP: Mi sucursal, Formulario mensual, Historial de cierres and Resultados for branch managers because each screen answers a concrete operating decision without duplicating the branch manager view. Resumen ejecutivo remains for CEO/viewer according to RBAC.
 - KEEP: Gerentes, Sucursales, Capacidad, Finanzas and Calidad de datos for the roles that consolidate or govern operations, subject to existing RBAC.
 - REWORK: Legacy Formulario mensual and generic Importaciones for branch managers; they should be absorbed by the vertical closure flow or limited to back-office roles.
 - REWORK: generic dashboards when the selected business line is not Fisioterapia; they must eventually read the same closure/KPI/target contracts by line of business.

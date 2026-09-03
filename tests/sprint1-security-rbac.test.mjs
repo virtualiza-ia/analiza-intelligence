@@ -349,7 +349,8 @@ assert.equal(
 
 for (const branchManagerAllowedPath of [
   "/protected/mi-sucursal",
-  "/protected/importaciones",
+  "/protected/plantillas",
+  "/protected/cierres/nuevo",
   "/protected/cierres",
   "/protected/resultados",
   "/protected/configuracion",
@@ -362,6 +363,7 @@ for (const branchManagerAllowedPath of [
 }
 
 for (const duplicateBranchManagerPath of [
+  "/protected/importaciones",
   "/protected/gerentes",
   "/protected/metas",
   "/protected/insights",
@@ -370,6 +372,28 @@ for (const duplicateBranchManagerPath of [
     canAccessProtectedPath(branchManager, duplicateBranchManagerPath),
     false,
     `Branch manager must use /protected/mi-sucursal instead of ${duplicateBranchManagerPath}.`,
+  );
+}
+
+for (const sensitiveBranchAction of [
+  "imports.upload",
+  "imports.publish",
+  "imports.rollback",
+  "connectors.manage",
+  "connectors.run",
+]) {
+  assert.equal(
+    canPerformAction(branchManager, sensitiveBranchAction, {
+      scope: {
+        branchId,
+        companyId,
+        countryId,
+        operationalAreaId: areaId,
+        organizationId,
+      },
+    }),
+    false,
+    `Branch manager must not access import/governance action ${sensitiveBranchAction}.`,
   );
 }
 

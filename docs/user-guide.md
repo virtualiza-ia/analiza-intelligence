@@ -142,7 +142,7 @@ For Google Workspace with app passwords, use `smtp.gmail.com`, port `587`, `SMTP
 
 ## Imports
 
-The import center guides users through the operational import form and controlled file fallback. For Gerente de operaciones and Gerente de area, Importaciones is the only visible data-entry entry point; the legacy Formulario mensual menu entry is hidden and blocked for both roles. Conectores and Integraciones are also hidden and blocked for Gerente de operaciones.
+The import center guides authorized back-office users through controlled file fallback, validation, publication, rollback and lineage. For Gerente de operaciones and Gerente de area, Importaciones is the visible operational import entry point; the branch monthly form remains separate. Gerente de sucursal does not see Importaciones and must complete assigned branch closures through Formulario mensual (`/protected/plantillas`) with the branch fixed by the logged-in scope. Conectores and Integraciones are also hidden and blocked for Gerente de operaciones.
 
 Templates are the root of the system when no API or CRM connector is available. The minimum root templates are appointments, capacity, costs, revenue, services, professionals, targets, result templates by branch, and payroll/bonus sheets.
 

@@ -59,15 +59,14 @@ const importMutationRoles: RoleKey[] = [
   "webmaster_admin",
   "gerente_operaciones",
   "gerente_area",
-  "gerente_sucursal",
-  "usuario_operativo",
 ];
 const connectorMutationRoles: RoleKey[] = [
   "super_admin",
   "webmaster_admin",
 ];
-const routeAccessAliases = new Map<string, string>([
-  ["/protected/cierres/nuevo", "/protected/importaciones"],
+const branchClosureFormRoles = new Set<RoleKey>([
+  "gerente_sucursal",
+  "usuario_operativo",
 ]);
 
 function normalizePathname(pathname: string) {
@@ -102,25 +101,28 @@ export function canAccessProtectedPath(
   pathname: string,
 ) {
   const normalizedPathname = normalizePathname(pathname);
-  const accessPathname =
-    routeAccessAliases.get(normalizedPathname) ?? normalizedPathname;
 
-  if (protectedBasePaths.has(accessPathname)) {
+  if (protectedBasePaths.has(normalizedPathname)) {
     return true;
   }
 
-  if (
-    normalizedPathname === "/protected/cierres/nuevo" &&
-    actor.roleKey === "gerente_area"
-  ) {
-    return false;
+  if (normalizedPathname === "/protected/cierres/nuevo") {
+    if (branchClosureFormRoles.has(actor.roleKey)) {
+      return canAccessProtectedPath(actor, "/protected/plantillas");
+    }
+
+    if (actor.roleKey === "gerente_area") {
+      return false;
+    }
+
+    return canAccessProtectedPath(actor, "/protected/importaciones");
   }
 
   if (isSuperAdministrator(actor.roleKey)) {
-    return accessPathname.startsWith("/protected");
+    return normalizedPathname.startsWith("/protected");
   }
 
-  const navigationItem = findNavigationItemForPath(accessPathname);
+  const navigationItem = findNavigationItemForPath(normalizedPathname);
 
   if (!navigationItem) {
     return false;

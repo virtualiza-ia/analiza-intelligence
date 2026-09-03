@@ -2,7 +2,7 @@
 
 ## Decision
 
-La via manual principal para actualizar Analiza Intelligence sera Importaciones, con un formulario mensual por linea de negocio, sucursal y periodo. Este acceso vive en `/protected/importaciones`, con etiqueta de menu `Importaciones`, y reemplaza la entrada separada de `Nuevo cierre mensual`. La ruta heredada `/protected/cierres/nuevo` debe redirigir a Importaciones para evitar dos caminos de captura. El flujo de Excel queda como respaldo para migraciones, reemplazos especiales o fuentes que todavia no esten cubiertas por el formulario.
+La via manual principal para que una sucursal actualice Analiza Intelligence es Formulario mensual, con un cierre por linea de negocio, sucursal y periodo. Este acceso vive en `/protected/plantillas` para `gerente_sucursal` y `usuario_operativo`, con la sucursal bloqueada por el alcance del usuario. `/protected/importaciones` queda como centro de importacion operativa para administracion, operaciones y area, incluyendo carga masiva, validacion, publicacion, rollback y lineage. La ruta heredada `/protected/cierres/nuevo` redirige a Formulario mensual para roles de sucursal y a Importaciones para roles operativos autorizados.
 
 ## Alcance
 
@@ -44,15 +44,15 @@ El formulario debe leerse como un asistente de cierre mensual, no como un tabler
 - `super_admin`: gobierna permisos globales, conectores, auditoria y seguridad del sistema.
 - `webmaster_admin`: alias historico de administrador DEMO, conservado por compatibilidad.
 - `ceo`: consulta resultados ejecutivos, decide metas finales, crea sucursales por linea de negocio dentro de su alcance y las deja pendientes de gerente antes de alimentar datos.
-- `gerente_operaciones`: crea sucursales, crea areas operativas, asigna sucursales a areas, crea gerentes de area, preasigna sus gerentes de sucursal a cargo, captura capacidad por sucursal y valida cierres desde Importaciones dentro de su alcance. No usa el menu heredado de Formulario mensual ni las pantallas de Conectores/Integraciones.
+- `gerente_operaciones`: crea sucursales, crea areas operativas, asigna sucursales a areas, crea gerentes de area, preasigna sus gerentes de sucursal a cargo, captura capacidad por sucursal y valida cierres desde Importaciones dentro de su alcance. No usa las pantallas de Conectores/Integraciones.
 - `gerente_area`: supervisa el grupo de sucursales asignadas, compara disciplina, puntualidad y calidad, crea gerentes de sucursal dentro de su area, define su bono base y puede invitar usuarios operativos dentro de su area.
-- `gerente_sucursal`: llena el cierre mensual de su sucursal y consulta sus resultados.
+- `gerente_sucursal`: llena el cierre mensual de su sucursal desde Formulario mensual y consulta sus resultados; no accede a Importaciones, Carga masiva, Conectores ni gobierno de importacion.
 - `usuario_operativo`: ayuda con carga o correccion de datos de su sucursal cuando tenga permiso.
 - `viewer`: solo consulta la informacion autorizada.
 
 El acceso siempre debe evaluar organizacion, pais, empresa, area operativa, sucursal y rol. Un rol valido sin alcance valido no debe permitir ver ni editar datos.
 
-Cuando el usuario tiene rol `gerente_sucursal`, la sucursal reportada, gerente de sucursal y gerente de area deben venir de la cuenta loggeada y su alcance asignado. En DEMO se simula con el rol y el selector superior; en produccion debe resolverse desde las asignaciones de usuario y bloquear cualquier cambio fuera de su `branch_id`.
+Cuando el usuario tiene rol `gerente_sucursal`, la sucursal reportada, gerente de sucursal y gerente de area deben venir de la cuenta loggeada y su alcance asignado. En DEMO se simula con el rol y el selector superior; en produccion debe resolverse desde las asignaciones de usuario y bloquear cualquier cambio fuera de su `branch_id`. Si la persona administra varias asignaciones, el sistema debe permitir solo esas sucursales/lineas asignadas.
 
 ## Historial
 

@@ -77,7 +77,8 @@ for (const requiredConnectorsText of [
 }
 
 for (const requiredImportText of [
-  "roleKey !== \"gerente_operaciones\"",
+  "importOperationsRoles",
+  "connectorAdminRoles",
   "Fuentes automaticas pendientes",
   "Formulario de importaciones",
 ]) {

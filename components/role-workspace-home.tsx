@@ -239,7 +239,7 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
     title: "Bandeja del gerente de sucursal",
     description:
       "Muestra solo lo que necesita completar o explicar: cierre mensual, resultados, alertas y evidencias de su sucursal.",
-    primaryHref: "/protected/importaciones",
+    primaryHref: "/protected/plantillas",
     primaryLabel: "Completar cierre mensual",
     metrics: [
       { label: "Cierre", value: "33%", note: "DEMO completado" },
@@ -250,7 +250,7 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
       {
         title: "Completar cierre de julio",
         detail: "Ingresar resultados, costos, capacidad y observaciones antes de publicar.",
-        href: "/protected/importaciones",
+        href: "/protected/plantillas",
         tone: "critical",
       },
       {
@@ -268,7 +268,7 @@ const workspaceByRole: Record<RoleKey, WorkspaceConfig> = {
     ],
     shortcutHrefs: [
       "/protected/mi-sucursal",
-      "/protected/importaciones",
+      "/protected/plantillas",
       "/protected/cierres",
       "/protected/resultados",
     ],
@@ -573,7 +573,7 @@ export function RoleWorkspaceHome({
             {
               detail:
                 "Completar o corregir el cierre mensual autorizado para la sucursal asignada.",
-              href: "/protected/importaciones",
+              href: "/protected/plantillas",
               title: "Actualizar datos de mi sucursal",
               tone: "action" as const,
             },
