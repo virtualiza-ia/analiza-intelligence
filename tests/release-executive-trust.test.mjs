@@ -25,6 +25,7 @@ const sidebar = read("components/app-sidebar.tsx");
 const tenantContextHeader = read("components/tenant-context-header.tsx");
 const roleHome = read("components/role-workspace-home.tsx");
 const laboratoryWizard = read("components/laboratory-vertical-dashboard.tsx");
+const physiotherapyWizard = read("components/physiotherapy-vertical-dashboard.tsx");
 const imagingWizard = read("components/imaging-vertical-dashboard.tsx");
 
 assert.ok(
@@ -154,14 +155,24 @@ assert.ok(
 
 for (const [label, source] of [
   ["Laboratory", laboratoryWizard],
+  ["Physiotherapy", physiotherapyWizard],
   ["Imaging", imagingWizard],
 ]) {
   assert.ok(
-    source.includes("Paso {activeStep + 1} de {wizardSteps.length}") &&
-      source.includes("wizardProgress") &&
-      source.includes("sticky bottom-3") &&
-      source.includes("Campos avanzados de capacidad") &&
+    source.includes("MonthlyClosureFormHeader") &&
+      source.includes("MonthlyClosureStepTabs") &&
+      source.includes("MonthlyClosureWizardActions"),
+    `${label} wizard must have controlled header, simple step tabs and panel actions.`,
+  );
+}
+
+for (const [label, source] of [
+  ["Laboratory", laboratoryWizard],
+  ["Imaging", imagingWizard],
+]) {
+  assert.ok(
+    source.includes("Campos avanzados de capacidad") &&
       source.includes("Campos avanzados de calidad"),
-    `${label} wizard must have mobile progress, sticky actions and collapsible advanced fields.`,
+    `${label} wizard must keep collapsible advanced fields.`,
   );
 }

@@ -3,8 +3,6 @@
 import Link from "next/link";
 import {
   AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
   BarChart3,
   CalendarClock,
   CheckCircle2,
@@ -15,16 +13,28 @@ import {
   Info,
   Lightbulb,
   LockKeyhole,
-  Save,
   Send,
   ShieldCheck,
   Target,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  MonthlyClosureFormHeader,
+  MonthlyClosureStepSection,
+  MonthlyClosureStepTabs,
+  MonthlyClosureWizardActions,
+  type ClosureContextItem,
+} from "@/components/monthly-closure-form-layout";
 import type {
   PhysiotherapyBranchSummary,
   PhysiotherapyClosure,
@@ -37,7 +47,6 @@ import type {
   PhysiotherapyTargetableKpiId,
   PhysiotherapyWorkspace,
 } from "@/lib/analytics/physiotherapy-closures";
-import { cn } from "@/lib/utils";
 
 type DashboardMode =
   | "branch-home"
@@ -1165,27 +1174,63 @@ export function PhysiotherapyVerticalDashboard({
   const showHistory = ["history", "branch-home"].includes(mode);
   const showTargets = mode === "targets";
   const showInsights = mode === "insights" || mode === "overview";
+  const wizardProgress = Math.round(
+    ((activeStep + 1) / wizardSteps.length) * 100,
+  );
+  const formContextItems: ClosureContextItem[] = [
+    {
+      label: "Asignacion",
+      note:
+        activeWorkspace.branches.length > 1
+          ? "Selecciona una de tus asignaciones activas."
+          : "Derivada de tu asignacion activa.",
+      value: selectedBranchScope?.branchName
+        ? `${selectedBranchScope.branchName} · Fisioterapia`
+        : "Sucursal autorizada · Fisioterapia",
+    },
+    {
+      label: "Pais",
+      note: "Derivado de tu asignacion activa.",
+      value: selectedBranchScope?.countryName ?? "Pendiente",
+    },
+    {
+      label: "Empresa / unidad",
+      note: "Derivada de tu asignacion activa.",
+      value: selectedBranchScope?.companyName ?? "Analiza Fisioterapia",
+    },
+    {
+      label: "Area operativa",
+      note: "Derivada de la sucursal asignada.",
+      value:
+        selectedBranchScope?.operationalAreaName ??
+        selectedBranchScope?.areaManagerName ??
+        "Pendiente",
+    },
+  ];
 
   function renderNumberFields(fields: FieldConfig[]) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2">
         {fields.map((field) => (
           <label className="grid gap-2 text-sm" key={field.key}>
-            <span className="flex flex-wrap items-center gap-2 font-medium">
-              {field.label}
-              <Badge variant="outline">MANUAL</Badge>
-            </span>
-            <Input
-              min={0}
-              onChange={(event) => updateInput(field.key, event.target.value)}
-              placeholder="0"
-              step={field.unit === "USD" ? "0.01" : "1"}
-              title={field.description}
-              type="number"
-              value={activeFormValues.inputs[field.key]}
-            />
+            <span className="font-semibold text-foreground">{field.label}</span>
+            <div className="relative">
+              <Input
+                className="h-12 bg-muted/20 pr-20 text-base"
+                min={0}
+                onChange={(event) => updateInput(field.key, event.target.value)}
+                placeholder="0"
+                step={field.unit === "USD" ? "0.01" : "1"}
+                title={field.description}
+                type="number"
+                value={activeFormValues.inputs[field.key]}
+              />
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
+                {field.unit}
+              </span>
+            </div>
             <span className="text-xs leading-5 text-muted-foreground">
-              {field.description} Unidad: {field.unit}.
+              {field.description}
             </span>
           </label>
         ))}
@@ -1193,25 +1238,66 @@ export function PhysiotherapyVerticalDashboard({
     );
   }
 
+  const wizardActions = (
+    <MonthlyClosureWizardActions
+      activeStep={activeStep}
+      canCreateClosure={activeWorkspace.canCreateClosure}
+      lastSavedAt={lastSavedAt}
+      onNext={() =>
+        setActiveStep((current) =>
+          Math.min(wizardSteps.length - 1, current + 1),
+        )
+      }
+      onPrevious={() =>
+        setActiveStep((current) => Math.max(0, current - 1))
+      }
+      onSave={() => void saveDraft(activeFormValues).catch(() => undefined)}
+      saving={saving}
+      totalSteps={wizardSteps.length}
+      versionedCorrection={Boolean(workingClosure?.replacesClosureId)}
+    />
+  );
+
+  function renderStepSection({
+    children,
+    description,
+    helperText,
+    title,
+  }: {
+    children: ReactNode;
+    description: string;
+    helperText?: string;
+    title: string;
+  }) {
+    return (
+      <MonthlyClosureStepSection
+        description={description}
+        footer={wizardActions}
+        helperText={helperText}
+        lineLabel="Fisioterapia"
+        stepIndex={activeStep}
+        stepTitle={title}
+        tone="teal"
+        totalSteps={wizardSteps.length}
+      >
+        {children}
+      </MonthlyClosureStepSection>
+    );
+  }
+
   function renderWizardStep() {
     if (activeStep === 0) {
-      return (
-        <section className="grid gap-4 rounded-md border bg-card p-4">
-          <div className="grid gap-1">
-            <h2 className="text-lg font-semibold tracking-normal">
-              Paso 1 - Contexto
-            </h2>
-            <p className="text-sm leading-6 text-muted-foreground">
-              Pais, empresa, area y gerentes se resuelven desde catalogos y
-              alcance autorizado.
-            </p>
-          </div>
+      return renderStepSection({
+        description:
+          "Pais, empresa, area y gerentes se resuelven desde catalogos y alcance autorizado.",
+        helperText: "Contexto fijo de sucursal",
+        title: "Contexto del cierre",
+        children: (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <label className="grid gap-2 text-sm">
-              <span className="flex items-center gap-2 font-medium">
-                Periodo <Badge variant="outline">MANUAL</Badge>
-              </span>
+              <span className="font-semibold text-foreground">Periodo</span>
               <Input
+                className="h-12 bg-muted/20 text-base"
                 onChange={(event) => {
                   setFormValues({
                     ...activeFormValues,
@@ -1224,11 +1310,9 @@ export function PhysiotherapyVerticalDashboard({
               />
             </label>
             <label className="grid gap-2 text-sm">
-              <span className="flex items-center gap-2 font-medium">
-                Sucursal <Badge variant="outline">CATALOGO</Badge>
-              </span>
+              <span className="font-semibold text-foreground">Sucursal</span>
               <select
-                className="h-10 rounded-md border bg-background px-3 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-12 rounded-md border bg-muted/20 px-3 text-base outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
                 onChange={(event) => {
                   setFormValues({
                     ...activeFormValues,
@@ -1247,95 +1331,66 @@ export function PhysiotherapyVerticalDashboard({
                 ))}
               </select>
             </label>
-            <div className="grid gap-2 rounded-md border bg-background p-3 text-sm">
-              <span className="flex items-center gap-2 font-medium">
-                Pais <Badge variant="outline">AUTOMATICO</Badge>
-              </span>
-              <span className="text-muted-foreground">
-                {selectedBranchScope?.countryName ?? "Pendiente"}
-              </span>
-            </div>
-            <div className="grid gap-2 rounded-md border bg-background p-3 text-sm">
-              <span className="flex items-center gap-2 font-medium">
-                Gerente sucursal <Badge variant="outline">AUTOMATICO</Badge>
-              </span>
-              <span className="text-muted-foreground">
-                {selectedBranchScope?.managerName ?? "Pendiente"}
-              </span>
-            </div>
-            <div className="grid gap-2 rounded-md border bg-background p-3 text-sm">
-              <span className="flex items-center gap-2 font-medium">
-                Gerente area <Badge variant="outline">AUTOMATICO</Badge>
-              </span>
-              <span className="text-muted-foreground">
-                {selectedBranchScope?.areaManagerName ?? "Pendiente"}
-              </span>
-            </div>
-            <div className="grid gap-2 rounded-md border bg-background p-3 text-sm">
-              <span className="flex items-center gap-2 font-medium">
-                Empresa <Badge variant="outline">AUTOMATICO</Badge>
-              </span>
-              <span className="text-muted-foreground">
-                {selectedBranchScope?.companyName ?? "Analiza Fisioterapia"}
-              </span>
-            </div>
+            {[
+              ["Pais", selectedBranchScope?.countryName ?? "Pendiente"],
+              [
+                "Gerente de sucursal",
+                selectedBranchScope?.managerName ?? "Pendiente",
+              ],
+              [
+                "Gerente de area",
+                selectedBranchScope?.areaManagerName ?? "Pendiente",
+              ],
+              [
+                "Empresa",
+                selectedBranchScope?.companyName ?? "Analiza Fisioterapia",
+              ],
+            ].map(([label, value]) => (
+              <div
+                className="grid gap-2 rounded-md border bg-muted/20 p-3 text-sm"
+                key={label}
+              >
+                <span className="font-semibold text-foreground">{label}</span>
+                <span className="text-muted-foreground">{value}</span>
+              </div>
+            ))}
           </div>
-        </section>
-      );
+        ),
+      });
     }
 
     if (activeStep === 1) {
-      return (
-        <section className="grid gap-4 rounded-md border bg-card p-4">
-          <div className="grid gap-1">
-            <h2 className="text-lg font-semibold tracking-normal">
-              Paso 2 - Venta y produccion
-            </h2>
-            <p className="text-sm leading-6 text-muted-foreground">
-              Capture datos fuente. Tickets, margen y cumplimiento se calculan
-              automaticamente.
-            </p>
-          </div>
-          {renderNumberFields(productionFields)}
-        </section>
-      );
+      return renderStepSection({
+        description:
+          "Capture datos fuente. Tickets, margen y cumplimiento se calculan automaticamente.",
+        helperText: "Solo valores reportados",
+        title: "Venta y produccion",
+        children: renderNumberFields(productionFields),
+      });
     }
 
     if (activeStep === 2) {
-      return (
-        <section className="grid gap-4 rounded-md border bg-card p-4">
-          <div className="grid gap-1">
-            <h2 className="text-lg font-semibold tracking-normal">
-              Paso 3 - Agenda y capacidad
-            </h2>
-            <p className="text-sm leading-6 text-muted-foreground">
-              Estos campos son manuales en MVP y quedan listos para reemplazo
-              posterior por conector de agenda.
-            </p>
-          </div>
-          {renderNumberFields(scheduleFields)}
-        </section>
-      );
+      return renderStepSection({
+        description:
+          "Estos campos son manuales en MVP y quedan listos para reemplazo posterior por conector de agenda.",
+        title: "Agenda y capacidad",
+        children: renderNumberFields(scheduleFields),
+      });
     }
 
     if (activeStep === 3) {
-      return (
-        <section className="grid gap-4 rounded-md border bg-card p-4">
-          <div className="grid gap-1">
-            <h2 className="text-lg font-semibold tracking-normal">
-              Paso 4 - Observaciones
-            </h2>
-            <p className="text-sm leading-6 text-muted-foreground">
-              Explique variaciones relevantes. No incluya nombres, telefonos,
-              documentos ni datos personales.
-            </p>
-          </div>
+      return renderStepSection({
+        description:
+          "Explique variaciones relevantes. No incluya nombres, telefonos, documentos ni datos personales.",
+        helperText: "Sin datos personales",
+        title: "Observaciones",
+        children: (
           <label className="grid gap-2 text-sm">
-            <span className="flex items-center gap-2 font-medium">
-              Observaciones del cierre <Badge variant="outline">MANUAL</Badge>
+            <span className="font-semibold text-foreground">
+              Observaciones del cierre
             </span>
             <textarea
-              className="min-h-32 rounded-md border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+              className="min-h-32 rounded-md border bg-muted/20 px-3 py-2 text-base outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
               onChange={(event) =>
                 updateInput("closureObservations", event.target.value)
               }
@@ -1343,12 +1398,16 @@ export function PhysiotherapyVerticalDashboard({
               value={activeFormValues.inputs.closureObservations}
             />
           </label>
-        </section>
-      );
+        ),
+      });
     }
 
     if (activeStep === 4) {
-      return (
+      return renderStepSection({
+        description:
+          "Revisa bloqueos y advertencias antes de publicar datos en dashboards.",
+        title: "Validacion",
+        children: (
         <div className="grid gap-4">
           <ValidationPanel closure={workingClosure} />
           <Button
@@ -1361,33 +1420,35 @@ export function PhysiotherapyVerticalDashboard({
             Ejecutar validacion
           </Button>
         </div>
-      );
+        ),
+      });
     }
 
     if (activeStep === 5) {
-      return workingClosure ? (
+      return renderStepSection({
+        description:
+          "Vista previa de KPIs y comparacion contra metas antes de publicar.",
+        title: "Vista previa",
+        children: workingClosure ? (
         <div className="grid gap-4">
           <KpiGrid kpis={workingClosure.kpiResults} />
           <TargetComparisonTable comparisons={workingClosure.targetComparisons} />
         </div>
       ) : (
-        <section className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
+        <div className="rounded-md border bg-muted/20 p-4 text-sm text-muted-foreground">
           Guarda y valida el cierre para ver el preview.
-        </section>
-      );
+        </div>
+      ),
+      });
     }
 
-    return (
-      <section className="grid gap-4 rounded-md border bg-card p-4">
-        <div className="grid gap-1">
-          <h2 className="text-lg font-semibold tracking-normal">
-            Paso 7 - Publicar
-          </h2>
-          <p className="text-sm leading-6 text-muted-foreground">
-            Al publicar, el cierre queda bloqueado y alimenta KPIs, metas,
-            insights y dashboards por rol.
-          </p>
-        </div>
+    return renderStepSection({
+      description:
+        "Al publicar, el cierre queda bloqueado y alimenta KPIs, metas, insights y dashboards por rol.",
+      helperText: "Publicacion versionada",
+      title: "Publicar",
+      children: (
+        <div className="grid gap-4">
         <div className="grid gap-3 md:grid-cols-3">
           <MetricCard
             label="Estado"
@@ -1418,13 +1479,25 @@ export function PhysiotherapyVerticalDashboard({
           <Send className="size-4" />
           Publicar cierre
         </Button>
-      </section>
-    );
+        </div>
+      ),
+    });
   }
 
   return (
     <section className={sectionClass}>
-      <Header mode={mode} workspace={activeWorkspace} />
+      {showWizard ? (
+        <MonthlyClosureFormHeader
+          contextItems={formContextItems}
+          currentStep={activeStep + 1}
+          lineLabel="Fisioterapia"
+          progress={wizardProgress}
+          stepCount={wizardSteps.length}
+          tone="teal"
+        />
+      ) : (
+        <Header mode={mode} workspace={activeWorkspace} />
+      )}
 
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
@@ -1477,71 +1550,13 @@ export function PhysiotherapyVerticalDashboard({
 
       {showWizard ? (
         <section className="grid gap-4">
-          <div className="rounded-md border bg-card p-3">
-            <div className="grid gap-2 md:grid-cols-7">
-              {wizardSteps.map((step, index) => (
-                <button
-                  className={cn(
-                    "min-h-11 rounded-md border px-2 text-xs font-medium transition-colors",
-                    activeStep === index
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "bg-background text-muted-foreground hover:bg-accent",
-                  )}
-                  key={step}
-                  onClick={() => setActiveStep(index)}
-                  type="button"
-                >
-                  {index + 1}. {step}
-                </button>
-              ))}
-            </div>
-          </div>
-
+          <MonthlyClosureStepTabs
+            activeStep={activeStep}
+            onStepChange={setActiveStep}
+            steps={wizardSteps}
+            tone="teal"
+          />
           {renderWizardStep()}
-
-          <div className="flex flex-col gap-3 rounded-md border bg-card p-3 md:flex-row md:items-center md:justify-between">
-            <div className="text-xs text-muted-foreground">
-              {saving ? "Guardando..." : "Autosave activo"}
-              {lastSavedAt ? ` / ultimo guardado ${lastSavedAt}` : ""}
-              {workingClosure?.replacesClosureId
-                ? " / correccion versionada"
-                : ""}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled={activeStep === 0}
-                onClick={() => setActiveStep((current) => Math.max(0, current - 1))}
-                type="button"
-                variant="outline"
-              >
-                <ArrowLeft className="size-4" />
-                Atras
-              </Button>
-              <Button
-                disabled={saving || !activeWorkspace.canCreateClosure}
-                onClick={() =>
-                  void saveDraft(activeFormValues).catch(() => undefined)
-                }
-                type="button"
-                variant="outline"
-              >
-                <Save className="size-4" />
-                Guardar borrador
-              </Button>
-              <Button
-                disabled={activeStep >= wizardSteps.length - 1}
-                onClick={() =>
-                  setActiveStep((current) =>
-                    Math.min(wizardSteps.length - 1, current + 1),
-                  )
-                }
-                type="button"
-              >
-                Siguiente
-                <ArrowRight className="size-4" />
-              </Button>
-            </div>
-          </div>
         </section>
       ) : null}
 
