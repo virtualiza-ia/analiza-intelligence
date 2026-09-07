@@ -761,7 +761,9 @@ const branchNetworkBaseRecords: BranchNetworkBaseRecord[] = [
 export const allBranchNetworkRecords: BranchNetworkRecord[] =
   enrichBranchNetworkRecords(branchNetworkBaseRecords);
 
-function scoreMetrics(records: BranchNetworkRecord[]): BranchNetworkMetric[] {
+export function buildBranchNetworkMetrics(
+  records: BranchNetworkRecord[],
+): BranchNetworkMetric[] {
   const active = records.length;
   const normal = records.filter((record) =>
     ["Sobresaliente", "Saludable"].includes(record.status),
@@ -833,7 +835,7 @@ export function getBranchNetworkScreen(slug: BusinessLineSlug): BranchNetworkScr
   return {
     slug,
     ...titles[slug],
-    metrics: scoreMetrics(records),
+    metrics: buildBranchNetworkMetrics(records),
     records,
     executiveActions: [
       "Comparar cada sede contra promedio de red, grupo comparable, mejor sede del grupo, resultado anterior y meta.",

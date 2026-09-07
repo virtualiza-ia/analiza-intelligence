@@ -47,6 +47,8 @@ import {
   type BranchOption,
   type RoleKey,
 } from "@/lib/tenant/demo-context";
+import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
+import { branchMatchesAreaScope } from "@/lib/tenant/scope-matching";
 import { cn } from "@/lib/utils";
 
 const contextStorageKey = "analiza:selected-context";
@@ -65,10 +67,13 @@ type StoredContext = {
   countryId?: string;
   companyName?: string;
   branchName?: string;
+  operationalAreaId?: string;
+  operationalAreaName?: string;
   managerName?: string;
   period?: string;
   periodStart?: string;
   periodEnd?: string;
+  isDemo?: boolean;
 };
 
 type LocalManualMonthlySubmission = ManualMonthlyHistoryEntry & {
@@ -83,6 +88,7 @@ type ManualMetricCardProps = {
 };
 
 type ManualMonthlyEntryDashboardProps = {
+  actorScope?: ScopeBoundary;
   roleKey?: RoleKey;
 };
 
@@ -304,6 +310,8 @@ function formatBranchOption(branch: BranchOption) {
 function getBranchOptionsForLine(
   line: ImportBusinessLine,
   context: StoredContext | null,
+  roleKey: RoleKey,
+  actorScope: ScopeBoundary | undefined,
 ) {
   const companyId = getBusinessLineCompanyId(line);
 
@@ -311,17 +319,23 @@ function getBranchOptionsForLine(
     return [];
   }
 
-  return demoBranches
+  const branchOptions = demoBranches
     .filter((branch) => branch.companyId === companyId)
     .filter(
       (branch) =>
         !context?.countryId ||
         context.countryId === regionalCountryId ||
         branch.countryId === context.countryId,
-    )
-    .sort((left, right) =>
-      formatBranchOption(left).localeCompare(formatBranchOption(right)),
     );
+
+  return (roleKey === "gerente_area"
+    ? branchOptions.filter((branch) =>
+        branchMatchesAreaScope(branch, actorScope, context),
+      )
+    : branchOptions
+  ).sort((left, right) =>
+    formatBranchOption(left).localeCompare(formatBranchOption(right)),
+  );
 }
 
 function uniqueSortedNames(names: Array<string | undefined>) {
@@ -479,9 +493,9 @@ function buildInitialFormValues(
   values.branch_reported = branchOptions.some(
     (branch) => branch.id === contextBranchId,
   )
-    ? contextBranchId
-    : branchByName?.id ??
-      (activeRole === "gerente_sucursal"
+      ? contextBranchId
+      : branchByName?.id ??
+      (activeRole === "gerente_sucursal" || activeRole === "gerente_area"
         ? getDefaultAssignedBranchId(line, branchOptions)
         : "");
   values.data_cutoff_date = getMonthEndDate(values.period);
@@ -1284,6 +1298,7 @@ function HistoryTable({ entries }: { entries: ManualMonthlyHistoryEntry[] }) {
 }
 
 export function ManualMonthlyEntryDashboard({
+  actorScope,
   roleKey,
 }: ManualMonthlyEntryDashboardProps = {}) {
   const activeBusinessLine = useActiveBusinessLine();
@@ -1340,8 +1355,8 @@ export function ManualMonthlyEntryDashboard({
     [activeLine],
   );
   const branchOptions = useMemo(
-    () => getBranchOptionsForLine(activeLine, context),
-    [activeLine, context],
+    () => getBranchOptionsForLine(activeLine, context, activeRole, actorScope),
+    [activeLine, activeRole, actorScope, context],
   );
   const branchManagerOptions = useMemo(
     () => getBranchManagerOptions(branchOptions),

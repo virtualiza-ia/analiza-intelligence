@@ -111,6 +111,9 @@ assert(
     branchDashboard.includes("allowedBranchOptions") &&
     branchDashboard.includes("recordMatchesBranchOption") &&
     branchDashboard.includes("recordMatchesContextBranch") &&
+    branchDashboard.includes("managerRecordMatchesAreaScope") &&
+    branchDashboard.includes("buildBranchNetworkMetrics(branchScopedRecords)") &&
+    branchDashboard.includes("Solo mi area") &&
     branchDashboard.includes("No hay filtros para cambiar de sucursal") &&
     branchDashboard.includes("Sin cierre cargado para esta sucursal") &&
     !branchDashboard.includes("screen.records.slice(0, 1)") &&

@@ -34,6 +34,7 @@ import {
 } from "@/lib/tenant/current-user-access";
 import {
   branchScoreWeights,
+  buildBranchNetworkMetrics,
   buildBranchTrendChart,
   getBranchNetworkScreen,
   type BranchNetworkMetric,
@@ -41,6 +42,8 @@ import {
   type BranchStatus,
 } from "@/lib/analytics/branch-network";
 import { formatCurrency, formatRate } from "@/lib/analytics/el-salvador-result-templates";
+import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
+import { managerRecordMatchesAreaScope } from "@/lib/tenant/scope-matching";
 import { cn } from "@/lib/utils";
 
 const roleStorageKey = "analiza:demo-role";
@@ -67,10 +70,17 @@ type StoredContext = {
   businessLineId?: string;
   businessLineName?: string;
   branchName?: string;
+  operationalAreaId?: string;
+  operationalAreaName?: string;
   period?: string;
   periodStart?: string;
   periodEnd?: string;
   isDemo?: boolean;
+};
+
+type BranchNetworkDashboardProps = {
+  actorScope?: ScopeBoundary;
+  roleKey?: RoleKey;
 };
 
 type BranchFilters = {
@@ -445,12 +455,35 @@ function heatClass(value: number) {
 }
 
 function ScopeCard({
+  actorScope,
   context,
   lineSlug,
+  roleKey,
 }: {
+  actorScope?: ScopeBoundary;
   context: StoredContext | null;
   lineSlug: BusinessLineSlug;
+  roleKey?: RoleKey;
 }) {
+  const contextBranchLabel =
+    context?.branchName && !isAllFilterValue(context.branchName)
+      ? context.branchName
+      : null;
+  const contextAreaLabel =
+    context?.operationalAreaName && !isAllFilterValue(context.operationalAreaName)
+      ? context.operationalAreaName
+      : null;
+  const actorAreaLabel =
+    actorScope?.operationalAreaName &&
+    !isAllFilterValue(actorScope.operationalAreaName)
+      ? actorScope.operationalAreaName
+      : null;
+  const scopeLabel =
+    contextBranchLabel ??
+    (roleKey === "gerente_area"
+      ? contextAreaLabel ?? actorAreaLabel ?? "Area asignada"
+      : "Todas las sucursales");
+
   return (
     <aside className="rounded-md border bg-card p-4 text-sm">
       <div className="mb-2 flex items-center gap-2 font-medium">
@@ -460,7 +493,7 @@ function ScopeCard({
       <div className="grid gap-1 text-muted-foreground">
         <span>{context?.countryName ?? "Vista regional"}</span>
         <span>{context?.businessLineName ?? context?.companyName ?? "Consolidado"}</span>
-        <span>{context?.branchName ?? "Todas las sucursales"}</span>
+        <span>{scopeLabel}</span>
         <span>Linea: {lineSlug}</span>
         <span>Periodo: {formatPeriod(context)}</span>
       </div>
@@ -1282,14 +1315,19 @@ function ScoreWeightsPanel() {
   );
 }
 
-export function BranchNetworkDashboard() {
+export function BranchNetworkDashboard({
+  actorScope,
+  roleKey,
+}: BranchNetworkDashboardProps = {}) {
   const [context, setContext] = useState<StoredContext | null>(null);
   const [currentUserAccess, setCurrentUserAccess] =
     useState<CurrentUserAccess | null>(null);
   const [allowedBranchOptions, setAllowedBranchOptions] = useState<
     AllowedBranchOption[] | null
   >(null);
-  const [activeRole, setActiveRole] = useState<RoleKey>("super_admin");
+  const [activeRole, setActiveRole] = useState<RoleKey>(
+    roleKey ?? "super_admin",
+  );
   const [filters, setFilters] = useState<BranchFilters>(() => createDefaultFilters());
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [trendBranchIds, setTrendBranchIds] = useState<string[]>([]);
@@ -1298,23 +1336,60 @@ export function BranchNetworkDashboard() {
     : null;
   const effectiveRole = scopedBranchAccess?.roleKey ?? activeRole;
   const isBranchManagerView = effectiveRole === "gerente_sucursal";
+  const isAreaManagerView = effectiveRole === "gerente_area";
   const lineSlug = useMemo(() => {
     if (!scopedBranchAccess) {
+      if (isAreaManagerView) {
+        const scopedLine = resolveBusinessLineSlug({
+          companyName:
+            currentUserAccess?.scope.companyName ??
+            actorScope?.companyName ??
+            undefined,
+        });
+
+        if (scopedLine !== "consolidado") {
+          return scopedLine;
+        }
+      }
+
       return resolveContextLine(context);
     }
 
     return resolveBusinessLineSlug({
       companyName: scopedBranchAccess.scope.companyName ?? undefined,
     });
-  }, [context, scopedBranchAccess]);
+  }, [
+    actorScope?.companyName,
+    context,
+    currentUserAccess?.scope.companyName,
+    isAreaManagerView,
+    scopedBranchAccess,
+  ]);
   const screen = useMemo(() => getBranchNetworkScreen(lineSlug), [lineSlug]);
-  const allowedRecords = useMemo(() => {
-    if (!currentUserAccess || context?.isDemo === true) {
+  const areaScopedRecords = useMemo(() => {
+    if (!isAreaManagerView || context?.isDemo === true) {
       return screen.records;
     }
 
+    const currentScope = currentUserAccess?.scope ?? actorScope;
+
+    return screen.records.filter((record) =>
+      managerRecordMatchesAreaScope(record, currentScope, context),
+    );
+  }, [
+    actorScope,
+    context,
+    currentUserAccess?.scope,
+    isAreaManagerView,
+    screen.records,
+  ]);
+  const allowedRecords = useMemo(() => {
+    if (!currentUserAccess || context?.isDemo === true) {
+      return areaScopedRecords;
+    }
+
     if (!allowedBranchOptions) {
-      return [];
+      return isAreaManagerView ? areaScopedRecords : [];
     }
 
     if (allowedBranchOptions.length === 0) {
@@ -1328,8 +1403,10 @@ export function BranchNetworkDashboard() {
     );
   }, [
     allowedBranchOptions,
+    areaScopedRecords,
     context?.isDemo,
     currentUserAccess,
+    isAreaManagerView,
     screen.records,
   ]);
   const branchScopedRecords = useMemo(() => {
@@ -1406,7 +1483,9 @@ export function BranchNetworkDashboard() {
     "Mi sucursal";
   const visibleMetrics = isBranchManagerView
     ? buildBranchManagerMetrics(selectedRecord, scopedBranchName)
-    : screen.metrics;
+    : isAreaManagerView
+      ? buildBranchNetworkMetrics(branchScopedRecords)
+      : screen.metrics;
 
   useEffect(() => {
     function refreshContext() {
@@ -1419,7 +1498,7 @@ export function BranchNetworkDashboard() {
         return;
       }
 
-      setActiveRole(readActiveDemoRole());
+      setActiveRole(roleKey ?? readActiveDemoRole());
     }
 
     refreshContext();
@@ -1435,7 +1514,7 @@ export function BranchNetworkDashboard() {
       window.removeEventListener("storage", refreshRole);
       window.removeEventListener(roleChangeEvent, refreshRole);
     };
-  }, [currentUserAccess]);
+  }, [currentUserAccess, roleKey]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1527,6 +1606,11 @@ export function BranchNetworkDashboard() {
                 Solo mi sucursal
               </Badge>
             ) : null}
+            {isAreaManagerView ? (
+              <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                Solo mi area
+              </Badge>
+            ) : null}
           </div>
           <div className="grid gap-2">
             <div className="flex items-center gap-3">
@@ -1542,7 +1626,12 @@ export function BranchNetworkDashboard() {
             </p>
           </div>
         </div>
-        <ScopeCard context={context} lineSlug={lineSlug} />
+        <ScopeCard
+          actorScope={actorScope}
+          context={context}
+          lineSlug={lineSlug}
+          roleKey={effectiveRole}
+        />
       </div>
 
       {isBranchManagerView ? (

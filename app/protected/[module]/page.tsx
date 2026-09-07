@@ -116,7 +116,7 @@ export default async function ModulePage({
   }
 
   if (module === "sucursales") {
-    if (!isDemoRuntimeEnvironment()) {
+    if (!isDemoRuntimeEnvironment() && actor.roleKey !== "gerente_area") {
       return renderOfficialDataModule("branches", actor, searchParams);
     }
 
@@ -124,7 +124,12 @@ export default async function ModulePage({
       "@/components/branch-network-dashboard"
     );
 
-    return <BranchNetworkDashboard />;
+    return (
+      <BranchNetworkDashboard
+        actorScope={actor.scope}
+        roleKey={actor.roleKey}
+      />
+    );
   }
 
   if (module === "profesionales") {
@@ -217,6 +222,7 @@ export default async function ModulePage({
   if (module === "importaciones") {
     return (
       <ImportOperationsDashboard
+        actorScope={actor.scope}
         isDemoEnvironment={isDemoRuntimeEnvironment()}
         roleKey={actor.roleKey}
       />
@@ -272,6 +278,19 @@ export default async function ModulePage({
       module as (typeof operationsModuleSlugs)[number],
     )
   ) {
+    if (!isDemoRuntimeEnvironment() && actor.roleKey === "gerente_area") {
+      const { ManagerBonusDashboard } = await import(
+        "@/components/manager-bonus-dashboard"
+      );
+
+      return (
+        <ManagerBonusDashboard
+          actorScope={actor.scope}
+          roleKey={actor.roleKey}
+        />
+      );
+    }
+
     if (!isDemoRuntimeEnvironment()) {
       return renderOfficialDataModule("managers", actor, searchParams);
     }

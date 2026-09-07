@@ -27,6 +27,7 @@ import {
   type BusinessLineSlug,
 } from "@/lib/analytics/business-line-operations";
 import {
+  buildManagerBonusMetrics,
   buildManagerBonusTrendChart,
   getManagerBonusBacktest,
   getManagerBonusScreen,
@@ -45,6 +46,12 @@ import {
   getGoalCompletionFactor,
   managementLevelLabels,
 } from "@/lib/tenant/manager-incentives";
+import type { RoleKey } from "@/lib/tenant/demo-context";
+import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
+import {
+  isAllScopeLabel,
+  managerRecordMatchesAreaScope,
+} from "@/lib/tenant/scope-matching";
 import { cn } from "@/lib/utils";
 
 const storageKey = "analiza:selected-context";
@@ -52,16 +59,24 @@ const contextChangeEvent = "analiza:context-change";
 const allOption = "Todos";
 
 type StoredContext = {
+  branchId?: string;
   countryName?: string;
   companyName?: string;
   businessLineId?: string;
   businessLineName?: string;
   branchName?: string;
+  operationalAreaId?: string;
+  operationalAreaName?: string;
   managerName?: string;
   period?: string;
   periodStart?: string;
   periodEnd?: string;
   isDemo?: boolean;
+};
+
+type ManagerBonusDashboardProps = {
+  actorScope?: ScopeBoundary;
+  roleKey?: RoleKey;
 };
 
 type ManagerFilters = {
@@ -370,12 +385,39 @@ function ChartExplanation({
 }
 
 function ScopeCard({
+  actorScope,
   context,
   lineSlug,
+  roleKey,
 }: {
+  actorScope?: ScopeBoundary;
   context: StoredContext | null;
   lineSlug: BusinessLineSlug;
+  roleKey?: RoleKey;
 }) {
+  const contextBranchLabel =
+    context?.branchName && !isAllScopeLabel(context.branchName)
+      ? context.branchName
+      : null;
+  const contextAreaLabel =
+    context?.operationalAreaName && !isAllScopeLabel(context.operationalAreaName)
+      ? context.operationalAreaName
+      : null;
+  const actorAreaLabel =
+    actorScope?.operationalAreaName &&
+    !isAllScopeLabel(actorScope.operationalAreaName)
+      ? actorScope.operationalAreaName
+      : null;
+  const managerLabel =
+    context?.managerName && !isAllScopeLabel(context.managerName)
+      ? context.managerName
+      : null;
+  const scopeLabel =
+    contextBranchLabel ??
+    (roleKey === "gerente_area"
+      ? contextAreaLabel ?? actorAreaLabel ?? "Area asignada"
+      : "Todas las sucursales");
+
   return (
     <aside className="rounded-md border bg-card p-4 text-sm">
       <div className="mb-2 flex items-center gap-2 font-medium">
@@ -385,8 +427,8 @@ function ScopeCard({
       <div className="grid gap-1 text-muted-foreground">
         <span>{context?.countryName ?? "Vista regional"}</span>
         <span>{context?.businessLineName ?? context?.companyName ?? "Consolidado"}</span>
-        <span>{context?.branchName ?? "Todas las sucursales"}</span>
-        <span>{context?.managerName ?? "Todos los gerentes"}</span>
+        <span>{scopeLabel}</span>
+        <span>{managerLabel ?? "Todos los gerentes"}</span>
         <span>Linea: {lineSlug}</span>
         <span>Periodo: {formatPeriod(context)}</span>
       </div>
@@ -2175,7 +2217,10 @@ function BonusSimulator({ record }: { record: ManagerBonusRecord }) {
   );
 }
 
-export function ManagerBonusDashboard() {
+export function ManagerBonusDashboard({
+  actorScope,
+  roleKey,
+}: ManagerBonusDashboardProps = {}) {
   const [context, setContext] = useState<StoredContext | null>(null);
   const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
   const [filters, setFilters] = useState(createDefaultFilters);
@@ -2270,7 +2315,19 @@ export function ManagerBonusDashboard() {
     void refreshBonusWorkflow();
   }, [refreshBonusWorkflow]);
 
-  const lineSlug = useMemo(() => resolveContextLine(context), [context]);
+  const lineSlug = useMemo(() => {
+    if (roleKey === "gerente_area") {
+      const scopedLine = resolveBusinessLineSlug({
+        companyName: actorScope?.companyName ?? undefined,
+      });
+
+      if (scopedLine !== "consolidado") {
+        return scopedLine;
+      }
+    }
+
+    return resolveContextLine(context);
+  }, [actorScope?.companyName, context, roleKey]);
   const screen = useMemo(() => getManagerBonusScreen(lineSlug), [lineSlug]);
   const workflowById = useMemo(
     () =>
@@ -2280,11 +2337,14 @@ export function ManagerBonusDashboard() {
     [workflowItems],
   );
   const contextRecords = useMemo(() => {
-    if (!workflowLoaded) {
-      return [];
+    let records = screen.records;
+
+    if (roleKey === "gerente_area") {
+      records = records.filter((record) =>
+        managerRecordMatchesAreaScope(record, actorScope, context),
+      );
     }
 
-    let records = screen.records.filter((record) => workflowById.has(record.id));
     const branchName = context?.branchName;
     const managerName = context?.managerName;
 
@@ -2303,12 +2363,18 @@ export function ManagerBonusDashboard() {
 
     return records;
   }, [
-    context?.branchName,
-    context?.managerName,
+    actorScope,
+    context,
+    roleKey,
     screen.records,
-    workflowById,
-    workflowLoaded,
   ]);
+  const visibleMetrics = useMemo(
+    () =>
+      roleKey === "gerente_area"
+        ? buildManagerBonusMetrics(contextRecords)
+        : screen.metrics,
+    [contextRecords, roleKey, screen.metrics],
+  );
   const filteredRecords = useMemo(
     () =>
       contextRecords.filter(
@@ -2353,9 +2419,16 @@ export function ManagerBonusDashboard() {
     <section className="flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-3">
-          <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
-            Entorno DEMO
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="w-fit bg-amber-100 text-amber-800 hover:bg-amber-100">
+              Entorno DEMO
+            </Badge>
+            {roleKey === "gerente_area" ? (
+              <Badge className="w-fit bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                Solo mi area
+              </Badge>
+            ) : null}
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-md border bg-card">
               <UsersRound className="size-5 text-primary" />
@@ -2371,7 +2444,12 @@ export function ManagerBonusDashboard() {
             {screen.description}
           </p>
         </div>
-        <ScopeCard context={context} lineSlug={lineSlug} />
+        <ScopeCard
+          actorScope={actorScope}
+          context={context}
+          lineSlug={lineSlug}
+          roleKey={roleKey}
+        />
       </div>
 
       {!workflowLoaded ? (
@@ -2408,7 +2486,7 @@ export function ManagerBonusDashboard() {
             children: (
               <>
                 <ExecutiveManagerPerformanceTable records={filteredRecords} />
-                <GroupedMetrics metrics={screen.metrics} />
+                <GroupedMetrics metrics={visibleMetrics} />
                 <BonusBacktestPanel backtest={backtest} />
                 <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
                   <WeightModel weights={screen.weights} />

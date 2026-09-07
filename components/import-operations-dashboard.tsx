@@ -33,7 +33,6 @@ import { ReadableTabs } from "@/components/readable-tabs";
 import {
   bulkImportDocuments,
   buildCsvTemplate,
-  buildImportCoverageSummary,
   connectorPlans,
   getConnectorsForLine,
   getDocumentsForLine,
@@ -52,6 +51,7 @@ import {
   demoRoleProfiles,
   type RoleKey,
 } from "@/lib/tenant/demo-context";
+import type { ScopeBoundary } from "@/lib/tenant/delegation-policy";
 import { cn } from "@/lib/utils";
 
 const storageKey = "analiza:selected-context";
@@ -70,6 +70,7 @@ type StoredContext = {
   branchId?: string;
   branchName?: string;
   operationalAreaId?: string;
+  operationalAreaName?: string;
   period?: string;
   periodStart?: string;
   periodEnd?: string;
@@ -145,6 +146,7 @@ type ImportLineFilter = ImportBusinessLine | typeof allLines;
 type StatusFilter = BulkImportStatus | typeof allStatuses;
 type FrequencyFilter = ImportFrequency | typeof allFrequencies;
 type ImportOperationsDashboardProps = {
+  actorScope?: ScopeBoundary;
   isDemoEnvironment?: boolean;
   roleKey?: RoleKey;
 };
@@ -190,6 +192,18 @@ const lineColors: Record<ImportBusinessLine, string> = {
   Fisioterapia: "bg-emerald-600",
   Imagenes: "bg-sky-600",
   Laboratorio: "bg-indigo-600",
+};
+
+const operationalImportLines: ImportBusinessLine[] = [
+  "Laboratorio",
+  "Fisioterapia",
+  "Imagenes",
+];
+
+const lineByDemoCompanyId: Record<string, ImportBusinessLine> = {
+  "40000000-0000-4000-8000-000000000001": "Fisioterapia",
+  "40000000-0000-4000-8000-000000000002": "Laboratorio",
+  "40000000-0000-4000-8000-000000000003": "Imagenes",
 };
 
 const importOperationsRoles = new Set<RoleKey>([
@@ -254,13 +268,11 @@ function readStoredContext() {
   }
 }
 
-function resolveLineFromContext(context: StoredContext | null): ImportLineFilter {
-  const lineText = [
-    context?.businessLineId,
-    context?.businessLineName,
-    context?.companyName,
-  ]
-    .filter(Boolean)
+function resolveLineFromText(
+  ...values: Array<string | null | undefined>
+): ImportBusinessLine | null {
+  const lineText = values
+    .filter((value): value is string => Boolean(value))
     .join(" ")
     .toLowerCase();
 
@@ -276,7 +288,78 @@ function resolveLineFromContext(context: StoredContext | null): ImportLineFilter
     return "Imagenes";
   }
 
-  return allLines;
+  return null;
+}
+
+function resolveLineFromCompanyId(companyId?: string | null) {
+  return companyId ? lineByDemoCompanyId[companyId] ?? null : null;
+}
+
+function resolveLineFromContext(context: StoredContext | null): ImportLineFilter {
+  return (
+    resolveLineFromCompanyId(context?.companyId) ??
+    resolveLineFromText(
+      context?.businessLineId,
+      context?.businessLineName,
+      context?.companyName,
+      context?.operationalAreaName,
+    ) ??
+    allLines
+  );
+}
+
+function resolveAreaManagerLine(
+  actorScope: ScopeBoundary | undefined,
+  context: StoredContext | null,
+) {
+  return (
+    resolveLineFromCompanyId(actorScope?.companyId) ??
+    resolveLineFromText(
+      actorScope?.companyName,
+      actorScope?.operationalAreaName,
+      context?.businessLineId,
+      context?.businessLineName,
+      context?.companyName,
+      context?.operationalAreaName,
+    ) ??
+    resolveLineFromCompanyId(context?.companyId)
+  );
+}
+
+function getLineOptionsForRole({
+  actorScope,
+  context,
+  roleKey,
+}: {
+  actorScope?: ScopeBoundary;
+  context: StoredContext | null;
+  roleKey?: RoleKey;
+}) {
+  if (roleKey !== "gerente_area") {
+    return [...importBusinessLines];
+  }
+
+  const areaManagerLine = resolveAreaManagerLine(actorScope, context);
+
+  return areaManagerLine && operationalImportLines.includes(areaManagerLine)
+    ? [areaManagerLine]
+    : [];
+}
+
+function normalizeLineSelection(
+  selectedLine: ImportLineFilter,
+  lineOptions: ImportBusinessLine[],
+  showAllLineOption: boolean,
+): ImportLineFilter {
+  if (showAllLineOption && selectedLine === allLines) {
+    return allLines;
+  }
+
+  if (selectedLine !== allLines && lineOptions.includes(selectedLine)) {
+    return selectedLine;
+  }
+
+  return lineOptions[0] ?? allLines;
 }
 
 function formatPeriod(context: StoredContext | null) {
@@ -289,6 +372,23 @@ function formatPeriod(context: StoredContext | null) {
   }
 
   return "Rango pendiente";
+}
+
+function isAllScopeLabel(value?: string | null) {
+  const normalizedValue = value
+    ?.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+  return Boolean(
+    normalizedValue === "all" ||
+      normalizedValue?.includes("todas las sucursales") ||
+      normalizedValue?.includes("todas las areas") ||
+      normalizedValue?.startsWith("todas mis ") ||
+      normalizedValue?.startsWith("todos los "),
+  );
 }
 
 function statusClass(status: BulkImportStatus | ConnectorStatus) {
@@ -341,6 +441,59 @@ function getDisplayStatus(
   return statusOverrides[importDocument.id] ?? importDocument.status;
 }
 
+function getScopedDocumentsForLine(
+  line: ImportLineFilter,
+  includeConsolidated: boolean,
+) {
+  const documents = getDocumentsForLine(line);
+
+  return includeConsolidated
+    ? documents
+    : documents.filter((document) => document.businessLine !== "Consolidado");
+}
+
+function getScopedConnectorsForLine(
+  line: ImportLineFilter,
+  includeConsolidated: boolean,
+) {
+  const connectors = getConnectorsForLine(line);
+
+  return includeConsolidated
+    ? connectors
+    : connectors.filter((connector) => connector.businessLine !== "Consolidado");
+}
+
+function isBatchRunVisibleForScope({
+  batchRunLine,
+  includeConsolidated,
+  lineOptions,
+  selectedLine,
+  showAllLineOption,
+}: {
+  batchRunLine: ImportBusinessLine;
+  includeConsolidated: boolean;
+  lineOptions: ImportBusinessLine[];
+  selectedLine: ImportLineFilter;
+  showAllLineOption: boolean;
+}) {
+  if (!includeConsolidated && batchRunLine === "Consolidado") {
+    return false;
+  }
+
+  if (showAllLineOption && selectedLine === allLines) {
+    return lineOptions.includes(batchRunLine);
+  }
+
+  if (selectedLine !== allLines) {
+    return (
+      batchRunLine === selectedLine ||
+      (includeConsolidated && batchRunLine === "Consolidado")
+    );
+  }
+
+  return lineOptions.includes(batchRunLine);
+}
+
 function MetricCard({
   icon: Icon,
   label,
@@ -365,12 +518,37 @@ function MetricCard({
 }
 
 function ScopeCard({
+  actorScope,
   context,
+  roleKey,
   selectedLine,
 }: {
+  actorScope?: ScopeBoundary;
   context: StoredContext | null;
+  roleKey?: RoleKey;
   selectedLine: ImportLineFilter;
 }) {
+  const contextBranchName = isAllScopeLabel(context?.branchName)
+    ? null
+    : context?.branchName;
+  const actorBranchName = isAllScopeLabel(actorScope?.branchName)
+    ? null
+    : actorScope?.branchName;
+  const contextOperationalAreaName = isAllScopeLabel(context?.operationalAreaName)
+    ? null
+    : context?.operationalAreaName;
+  const actorOperationalAreaName = isAllScopeLabel(actorScope?.operationalAreaName)
+    ? null
+    : actorScope?.operationalAreaName;
+  const assignedScopeLabel =
+    contextBranchName ??
+    actorBranchName ??
+    contextOperationalAreaName ??
+    actorOperationalAreaName ??
+    (roleKey === "gerente_area" && actorScope?.operationalAreaId
+      ? "Area asignada"
+      : "Todas las sucursales");
+
   return (
     <aside className="rounded-md border bg-card p-4 text-sm">
       <div className="mb-2 flex items-center gap-2 font-medium">
@@ -378,9 +556,9 @@ function ScopeCard({
         Filtro de importacion
       </div>
       <div className="grid gap-1 text-muted-foreground">
-        <span>{context?.countryName ?? "Vista regional"}</span>
-        <span>{context?.companyName ?? "Vista consolidada"}</span>
-        <span>{context?.branchName ?? "Todas las sucursales"}</span>
+        <span>{context?.countryName ?? actorScope?.countryName ?? "Vista regional"}</span>
+        <span>{context?.companyName ?? actorScope?.companyName ?? "Vista consolidada"}</span>
+        <span>{assignedScopeLabel}</span>
         <span>Linea activa: {selectedLine}</span>
         <span>Periodo: {formatPeriod(context)}</span>
       </div>
@@ -389,12 +567,16 @@ function ScopeCard({
 }
 
 function CoverageByLine({
+  includeConsolidated,
+  lines,
   statusOverrides,
 }: {
+  includeConsolidated: boolean;
+  lines: ImportBusinessLine[];
   statusOverrides: Record<string, BulkImportStatus>;
 }) {
-  const lineSummaries = importBusinessLines.map((line) => {
-    const documents = getDocumentsForLine(line);
+  const lineSummaries = lines.map((line) => {
+    const documents = getScopedDocumentsForLine(line, includeConsolidated);
     const total = documents.length;
     const completed = documents.filter((importDocument) =>
       ["Validado", "Importado"].includes(
@@ -429,28 +611,34 @@ function CoverageByLine({
         </p>
       </div>
       <div className="grid gap-4">
-        {lineSummaries.map((summary) => (
-          <div className="grid gap-2" key={summary.line}>
-            <div className="flex items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2 font-medium">
-                <span
-                  className={cn("size-2 rounded-full", lineColors[summary.line])}
-                />
-                {summary.line}
+        {lineSummaries.length > 0 ? (
+          lineSummaries.map((summary) => (
+            <div className="grid gap-2" key={summary.line}>
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 font-medium">
+                  <span
+                    className={cn("size-2 rounded-full", lineColors[summary.line])}
+                  />
+                  {summary.line}
+                </div>
+                <span className="text-muted-foreground">
+                  {summary.completed}/{summary.total} listos
+                  {summary.errors > 0 ? `, ${summary.errors} con errores` : ""}
+                </span>
               </div>
-              <span className="text-muted-foreground">
-                {summary.completed}/{summary.total} listos
-                {summary.errors > 0 ? `, ${summary.errors} con errores` : ""}
-              </span>
+              <div className="h-3 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={cn("h-full rounded-full", lineColors[summary.line])}
+                  style={{ width: `${summary.completion}%` }}
+                />
+              </div>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-muted">
-              <div
-                className={cn("h-full rounded-full", lineColors[summary.line])}
-                style={{ width: `${summary.completion}%` }}
-              />
-            </div>
+          ))
+        ) : (
+          <div className="rounded-md border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
+            No hay linea operativa autorizada para este alcance.
           </div>
-        ))}
+        )}
       </div>
     </section>
   );
@@ -458,17 +646,21 @@ function CoverageByLine({
 
 function ImportFilters({
   frequencyFilter,
+  lineOptions,
   selectedLine,
   setFrequencyFilter,
   setSelectedLine,
   setStatusFilter,
+  showAllLineOption,
   statusFilter,
 }: {
   frequencyFilter: FrequencyFilter;
+  lineOptions: ImportBusinessLine[];
   selectedLine: ImportLineFilter;
   setFrequencyFilter: (value: FrequencyFilter) => void;
   setSelectedLine: (value: ImportLineFilter) => void;
   setStatusFilter: (value: StatusFilter) => void;
+  showAllLineOption: boolean;
   statusFilter: StatusFilter;
 }) {
   return (
@@ -481,9 +673,15 @@ function ImportFilters({
             setSelectedLine(event.target.value as ImportLineFilter)
           }
           value={selectedLine}
+          disabled={!showAllLineOption && lineOptions.length <= 1}
         >
-          <option value={allLines}>Todas las lineas</option>
-          {importBusinessLines.map((line) => (
+          {showAllLineOption ? (
+            <option value={allLines}>Todas las lineas</option>
+          ) : null}
+          {lineOptions.length === 0 ? (
+            <option value={allLines}>Sin linea autorizada</option>
+          ) : null}
+          {lineOptions.map((line) => (
             <option key={line} value={line}>
               {line}
             </option>
@@ -954,16 +1152,20 @@ function OfficialMonthlyClosureForm({
 }
 
 function MonthlyFormEntry({
+  actorScope,
   isDemoEnvironment,
   roleKey,
   selectedLine,
 }: {
+  actorScope?: ScopeBoundary;
   isDemoEnvironment: boolean;
   roleKey?: RoleKey;
   selectedLine: ImportLineFilter;
 }) {
-  if (isDemoEnvironment) {
-    return <ManualMonthlyEntryDashboard roleKey={roleKey} />;
+  if (isDemoEnvironment || roleKey === "gerente_area") {
+    return (
+      <ManualMonthlyEntryDashboard actorScope={actorScope} roleKey={roleKey} />
+    );
   }
 
   return <OfficialMonthlyClosureForm selectedLine={selectedLine} />;
@@ -999,10 +1201,18 @@ function BulkUploadPanel({
   onRollback: (importDocument: BulkImportDocument) => void;
   onSelectDocument: (importDocument: BulkImportDocument) => void;
   onValidate: (importDocument: BulkImportDocument) => void;
-  selectedDocument: BulkImportDocument;
+  selectedDocument: BulkImportDocument | null;
   selectedFileName: string;
   statusOverrides: Record<string, BulkImportStatus>;
 }) {
+  if (documents.length === 0 || !selectedDocument) {
+    return (
+      <section className="rounded-md border border-dashed bg-card p-6 text-sm text-muted-foreground">
+        No hay documentos de importacion autorizados para este alcance.
+      </section>
+    );
+  }
+
   return (
     <section className="grid gap-4 xl:grid-cols-[1fr_480px]">
       <div className="grid gap-3">
@@ -1165,7 +1375,11 @@ function PipelineSection() {
   );
 }
 
-function BatchHistorySection() {
+function BatchHistorySection({
+  batchRuns,
+}: {
+  batchRuns: typeof importBatchRuns;
+}) {
   return (
     <section className="rounded-md border bg-card p-4">
       <div className="mb-4 flex items-center gap-2 text-sm font-medium">
@@ -1173,45 +1387,51 @@ function BatchHistorySection() {
         Historial reciente DEMO
       </div>
       <div className="grid gap-3 md:hidden">
-        {importBatchRuns.map((batchRun) => (
-          <article
-            className="grid gap-3 rounded-md border bg-background p-3 text-sm"
-            key={`${batchRun.id}-mobile`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-medium">{batchRun.documentName}</div>
-                <div className="text-xs text-muted-foreground">
-                  {batchRun.businessLine} · {batchRun.period}
+        {batchRuns.length > 0 ? (
+          batchRuns.map((batchRun) => (
+            <article
+              className="grid gap-3 rounded-md border bg-background p-3 text-sm"
+              key={`${batchRun.id}-mobile`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-medium">{batchRun.documentName}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {batchRun.businessLine} · {batchRun.period}
+                  </div>
                 </div>
+                <Badge className={statusClass(batchRun.status)}>
+                  {batchRun.status}
+                </Badge>
               </div>
-              <Badge className={statusClass(batchRun.status)}>
-                {batchRun.status}
-              </Badge>
-            </div>
-            <dl className="grid gap-2 text-xs text-muted-foreground">
-              <div className="flex items-center justify-between gap-3">
-                <dt>Responsable</dt>
-                <dd>{batchRun.owner}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt>Calidad</dt>
-                <dd>{batchRun.qualityScore}%</dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt>Publica en</dt>
-                <dd>
-                  {batchRun.publishedModules.length > 0
-                    ? batchRun.publishedModules.join(", ")
-                    : "No publicado"}
-                </dd>
-              </div>
-            </dl>
-            <p className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
-              {batchRun.traceability}
-            </p>
-          </article>
-        ))}
+              <dl className="grid gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between gap-3">
+                  <dt>Responsable</dt>
+                  <dd>{batchRun.owner}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt>Calidad</dt>
+                  <dd>{batchRun.qualityScore}%</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt>Publica en</dt>
+                  <dd>
+                    {batchRun.publishedModules.length > 0
+                      ? batchRun.publishedModules.join(", ")
+                      : "No publicado"}
+                  </dd>
+                </div>
+              </dl>
+              <p className="rounded-md bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+                {batchRun.traceability}
+              </p>
+            </article>
+          ))
+        ) : (
+          <div className="rounded-md border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
+            No hay historial autorizado para este alcance.
+          </div>
+        )}
       </div>
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[920px] text-left text-sm">
@@ -1227,30 +1447,41 @@ function BatchHistorySection() {
             </tr>
           </thead>
           <tbody>
-            {importBatchRuns.map((batchRun) => (
-              <tr className="border-b last:border-b-0" key={batchRun.id}>
-                <td className="py-3 pr-4">
-                  <div className="font-medium">{batchRun.documentName}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {batchRun.traceability}
-                  </div>
-                </td>
-                <td className="py-3 pr-4">{batchRun.businessLine}</td>
-                <td className="py-3 pr-4">{batchRun.period}</td>
-                <td className="py-3 pr-4">{batchRun.owner}</td>
-                <td className="py-3 pr-4">
-                  <Badge className={statusClass(batchRun.status)}>
-                    {batchRun.status}
-                  </Badge>
-                </td>
-                <td className="py-3 pr-4">{batchRun.qualityScore}%</td>
-                <td className="py-3 pr-4 text-muted-foreground">
-                  {batchRun.publishedModules.length > 0
-                    ? batchRun.publishedModules.join(", ")
-                    : "No publicado"}
+            {batchRuns.length > 0 ? (
+              batchRuns.map((batchRun) => (
+                <tr className="border-b last:border-b-0" key={batchRun.id}>
+                  <td className="py-3 pr-4">
+                    <div className="font-medium">{batchRun.documentName}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {batchRun.traceability}
+                    </div>
+                  </td>
+                  <td className="py-3 pr-4">{batchRun.businessLine}</td>
+                  <td className="py-3 pr-4">{batchRun.period}</td>
+                  <td className="py-3 pr-4">{batchRun.owner}</td>
+                  <td className="py-3 pr-4">
+                    <Badge className={statusClass(batchRun.status)}>
+                      {batchRun.status}
+                    </Badge>
+                  </td>
+                  <td className="py-3 pr-4">{batchRun.qualityScore}%</td>
+                  <td className="py-3 pr-4 text-muted-foreground">
+                    {batchRun.publishedModules.length > 0
+                      ? batchRun.publishedModules.join(", ")
+                      : "No publicado"}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td
+                  className="py-6 text-sm text-muted-foreground"
+                  colSpan={7}
+                >
+                  No hay historial autorizado para este alcance.
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
@@ -1297,6 +1528,7 @@ function GovernanceSection() {
 }
 
 export function ImportOperationsDashboard({
+  actorScope,
   isDemoEnvironment = false,
   roleKey,
 }: ImportOperationsDashboardProps = {}) {
@@ -1326,6 +1558,20 @@ export function ImportOperationsDashboard({
   const [notice, setNotice] = useState(
     "El formulario mensual es la via manual principal. Excel queda como respaldo para migraciones o correcciones especiales.",
   );
+  const allowedLineOptions = useMemo(
+    () =>
+      getLineOptionsForRole({
+        actorScope,
+        context,
+        roleKey,
+      }),
+    [actorScope, context, roleKey],
+  );
+  const showAllLineOption =
+    roleKey !== "gerente_area" && allowedLineOptions.length > 1;
+  const includeConsolidatedImports = roleKey !== "gerente_area";
+  const hasScopedImportAccess =
+    roleKey !== "gerente_area" || allowedLineOptions.length > 0;
 
   useEffect(() => {
     function refreshContext() {
@@ -1344,9 +1590,22 @@ export function ImportOperationsDashboard({
     };
   }, []);
 
+  useEffect(() => {
+    setSelectedLine((currentLine) =>
+      normalizeLineSelection(
+        currentLine,
+        allowedLineOptions,
+        showAllLineOption,
+      ),
+    );
+  }, [allowedLineOptions, showAllLineOption]);
+
   const documentsForLine = useMemo(
-    () => getDocumentsForLine(selectedLine),
-    [selectedLine],
+    () =>
+      hasScopedImportAccess
+        ? getScopedDocumentsForLine(selectedLine, includeConsolidatedImports)
+        : [],
+    [hasScopedImportAccess, includeConsolidatedImports, selectedLine],
   );
   const filteredDocuments = useMemo(
     () =>
@@ -1363,11 +1622,36 @@ export function ImportOperationsDashboard({
     [documentsForLine, frequencyFilter, statusFilter, statusOverrides],
   );
   const connectors = useMemo(
-    () => getConnectorsForLine(selectedLine),
-    [selectedLine],
+    () =>
+      hasScopedImportAccess
+        ? getScopedConnectorsForLine(selectedLine, includeConsolidatedImports)
+        : [],
+    [hasScopedImportAccess, includeConsolidatedImports, selectedLine],
   );
+  const visibleBatchRuns = useMemo(
+    () =>
+      hasScopedImportAccess
+        ? importBatchRuns.filter((batchRun) =>
+            isBatchRunVisibleForScope({
+              batchRunLine: batchRun.businessLine,
+              includeConsolidated: includeConsolidatedImports,
+              lineOptions: allowedLineOptions,
+              selectedLine,
+              showAllLineOption,
+            }),
+          )
+        : [],
+    [
+      allowedLineOptions,
+      hasScopedImportAccess,
+      includeConsolidatedImports,
+      selectedLine,
+      showAllLineOption,
+    ],
+  );
+  const areaManagerImportView = roleKey === "gerente_area";
   const canUseImportOperations =
-    !roleKey || importOperationsRoles.has(roleKey);
+    (!roleKey || importOperationsRoles.has(roleKey)) && !areaManagerImportView;
   const showConnectorTab =
     !roleKey || connectorAdminRoles.has(roleKey);
   const roleBadgeLabel = roleKey
@@ -1395,18 +1679,38 @@ export function ImportOperationsDashboard({
         (importDocument) => importDocument.id === selectedDocumentId,
       ) ??
       documentsForLine[0] ??
-      bulkImportDocuments[0],
+      null,
     [documentsForLine, filteredDocuments, selectedDocumentId],
   );
 
   const visibleDocuments =
     filteredDocuments.length > 0 ? filteredDocuments : documentsForLine;
-  const selectedFileName = selectedFileByDocument[selectedDocument.id] ?? "";
-  const latestServerResult = serverResultByDocument[selectedDocument.id] ?? null;
-  const selectedLineage = lineageByDocument[selectedDocument.id] ?? null;
-  const baseSummary = buildImportCoverageSummary(selectedLine);
+  const selectedFileName = selectedDocument
+    ? selectedFileByDocument[selectedDocument.id] ?? ""
+    : "";
+  const latestServerResult = selectedDocument
+    ? serverResultByDocument[selectedDocument.id] ?? null
+    : null;
+  const selectedLineage = selectedDocument
+    ? lineageByDocument[selectedDocument.id] ?? null
+    : null;
+  const requiredDocuments = documentsForLine.filter(
+    (importDocument) => importDocument.required,
+  );
+  const nextDueAt =
+    documentsForLine
+      .map((importDocument) => importDocument.nextDueAt)
+      .sort((left, right) => left.localeCompare(right))[0] ?? "Sin fecha";
   const currentSummary = {
-    ...baseSummary,
+    errorDocuments: documentsForLine.filter(
+      (importDocument) =>
+        getDisplayStatus(importDocument, statusOverrides) === "Con errores",
+    ).length,
+    line: selectedLine,
+    nextDueAt,
+    pendingConnectors: connectors.filter(
+      (connector) => connector.status !== "Conectado DEMO",
+    ).length,
     pendingRequired: documentsForLine.filter((importDocument) => {
       const status = getDisplayStatus(importDocument, statusOverrides);
       return (
@@ -1416,12 +1720,29 @@ export function ImportOperationsDashboard({
         )
       );
     }).length,
+    requiredDocuments: requiredDocuments.length,
+    totalDocuments: documentsForLine.length,
     validatedOrImported: documentsForLine.filter((importDocument) =>
       ["Validado", "Importado"].includes(
         getDisplayStatus(importDocument, statusOverrides),
       ),
     ).length,
   };
+  const monthlyFormContent = hasScopedImportAccess ? (
+    <MonthlyFormEntry
+      actorScope={actorScope}
+      isDemoEnvironment={isDemoEnvironment}
+      roleKey={roleKey}
+      selectedLine={selectedLine}
+    />
+  ) : (
+    <section className="rounded-md border border-dashed bg-card p-6 text-sm text-muted-foreground">
+      No hay linea operativa autorizada para este alcance.
+    </section>
+  );
+  const description = areaManagerImportView
+    ? "Formulario mensual para cargar la informacion operativa de las sucursales asignadas a su area."
+    : "Centro para mantener Analiza actualizado: formulario de importaciones por linea de negocio, validacion, historial, auditoria y respaldo por documento cuando sea necesario.";
 
   function downloadTemplate(importDocument: BulkImportDocument) {
     const blob = new Blob([buildCsvTemplate(importDocument)], {
@@ -1488,15 +1809,22 @@ export function ImportOperationsDashboard({
     formData.set("dataset_type", datasetType);
     formData.set("period", context?.periodStart?.slice(0, 7) ?? "2026-07");
     formData.set("source_id", importDocument.id);
-    formData.set("country_id", context?.countryId ?? "");
-    formData.set("country_name", context?.countryName ?? "El Salvador");
-    formData.set("company_id", context?.companyId ?? "");
-    formData.set("company_name", context?.companyName ?? "");
+    formData.set("country_id", context?.countryId ?? actorScope?.countryId ?? "");
+    formData.set(
+      "country_name",
+      context?.countryName ?? actorScope?.countryName ?? "El Salvador",
+    );
+    formData.set("company_id", context?.companyId ?? actorScope?.companyId ?? "");
+    formData.set("company_name", context?.companyName ?? actorScope?.companyName ?? "");
     formData.set("business_line_id", context?.businessLineId ?? "");
     formData.set("business_line_name", context?.businessLineName ?? selectedLine);
     formData.set("branch_id", context?.branchId ?? "");
     formData.set("branch_name", context?.branchName ?? "");
-    formData.set("operational_area_id", context?.operationalAreaId ?? "");
+    formData.set(
+      "operational_area_id",
+      context?.operationalAreaId ?? actorScope?.operationalAreaId ?? "",
+    );
+    formData.set("organization_id", actorScope?.organizationId ?? "");
 
     return formData;
   }
@@ -1705,15 +2033,21 @@ export function ImportOperationsDashboard({
               Importaciones operativas
             </h1>
             <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
-              Centro para mantener Analiza actualizado: formulario de
-              importaciones por linea de negocio, validacion, historial,
-              auditoria y respaldo por documento cuando sea necesario.
+              {description}
             </p>
           </div>
         </div>
-        <ScopeCard context={context} selectedLine={selectedLine} />
+        <ScopeCard
+          actorScope={actorScope}
+          context={context}
+          roleKey={roleKey}
+          selectedLine={selectedLine}
+        />
       </div>
 
+      {areaManagerImportView ? (
+        monthlyFormContent
+      ) : (
       <ReadableTabs
         activeTabId={activeSection}
         onTabChange={setActiveSection}
@@ -1722,13 +2056,7 @@ export function ImportOperationsDashboard({
             id: "formulario-importaciones",
             label: "Formulario de importaciones",
             description: "Entrada principal que alimenta KPIs por sucursal.",
-            children: (
-              <MonthlyFormEntry
-                isDemoEnvironment={isDemoEnvironment}
-                roleKey={roleKey}
-                selectedLine={selectedLine}
-              />
-            ),
+            children: monthlyFormContent,
           },
           ...(canUseImportOperations
             ? [
@@ -1774,7 +2102,11 @@ export function ImportOperationsDashboard({
                           value={`${currentSummary.errorDocuments}`}
                         />
                       </div>
-                      <CoverageByLine statusOverrides={statusOverrides} />
+                      <CoverageByLine
+                        includeConsolidated={includeConsolidatedImports}
+                        lines={allowedLineOptions}
+                        statusOverrides={statusOverrides}
+                      />
                     </>
                   ),
                 },
@@ -1786,10 +2118,12 @@ export function ImportOperationsDashboard({
                     <>
                       <ImportFilters
                         frequencyFilter={frequencyFilter}
+                        lineOptions={allowedLineOptions}
                         selectedLine={selectedLine}
                         setFrequencyFilter={setFrequencyFilter}
                         setSelectedLine={setSelectedLine}
                         setStatusFilter={setStatusFilter}
+                        showAllLineOption={showAllLineOption}
                         statusFilter={statusFilter}
                       />
                       <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
@@ -1849,7 +2183,7 @@ export function ImportOperationsDashboard({
                   children: (
                     <>
                       <PipelineSection />
-                      <BatchHistorySection />
+                      <BatchHistorySection batchRuns={visibleBatchRuns} />
                       <GovernanceSection />
                     </>
                   ),
@@ -1858,6 +2192,7 @@ export function ImportOperationsDashboard({
             : []),
         ]}
       />
+      )}
     </section>
   );
 }

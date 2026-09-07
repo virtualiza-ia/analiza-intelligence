@@ -100,20 +100,41 @@ assert(
   "Import operations must render official monthly closure forms outside DEMO.",
 );
 assert(
-  importDashboard.includes("<ManualMonthlyEntryDashboard roleKey={roleKey} />"),
-  "Import operations must keep the manual monthly dashboard only as the DEMO fallback.",
+  importDashboard.includes('isDemoEnvironment || roleKey === "gerente_area"') &&
+    importDashboard.includes("<ManualMonthlyEntryDashboard") &&
+    importDashboard.includes("actorScope={actorScope}"),
+  "Import operations must keep the manual monthly dashboard for DEMO and area manager imports.",
+);
+assert(
+  importDashboard.includes("actorScope?: ScopeBoundary") &&
+    importDashboard.includes('roleKey !== "gerente_area"') &&
+    importDashboard.includes("getLineOptionsForRole") &&
+    importDashboard.includes("includeConsolidatedImports = roleKey !== \"gerente_area\"") &&
+    importDashboard.includes("isAllScopeLabel") &&
+    importDashboard.includes("areaManagerImportView") &&
+    importDashboard.includes("&& !areaManagerImportView") &&
+    importDashboard.includes("monthlyFormContent") &&
+    importDashboard.includes("No hay linea operativa autorizada para este alcance."),
+  "Import operations must limit area managers to their assigned line and hide central import operations.",
 );
 assert(
   component.includes("type ManualMonthlyEntryDashboardProps") &&
-    component.includes("roleKey ?? readActiveDemoRole()"),
-  "Manual monthly fallback must use the server role when it is provided.",
+    component.includes("actorScope?: ScopeBoundary") &&
+    component.includes("roleKey ?? readActiveDemoRole()") &&
+    component.includes("branchMatchesAreaScope") &&
+    component.includes('activeRole === "gerente_area"'),
+  "Manual monthly fallback must use server role and area scope when provided.",
 );
 assert(
   modulePage.includes('module === "importaciones"') &&
     modulePage.includes("ImportOperationsDashboard") &&
+    modulePage.includes("actorScope={actor.scope}") &&
+    modulePage.includes("ManagerBonusDashboard") &&
+    modulePage.includes("BranchNetworkDashboard") &&
+    modulePage.includes('actor.roleKey === "gerente_area"') &&
     modulePage.includes('module === "plantillas"') &&
     modulePage.includes("MonthlyClosureRouter"),
-  "Importaciones must render the import dashboard while Plantillas keeps the monthly router.",
+  "Importaciones must render the import dashboard while area managers keep rich Gerentes and Sucursales dashboards.",
 );
 assert(
   newClosurePage.includes('from "next/navigation"') &&

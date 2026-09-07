@@ -108,6 +108,10 @@ for (const requiredDashboardText of [
   "Ajustar",
   "Rechazar",
   "No ejecuta pagos",
+  "managerRecordMatchesAreaScope",
+  "buildManagerBonusMetrics(contextRecords)",
+  'roleKey === "gerente_area"',
+  "Solo mi area",
 ]) {
   assert.ok(
     dashboard.includes(requiredDashboardText),

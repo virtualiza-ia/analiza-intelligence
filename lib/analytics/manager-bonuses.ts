@@ -96,6 +96,7 @@ export type ManagerBonusRecord = {
   id: string;
   manager: string;
   managerRole: ManagerRole;
+  areaManager: string;
   branch: string;
   branchCode: string;
   period: string;
@@ -992,6 +993,7 @@ function buildManagerBonusRecord(
     id: `${managerRole === "Gerente de Area" ? "area-manager" : "branch-manager"}-${record.id}`,
     manager: record.manager,
     managerRole,
+    areaManager: record.areaManager,
     branch: record.branch,
     branchCode: record.id,
     branchesInScope: scopeRecords.map((scopeRecord) => scopeRecord.branch),
@@ -1177,7 +1179,9 @@ export const allManagerBonusRecords: ManagerBonusRecord[] = [
   ...buildAreaManagerBonusRecords(),
 ];
 
-function buildMetrics(records: ManagerBonusRecord[]): ManagerBonusMetric[] {
+export function buildManagerBonusMetrics(
+  records: ManagerBonusRecord[],
+): ManagerBonusMetric[] {
   const active = records.length;
   const evaluated = records.filter((record) => record.status !== "Sin datos suficientes").length;
   const pending = active - evaluated;
@@ -1357,7 +1361,7 @@ export function getManagerBonusScreen(slug: BusinessLineSlug): ManagerBonusScree
     rule:
       "Regla: el sistema recomienda el bono mensual como bono base del gerente por cumplimiento de meta de su sucursal o portafolio; no paga automaticamente y no reemplaza aprobacion humana.",
     weights: managerBonusWeightsByLine[slug],
-    metrics: buildMetrics(records),
+    metrics: buildManagerBonusMetrics(records),
     records,
     executiveInsights: [
       "El monto recomendado se calcula con bono base por nivel y cumplimiento de meta; el puntaje controla elegibilidad, revision y riesgos.",
