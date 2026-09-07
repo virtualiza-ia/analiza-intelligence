@@ -126,6 +126,13 @@ assert(
   "Manual monthly fallback must use server role and area scope when provided.",
 );
 assert(
+  component.includes("showLoadControlPanel") &&
+    component.includes('activeRole !== "gerente_area"') &&
+    component.includes("Carga mensual por sucursal") &&
+    component.includes("Excel operativo"),
+  "Area manager imports must hide load-control surfaces and only describe the authorized monthly Excel load.",
+);
+assert(
   modulePage.includes('module === "importaciones"') &&
     modulePage.includes("ImportOperationsDashboard") &&
     modulePage.includes("actorScope={actor.scope}") &&

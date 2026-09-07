@@ -1482,6 +1482,8 @@ export function ManualMonthlyEntryDashboard({
       }),
     [automaticQualityAlerts, requiredMissing.length],
   );
+  const areaManagerImportMode = activeRole === "gerente_area";
+  const showLoadControlPanel = activeRole !== "gerente_area";
   const lockAssignedScope = activeRole === "gerente_sucursal";
 
   function updateField(fieldId: string, value: string) {
@@ -1684,13 +1686,19 @@ export function ManualMonthlyEntryDashboard({
 
           <aside className={cn("rounded-md border p-4", tone.soft, tone.border)}>
             <div className={cn("mb-3 flex items-center gap-2 font-medium", tone.text)}>
-              <DatabaseZap className="size-4" />
-              Manual ahora, fuente automatica despues
+              {areaManagerImportMode ? (
+                <FileSpreadsheet className="size-4" />
+              ) : (
+                <DatabaseZap className="size-4" />
+              )}
+              {areaManagerImportMode
+                ? "Carga mensual por sucursal"
+                : "Manual ahora, fuente automatica despues"}
             </div>
             <p className="text-sm leading-6 text-muted-foreground">
-              El mismo mapa de datos servira para CRM, agenda, facturacion,
-              inventario o ERP cuando exista una fuente automatica aprobada por
-              administracion.
+              {areaManagerImportMode
+                ? "Registra unicamente la informacion mensual autorizada para las sucursales del area, incluyendo la carga de doctores y el Excel operativo."
+                : "El mismo mapa de datos servira para CRM, agenda, facturacion, inventario o ERP cuando exista una fuente automatica aprobada por administracion."}
             </p>
           </aside>
         </div>
@@ -1903,23 +1911,25 @@ export function ManualMonthlyEntryDashboard({
               </div>
             </section>
 
-            <section className="grid gap-3 rounded-md border bg-card p-4">
-              <div className="flex items-center gap-2 font-medium">
-                <CalendarClock className="size-4 text-primary" />
-                Control de carga
-              </div>
-              <div className="grid gap-2 text-sm leading-6 text-muted-foreground">
-                <span>Deadline: {deadlineDate}</span>
-                <span>Estado: {currentDeadlineStatus}</span>
-                <span>
-                  Penalizacion:{" "}
-                  {currentDeadlineStatus === "Tarde DEMO"
-                    ? "impacta puntaje y bono"
-                    : "sin penalizacion"}
-                </span>
-                <span>{branchGroupCount || 0} sucursales bajo esta gerencia.</span>
-              </div>
-            </section>
+            {showLoadControlPanel ? (
+              <section className="grid gap-3 rounded-md border bg-card p-4">
+                <div className="flex items-center gap-2 font-medium">
+                  <CalendarClock className="size-4 text-primary" />
+                  Control de carga
+                </div>
+                <div className="grid gap-2 text-sm leading-6 text-muted-foreground">
+                  <span>Deadline: {deadlineDate}</span>
+                  <span>Estado: {currentDeadlineStatus}</span>
+                  <span>
+                    Penalizacion:{" "}
+                    {currentDeadlineStatus === "Tarde DEMO"
+                      ? "impacta puntaje y bono"
+                      : "sin penalizacion"}
+                  </span>
+                  <span>{branchGroupCount || 0} sucursales bajo esta gerencia.</span>
+                </div>
+              </section>
+            ) : null}
 
             <section className="grid gap-3 rounded-md border bg-card p-4">
               <div className="flex items-center gap-2 font-medium">
