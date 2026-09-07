@@ -500,7 +500,7 @@ function ManagerFiltersPanel({
             >
               {field.options.map((option) => (
                 <option key={option} value={option}>
-                  {field.key === "bonusState"
+                  {field.key === "bonusState" && option !== allOption
                     ? bonusStateLabel(option as BonusState)
                     : option}
                 </option>
@@ -2348,13 +2348,13 @@ export function ManagerBonusDashboard({
     const branchName = context?.branchName;
     const managerName = context?.managerName;
 
-    if (branchName && !/^Todas/i.test(branchName)) {
+    if (branchName && !isAllScopeLabel(branchName)) {
       records = records.filter((record) => record.branch === branchName);
     }
 
     if (
       managerName &&
-      managerName !== "Todos los gerentes" &&
+      !isAllScopeLabel(managerName) &&
       !/^Gerencia operaciones/i.test(managerName) &&
       managerName !== "Gerentes sucursales SV"
     ) {

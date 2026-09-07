@@ -110,6 +110,8 @@ for (const requiredDashboardText of [
   "No ejecuta pagos",
   "managerRecordMatchesAreaScope",
   "buildManagerBonusMetrics(contextRecords)",
+  "option !== allOption",
+  "!isAllScopeLabel(managerName)",
   'roleKey === "gerente_area"',
   "Solo mi area",
 ]) {
