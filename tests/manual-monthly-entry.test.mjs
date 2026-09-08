@@ -14,6 +14,25 @@ function assert(condition, message) {
   }
 }
 
+function fieldBlock(source, fieldId) {
+  const start = source.indexOf(`id: "${fieldId}"`);
+  assert(start >= 0, `Field ${fieldId} must exist.`);
+  const end = source.indexOf("\n      },", start);
+
+  return source.slice(start, end > start ? end : undefined);
+}
+
+function assertFieldContains(source, fieldId, snippets) {
+  const block = fieldBlock(source, fieldId);
+
+  for (const snippet of snippets) {
+    assert(
+      block.includes(snippet),
+      `Field ${fieldId} must include ${snippet}.`,
+    );
+  }
+}
+
 const componentPath = "components/manual-monthly-entry-dashboard.tsx";
 const component = readWorkspaceFile(componentPath);
 const importDashboard = readWorkspaceFile(
@@ -181,28 +200,114 @@ assert(
     importOperations.includes("team_feedback_score"),
   "Manual monthly form must include area manager, deadline, and 360 evaluation fields.",
 );
-for (const requiredLabField of [
+const requiredLabDataFields = [
+  "period",
+  "branch_reported",
+  "manager_name",
+  "area_manager_name",
+  "area_zone",
+  "data_cutoff_date",
+  "load_deadline_date",
   "lab_financial_target",
   "lab_total_sales",
   "lab_cost_of_sale",
   "lab_medical_order_sales",
   "lab_medical_order_count",
+  "lab_analiza_patient_sales",
+  "lab_analiza_order_count",
+  "lab_drsv_patient_sales",
+  "lab_drsv_order_count",
+  "lab_home_visit_sales",
+  "lab_home_visit_count",
   "lab_total_orders",
   "lab_total_clients",
   "lab_analiza_clients",
   "lab_drsv_clients",
   "lab_rent_expense",
   "lab_personnel_expense",
+  "lab_social_security_expense",
+  "lab_energy_expense",
+  "lab_water_expense",
+  "lab_internet_expense",
+  "lab_petty_cash_expense",
+  "lab_electronic_security_expense",
+  "lab_transae_expense",
+  "lab_municipality_expense",
+  "lab_call_center_operating_costs",
+  "lab_company_operating_costs",
   "lab_phlebotomists_count",
-  "inventory_consumables_amount",
+  "lab_customer_service_count",
+  "lab_nurses_count",
+  "lab_technical_area_count",
+  "lab_cleaning_security_count",
   "inventory_reactives_quantity",
+  "inventory_reactives_amount",
+  "inventory_consumables_quantity",
+  "inventory_consumables_amount",
+  "inventory_supplies_quantity",
+  "inventory_supplies_amount",
+];
+assert(
+  requiredLabDataFields.length === 45,
+  "Laboratorio form must define exactly 45 required data fields.",
+);
+for (const requiredLabField of requiredLabDataFields) {
+  assertFieldContains(importOperations, requiredLabField, ["required: true"]);
+}
+for (const requiredLabText of [
+  "Archivos y publicacion",
+  "Adjunta minimo 1 y maximo 2 archivos",
+  "campos obligatorios al 100%",
+  "version guardada",
+  "al menos un Excel/CSV",
+  "sin archivos bloqueados",
   "medical_exam_sales_file",
+  "lab_supporting_evidence_file",
+  "change_reason",
+  "requiredForPublish: true",
+  "Cierre inicial",
+  "Correccion de datos",
+  "Actualizacion de costos",
+  "Actualizacion de evidencia",
+  "Revision solicitada",
+  "Reapertura autorizada",
+  "Comunicacion interna",
+  "Servicio al cliente",
+  "Procesos y tiempos",
+  "Carga de trabajo",
+  "Capacitacion",
+  "Liderazgo",
+  "Sin hallazgos relevantes",
+  "Sin accion adicional",
+  "Reconocimiento al equipo",
 ]) {
   assert(
-    importOperations.includes(requiredLabField),
-    `Laboratorio form must include template field ${requiredLabField}.`,
+    importOperations.includes(requiredLabText),
+    `Laboratorio form must include publication or 360 text: ${requiredLabText}.`,
   );
 }
+assertFieldContains(importOperations, "medical_exam_sales_file", [
+  "required: false",
+  "requiredForPublish: true",
+  'accept: ".xlsx,.xls,.csv"',
+]);
+assertFieldContains(importOperations, "lab_supporting_evidence_file", [
+  "required: false",
+  'accept: ".pdf,.doc,.docx,.png,.jpg,.jpeg,.xlsx,.xls,.csv"',
+]);
+assertFieldContains(importOperations, "change_reason", [
+  'inputType: "select"',
+  "required: false",
+  "requiredForPublish: true",
+]);
+assert(
+  component.includes("getLabPublishBlockers") &&
+    component.includes("isSpreadsheetFileName") &&
+    component.includes("savedDraftSignature") &&
+    component.includes("requiredFields.length") &&
+    component.includes("1-2 adjuntos validos y al menos un Excel/CSV"),
+  "Manual monthly dashboard must enforce Laboratorio publish conditions separately from the 45 required data fields.",
+);
 for (const retiredLabField of [
   "lab_unique_clients",
   "lab_new_clients",

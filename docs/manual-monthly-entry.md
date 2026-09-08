@@ -20,7 +20,10 @@ La via manual principal para que una sucursal actualice Analiza Intelligence es 
 - Laboratorio captura personal de la sucursal, como flebotomistas, atencion al cliente, enfermeras, area tecnica y limpieza/vigilantes, para que productividad y bonos no dependan de texto fijo del dashboard.
 - El cierre de Laboratorio incluye cantidad y monto de consumibles, insumos y reactivos. AnaliA compara esos montos contra ingreso, ordenes, costos e historico antes de tratarlos como confiables.
 - La calidad ya no se captura como un score manual. AnaliA calcula el score con completitud, coherencia, archivos cargados, montos sospechosos, sucursal, periodo, duplicados y trazabilidad.
-- El Excel comercial de examenes medicos y montos vendidos se carga como una sola fuente de apoyo con columnas Fecha, Sucursal, Doctor, Examen, Especialidad, Area, Total y Visitador.
+- El paso final de Laboratorio es Archivos y publicacion: permite minimo 1 y maximo 2 adjuntos. Para publicar debe existir al menos un Excel o CSV; el segundo archivo puede ser evidencia PDF, Word o imagen permitida.
+- El Excel/CSV comercial de examenes medicos y montos vendidos debe incluir Fecha, Sucursal, Doctor, Examen, Especialidad, Area, Total y Visitador.
+- Laboratorio mantiene 45 campos obligatorios de datos antes de publicar: contexto, financiero, datos generales, base de clientes, gastos, personal e inventario. Archivos, motivo y version guardada son condiciones de publicacion separadas.
+- El motivo de cambio de Laboratorio se selecciona desde opciones controladas: cierre inicial, correccion de datos, actualizacion de costos, actualizacion de evidencia, revision solicitada o reapertura autorizada.
 - La evaluacion 360 se realizara por correo o formulario anonimo; sus resultados llenan automaticamente score, tema cualitativo y accion sugerida.
 - La pantalla muestra un bloque Year to date para revisar acumulado 2026 por linea y sucursal seleccionada. Si la sucursal no tiene datos, no se debe rellenar con otras sucursales.
 - Cada registro conserva historial por linea, sucursal, periodo, fuente, estado y marca `DEMO`.

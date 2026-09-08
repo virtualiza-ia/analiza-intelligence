@@ -114,6 +114,7 @@ export type ManualMonthlyFormInputType =
   | "month"
   | "number"
   | "percent"
+  | "select"
   | "text";
 
 export type ManualMonthlyFormField = {
@@ -125,8 +126,11 @@ export type ManualMonthlyFormField = {
   required: boolean;
   placeholder: string;
   appliesTo: ImportBusinessLine[];
+  accept?: string;
   min?: number;
   max?: number;
+  options?: string[];
+  requiredForPublish?: boolean;
 };
 
 export type ManualMonthlyFormStep = {
@@ -1240,7 +1244,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
     fields: [
       {
         id: "lab_financial_target",
-        label: "Meta",
+        label: "Meta mensual",
         description: "Meta mensual aprobada para la sucursal.",
         inputType: "currency",
         unit: "USD",
@@ -1251,7 +1255,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "lab_total_sales",
-        label: "Venta Total",
+        label: "Venta total",
         description: "Venta total reportada en la plantilla mensual.",
         inputType: "currency",
         unit: "USD",
@@ -1262,7 +1266,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "lab_cost_of_sale",
-        label: "Costo de la Venta",
+        label: "Costo de la venta",
         description: "Costo de venta del periodo.",
         inputType: "currency",
         unit: "USD",
@@ -1568,7 +1572,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
     fields: [
       {
         id: "lab_total_clients",
-        label: "Cantidad de Clientes Totales",
+        label: "Cantidad de clientes totales",
         description: "Total de clientes atendidos durante el mes.",
         inputType: "number",
         unit: "clientes",
@@ -1579,7 +1583,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "lab_analiza_clients",
-        label: "Cantidad de Clientes (Analiza)",
+        label: "Cantidad de clientes Analiza",
         description: "Clientes clasificados como Analiza en el periodo.",
         inputType: "number",
         unit: "clientes",
@@ -1590,7 +1594,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "lab_drsv_clients",
-        label: "Cantidad de Clientes (DRSV)",
+        label: "Cantidad de clientes DRSV",
         description: "Clientes clasificados como DRSV en el periodo.",
         inputType: "number",
         unit: "clientes",
@@ -1611,7 +1615,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
     fields: [
       {
         id: "lab_rent_expense",
-        label: "Renta Local",
+        label: "Renta local",
         description: "Gasto mensual de renta de local.",
         inputType: "currency",
         unit: "USD",
@@ -1633,7 +1637,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "lab_social_security_expense",
-        label: "ISSS/AFP Patronal",
+        label: "ISSS/AFP patronal",
         description: "Gasto patronal reportado para el mes.",
         inputType: "currency",
         unit: "USD",
@@ -1677,7 +1681,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "lab_petty_cash_expense",
-        label: "Caja Chica",
+        label: "Caja chica",
         description: "Monto usado de caja chica durante el mes.",
         inputType: "currency",
         unit: "USD",
@@ -1688,7 +1692,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "lab_electronic_security_expense",
-        label: "Seguridad Electronica",
+        label: "Seguridad electronica",
         description: "Gasto mensual de seguridad electronica.",
         inputType: "currency",
         unit: "USD",
@@ -1721,7 +1725,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "lab_call_center_operating_costs",
-        label: "Gastos y costos Operativos CC",
+        label: "Gastos y costos operativos CC",
         description: "Gastos y costos operativos asociados a call center.",
         inputType: "currency",
         unit: "USD",
@@ -1732,7 +1736,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "lab_company_operating_costs",
-        label: "Gastos y costos Operativos empresas",
+        label: "Gastos y costos operativos empresas",
         description: "Gastos y costos operativos asignados por empresas.",
         inputType: "currency",
         unit: "USD",
@@ -1786,7 +1790,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "lab_technical_area_count",
-        label: "Area Tecnica",
+        label: "Area tecnica",
         description: "Cantidad de personas asignadas al area tecnica.",
         inputType: "number",
         unit: "personas",
@@ -1797,7 +1801,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "lab_cleaning_security_count",
-        label: "Limpieza / Vigilantes",
+        label: "Limpieza / vigilantes",
         description: "Cantidad de personas en limpieza o vigilancia.",
         inputType: "number",
         unit: "personas",
@@ -1818,7 +1822,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
     fields: [
       {
         id: "inventory_consumables_amount",
-        label: "Monto Consumibles",
+        label: "Monto consumibles",
         description: "Monto mensual asociado a consumibles.",
         inputType: "currency",
         unit: "USD",
@@ -1829,7 +1833,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "inventory_supplies_amount",
-        label: "Monto Insumos",
+        label: "Monto insumos",
         description: "Monto mensual asociado a insumos.",
         inputType: "currency",
         unit: "USD",
@@ -1840,7 +1844,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "inventory_reactives_amount",
-        label: "Monto Reactivos",
+        label: "Monto reactivos",
         description:
           "Monto mensual asociado a reactivos. AnaliA lo comparara contra venta, ordenes y costo de venta.",
         inputType: "currency",
@@ -1852,7 +1856,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "inventory_consumables_quantity",
-        label: "Cantidad Consumibles",
+        label: "Cantidad consumibles",
         description: "Cantidad de consumibles reportados en el cierre.",
         inputType: "number",
         unit: "unidades",
@@ -1863,7 +1867,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "inventory_supplies_quantity",
-        label: "Cantidad Insumos",
+        label: "Cantidad insumos",
         description: "Cantidad de insumos reportados en el cierre.",
         inputType: "number",
         unit: "unidades",
@@ -1874,7 +1878,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
       },
       {
         id: "inventory_reactives_quantity",
-        label: "Cantidad Reactivos",
+        label: "Cantidad reactivos",
         description: "Cantidad de reactivos reportados en el cierre.",
         inputType: "number",
         unit: "unidades",
@@ -1983,7 +1987,7 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
     fields: [
       {
         id: "team_feedback_score",
-        label: "Puntaje 360 del equipo automatico",
+        label: "Score 360 del equipo automatico",
         description:
           "Promedio anonimo de confianza, claridad, seguimiento y apoyo del gerente recibido por correo.",
         inputType: "percent",
@@ -1999,43 +2003,94 @@ export const manualMonthlyFormSteps: ManualMonthlyFormStep[] = [
         label: "Tema cualitativo automatico",
         description:
           "Resumen anonimo del tema mas repetido por el equipo este mes.",
-        inputType: "text",
-        unit: "texto",
+        inputType: "select",
+        unit: "tema",
         required: false,
-        placeholder: "Ej. comunicacion, seguimiento, carga de trabajo",
+        placeholder: "Sin hallazgos relevantes",
         appliesTo: manualOperationalLines,
+        options: [
+          "Comunicacion interna",
+          "Servicio al cliente",
+          "Procesos y tiempos",
+          "Carga de trabajo",
+          "Capacitacion",
+          "Liderazgo",
+          "Sin hallazgos relevantes",
+        ],
       },
       {
         id: "team_feedback_action",
         label: "Accion sugerida por evaluacion",
         description:
           "Accion sugerida a partir de las respuestas anonimas.",
-        inputType: "text",
-        unit: "texto",
+        inputType: "select",
+        unit: "accion",
         required: false,
-        placeholder: "Ej. reunion semanal de bloqueo operativo",
+        placeholder: "Sin accion adicional",
         appliesTo: manualOperationalLines,
+        options: [
+          "Sin accion adicional",
+          "Capacitacion del equipo",
+          "Ajuste de proceso",
+          "Seguimiento individual",
+          "Reasignacion de recursos",
+          "Reconocimiento al equipo",
+        ],
       },
     ],
   },
   {
     id: "calidad-validacion",
-    title: "Excel y montos vendidos",
+    title: "Archivos y publicacion",
     description:
-      "Carga el reporte comercial de examenes medicos y montos vendidos.",
+      "Adjunta minimo 1 y maximo 2 archivos. Para publicar, al menos uno debe ser Excel o CSV.",
     ownerNote:
-      "El archivo esperado contiene Fecha, Sucursal, Doctor, Examen, Especialidad, Area, Total y Visitador.",
+      "Condiciones para publicar: campos obligatorios al 100%, version guardada, 1-2 adjuntos validos, al menos un Excel/CSV y sin archivos bloqueados.",
     fields: [
       {
         id: "medical_exam_sales_file",
-        label: "Reporte examen medico y montos vendidos",
+        label: "Adjunto Excel/CSV principal",
         description:
-          "Sube el Excel mensual con fecha, sucursal, doctor, examen, especialidad, area, total vendido y visitador.",
+          "Sube el reporte mensual de examenes medicos y montos vendidos. Debe ser Excel o CSV.",
         inputType: "file",
-        unit: ".xlsx",
-        required: true,
-        placeholder: "Selecciona Reporte_examen_medico_monto.xlsx",
+        unit: ".xlsx, .xls, .csv",
+        required: false,
+        requiredForPublish: true,
+        placeholder: "Selecciona Reporte_examen_medico_monto.xlsx o .csv",
+        accept: ".xlsx,.xls,.csv",
         appliesTo: ["Laboratorio"],
+      },
+      {
+        id: "lab_supporting_evidence_file",
+        label: "Adjunto de evidencia opcional",
+        description:
+          "Segundo archivo opcional: PDF, Word, imagen u otro formato permitido para respaldo del cierre.",
+        inputType: "file",
+        unit: ".pdf, .doc, .docx, .png, .jpg, .xlsx, .csv",
+        required: false,
+        placeholder: "Selecciona evidencia adicional",
+        accept: ".pdf,.doc,.docx,.png,.jpg,.jpeg,.xlsx,.xls,.csv",
+        appliesTo: ["Laboratorio"],
+      },
+      {
+        id: "change_reason",
+        label: "Motivo del cambio",
+        description:
+          "Motivo usado para crear, corregir, actualizar evidencia o documentar una reapertura autorizada.",
+        inputType: "select",
+        unit: "motivo",
+        required: false,
+        requiredForPublish: true,
+        placeholder: "Selecciona motivo",
+        appliesTo: ["Laboratorio"],
+        options: [
+          "Cierre inicial",
+          "Correccion de datos",
+          "Actualizacion de costos",
+          "Actualizacion de evidencia",
+          "Revision solicitada",
+          "Reapertura autorizada",
+        ],
       },
       {
         id: "late_reason",

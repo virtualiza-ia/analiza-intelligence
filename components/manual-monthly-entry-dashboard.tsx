@@ -699,6 +699,117 @@ function fieldInputStep(field: ManualMonthlyFormField) {
   return undefined;
 }
 
+const labSpreadsheetFileExtensions = [".xlsx", ".xls", ".csv"];
+const labEvidenceFileExtensions = [
+  ...labSpreadsheetFileExtensions,
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".png",
+  ".jpg",
+  ".jpeg",
+];
+
+function getFileExtension(fileName: string) {
+  const normalizedFileName = fileName.trim().toLowerCase();
+  const extensionIndex = normalizedFileName.lastIndexOf(".");
+
+  return extensionIndex >= 0 ? normalizedFileName.slice(extensionIndex) : "";
+}
+
+function isAllowedFileName(fileName: string, allowedExtensions: string[]) {
+  const extension = getFileExtension(fileName);
+
+  return Boolean(extension) && allowedExtensions.includes(extension);
+}
+
+function isSpreadsheetFileName(fileName: string) {
+  return isAllowedFileName(fileName, labSpreadsheetFileExtensions);
+}
+
+function getLabAttachedFileNames(values: Record<string, string>) {
+  return [
+    values.medical_exam_sales_file,
+    values.lab_supporting_evidence_file,
+  ].filter((fileName): fileName is string => Boolean(fileName?.trim()));
+}
+
+function getBlockedLabFileNames(values: Record<string, string>) {
+  return [
+    {
+      allowedExtensions: labSpreadsheetFileExtensions,
+      fileName: values.medical_exam_sales_file,
+    },
+    {
+      allowedExtensions: labEvidenceFileExtensions,
+      fileName: values.lab_supporting_evidence_file,
+    },
+  ]
+    .filter((file): file is { allowedExtensions: string[]; fileName: string } =>
+      Boolean(file.fileName?.trim()),
+    )
+    .filter((file) => !isAllowedFileName(file.fileName, file.allowedExtensions))
+    .map((file) => file.fileName);
+}
+
+function getLabPublishBlockers({
+  draftIsSaved,
+  requiredMissingCount,
+  values,
+}: {
+  draftIsSaved: boolean;
+  requiredMissingCount: number;
+  values: Record<string, string>;
+}) {
+  const blockers: string[] = [];
+  const attachedFileNames = getLabAttachedFileNames(values);
+  const blockedFileNames = getBlockedLabFileNames(values);
+
+  if (requiredMissingCount > 0) {
+    blockers.push(
+      `Faltan ${requiredMissingCount} campos obligatorios antes de publicar el cierre.`,
+    );
+  }
+
+  if (!draftIsSaved) {
+    blockers.push("Guarda la version del cierre antes de publicar.");
+  }
+
+  if (attachedFileNames.length < 1) {
+    blockers.push("Adjunta minimo 1 archivo antes de publicar.");
+  }
+
+  if (attachedFileNames.length > 2) {
+    blockers.push("Adjunta maximo 2 archivos por cierre.");
+  }
+
+  if (!attachedFileNames.some(isSpreadsheetFileName)) {
+    blockers.push("Adjunta al menos un archivo Excel o CSV.");
+  }
+
+  if (blockedFileNames.length > 0) {
+    blockers.push(`Archivo no permitido: ${blockedFileNames.join(", ")}.`);
+  }
+
+  if (!values.change_reason?.trim()) {
+    blockers.push("Selecciona el motivo del cambio antes de publicar.");
+  }
+
+  return blockers;
+}
+
+function buildFormSignature(
+  line: ImportBusinessLine,
+  values: Record<string, string>,
+) {
+  return JSON.stringify({
+    line,
+    values: Object.entries(values).sort(([leftKey], [rightKey]) =>
+      leftKey.localeCompare(rightKey),
+    ),
+  });
+}
+
 function normalizeBranchText(value: string) {
   return value
     .normalize("NFD")
@@ -787,6 +898,8 @@ function getAutomaticQualityAlerts({
       numberFromValue(values.reactive_cost);
     const consumablesAmount = numberFromValue(values.inventory_consumables_amount);
     const suppliesAmount = numberFromValue(values.inventory_supplies_amount);
+    const attachedFileNames = getLabAttachedFileNames(values);
+    const blockedFileNames = getBlockedLabFileNames(values);
 
     if (netRevenue > 0 && reactiveCost > netRevenue * 0.22) {
       alerts.push({
@@ -824,12 +937,21 @@ function getAutomaticQualityAlerts({
       });
     }
 
-    if (!values.medical_exam_sales_file?.trim()) {
+    if (!attachedFileNames.some(isSpreadsheetFileName)) {
       alerts.push({
         title: "Falta reporte de examenes y montos",
         reason:
-          "Sin este Excel no se puede validar venta por doctor, examen, sucursal, monto vendido y visitador.",
+          "Sin un Excel o CSV no se puede validar venta por doctor, examen, sucursal, monto vendido y visitador.",
         severity: "media",
+      });
+    }
+
+    if (blockedFileNames.length > 0) {
+      alerts.push({
+        title: "Archivo bloqueado",
+        reason:
+          "Hay un adjunto con formato no permitido para publicacion. Retiralo y carga Excel, CSV, PDF, Word o imagen permitida.",
+        severity: "alta",
       });
     }
   }
@@ -916,8 +1038,12 @@ function ManualField({
   const isBranchSelector = field.id === "branch_reported";
   const isBranchManagerSelector = field.id === "manager_name";
   const isAreaManagerSelector = field.id === "area_manager_name";
+  const isOptionSelector = field.inputType === "select";
   const isSelectField =
-    isBranchSelector || isBranchManagerSelector || isAreaManagerSelector;
+    isBranchSelector ||
+    isBranchManagerSelector ||
+    isAreaManagerSelector ||
+    isOptionSelector;
   const isSystemDateField = ["data_cutoff_date", "load_deadline_date"].includes(
     field.id,
   );
@@ -972,11 +1098,17 @@ function ManualField({
           className={
             field.required
               ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/10"
+              : field.requiredForPublish
+                ? "border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-100"
               : undefined
           }
           variant="outline"
         >
-          {field.required ? "Obligatorio" : "Opcional"}
+          {field.required
+            ? "Obligatorio"
+            : field.requiredForPublish
+              ? "Para publicar"
+              : "Opcional"}
         </Badge>
       </span>
       <span className="min-h-10 text-sm leading-6 text-muted-foreground">
@@ -1023,10 +1155,23 @@ function ManualField({
               : null}
             {areaManagerOptions.map(renderTextOption)}
           </select>
+        ) : isOptionSelector ? (
+          <select
+            className={cn(
+              "h-12 w-full rounded-md border bg-background px-3 text-base outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+              readOnly && "bg-muted text-muted-foreground",
+            )}
+            disabled={readOnly}
+            onChange={(event) => onChange(event.target.value)}
+            value={value}
+          >
+            <option value="">{field.placeholder}</option>
+            {(field.options ?? []).map(renderTextOption)}
+          </select>
         ) : isFile ? (
           <div className="grid gap-2">
             <Input
-              accept=".xlsx,.xls,.csv"
+              accept={field.accept ?? ".xlsx,.xls,.csv"}
               className="h-12 cursor-pointer text-base file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-foreground"
               disabled={readOnly}
               onChange={handleFileChange}
@@ -1310,6 +1455,9 @@ export function ManualMonthlyEntryDashboard({
   );
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [savedDraftSignature, setSavedDraftSignature] = useState<string | null>(
+    null,
+  );
   const [localHistory, setLocalHistory] = useState<LocalManualMonthlySubmission[]>(
     [],
   );
@@ -1388,6 +1536,7 @@ export function ManualMonthlyEntryDashboard({
     setFormValues(
       buildInitialFormValues(activeLine, context, branchOptions, activeRole),
     );
+    setSavedDraftSignature(null);
     setActiveStepIndex(0);
   }, [activeLine, activeRole, branchOptions, context]);
 
@@ -1395,33 +1544,44 @@ export function ManualMonthlyEntryDashboard({
     () => formSteps.flatMap((step) => step.fields),
     [formSteps],
   );
+  const requiredFields = useMemo(
+    () => allFields.filter((field) => field.required),
+    [allFields],
+  );
   const requiredMissing = useMemo(
     () =>
-      allFields.filter(
+      requiredFields.filter(
         (field) => field.required && !formValues[field.id]?.trim(),
       ),
-    [allFields, formValues],
+    [formValues, requiredFields],
   );
   const completionPercent =
-    allFields.length > 0
+    requiredFields.length > 0
       ? Math.round(
-          ((allFields.length - requiredMissing.length) / allFields.length) *
+          ((requiredFields.length - requiredMissing.length) /
+            requiredFields.length) *
             100,
         )
       : 0;
   const currentStep = formSteps[activeStepIndex] ?? formSteps[0];
-  const currentStepMissingCount =
+  const currentStepCompletionFields =
     currentStep?.fields.filter(
-      (field) => field.required && !formValues[field.id]?.trim(),
-    ).length ?? 0;
+      (field) => field.required || field.requiredForPublish,
+    ) ?? [];
+  const currentStepMissingCount =
+    currentStepCompletionFields.filter(
+      (field) =>
+        (field.required || field.requiredForPublish) &&
+        !formValues[field.id]?.trim(),
+    ).length;
   const currentStepCompletionPercent =
-    currentStep && currentStep.fields.length > 0
+    currentStepCompletionFields.length > 0
       ? Math.round(
-          ((currentStep.fields.length - currentStepMissingCount) /
-            currentStep.fields.length) *
+          ((currentStepCompletionFields.length - currentStepMissingCount) /
+            currentStepCompletionFields.length) *
             100,
         )
-      : 0;
+      : 100;
   const canUseManualForm = activeLine !== "Consolidado";
   const historyLine = activeLine === "Consolidado" ? "Todas" : activeLine;
   const demoHistory = useMemo(
@@ -1485,6 +1645,22 @@ export function ManualMonthlyEntryDashboard({
   const areaManagerImportMode = activeRole === "gerente_area";
   const showLoadControlPanel = activeRole !== "gerente_area";
   const lockAssignedScope = activeRole === "gerente_sucursal";
+  const currentFormSignature = useMemo(
+    () => buildFormSignature(activeLine, formValues),
+    [activeLine, formValues],
+  );
+  const draftIsSaved = savedDraftSignature === currentFormSignature;
+  const labPublishBlockers = useMemo(
+    () =>
+      activeLine === "Laboratorio"
+        ? getLabPublishBlockers({
+            draftIsSaved,
+            requiredMissingCount: requiredMissing.length,
+            values: formValues,
+          })
+        : [],
+    [activeLine, draftIsSaved, formValues, requiredMissing.length],
+  );
 
   function updateField(fieldId: string, value: string) {
     setFormValues((currentValue) => {
@@ -1574,11 +1750,18 @@ export function ManualMonthlyEntryDashboard({
       return;
     }
 
-    if (status === "Publicado DEMO" && requiredMissing.length > 0) {
-      setNotice(
-        `Faltan ${requiredMissing.length} campos obligatorios antes de publicar el cierre.`,
-      );
-      return;
+    if (status === "Publicado DEMO") {
+      if (activeLine === "Laboratorio" && labPublishBlockers.length > 0) {
+        setNotice(labPublishBlockers[0] ?? "Completa las condiciones de publicacion.");
+        return;
+      }
+
+      if (activeLine !== "Laboratorio" && requiredMissing.length > 0) {
+        setNotice(
+          `Faltan ${requiredMissing.length} campos obligatorios antes de publicar el cierre.`,
+        );
+        return;
+      }
     }
 
     const submission = buildSubmission(status);
@@ -1610,6 +1793,9 @@ export function ManualMonthlyEntryDashboard({
       ),
     ];
     persistHistory(nextHistory);
+    if (status === "Borrador DEMO") {
+      setSavedDraftSignature(currentFormSignature);
+    }
     setNotice(
       `${submission.status} guardado para ${submission.businessLine}, ${submission.branch}, ${submission.period}. Puntualidad: ${submission.deadlineStatus}.`,
     );
@@ -1746,7 +1932,9 @@ export function ManualMonthlyEntryDashboard({
                 {formSteps.map((step, index) => {
                   const isActiveStep = activeStepIndex === index;
                   const stepMissingCount = step.fields.filter(
-                    (field) => field.required && !formValues[field.id]?.trim(),
+                    (field) =>
+                      (field.required || field.requiredForPublish) &&
+                      !formValues[field.id]?.trim(),
                   ).length;
                   const isCompleteStep = stepMissingCount === 0;
 
@@ -1909,6 +2097,22 @@ export function ManualMonthlyEntryDashboard({
                   <strong>{selectedAreaManagerName ?? "Pendiente de asignar"}</strong>
                 </div>
               </div>
+              {activeLine === "Laboratorio" ? (
+                <div className="mt-3 grid gap-2 rounded-md border bg-background p-3 text-xs leading-5 text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    Estado de publicacion
+                  </span>
+                  {labPublishBlockers.length === 0 ? (
+                    <span className="text-emerald-700">
+                      Listo para publicar.
+                    </span>
+                  ) : (
+                    labPublishBlockers.slice(0, 4).map((blocker) => (
+                      <span key={blocker}>- {blocker}</span>
+                    ))
+                  )}
+                </div>
+              ) : null}
             </section>
 
             {showLoadControlPanel ? (
@@ -1937,10 +2141,21 @@ export function ManualMonthlyEntryDashboard({
                 Reglas clave
               </div>
               <div className="grid gap-2 text-sm leading-6 text-muted-foreground">
-                <span>Sin datos personales de pacientes.</span>
-                <span>Publicar requiere todos los obligatorios.</span>
-                <span>Editar un cierre publicado requiere autorizacion.</span>
-                <span>AnaliA alerta si calidad baja de 70%.</span>
+                {activeLine === "Laboratorio" ? (
+                  <>
+                    <span>{requiredFields.length} campos obligatorios al 100%.</span>
+                    <span>Version guardada antes de publicar.</span>
+                    <span>1-2 adjuntos validos y al menos un Excel/CSV.</span>
+                    <span>Motivo del cambio seleccionado y sin archivos bloqueados.</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sin datos personales de pacientes.</span>
+                    <span>Publicar requiere todos los obligatorios.</span>
+                    <span>Editar un cierre publicado requiere autorizacion.</span>
+                    <span>AnaliA alerta si calidad baja de 70%.</span>
+                  </>
+                )}
               </div>
             </section>
           </aside>
@@ -1951,7 +2166,9 @@ export function ManualMonthlyEntryDashboard({
         <ManualMetricCard
           icon={ClipboardList}
           label="Campos completos"
-          note={`${requiredMissing.length} obligatorios pendientes.`}
+          note={`${
+            requiredFields.length - requiredMissing.length
+          }/${requiredFields.length} obligatorios completos.`}
           value={`${completionPercent}%`}
         />
         <ManualMetricCard
